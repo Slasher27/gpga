@@ -1,0 +1,746 @@
+import initSqlJs from 'sql.js';
+
+let db = null;
+let SQL = null;
+
+// Initialize the database
+export async function initDatabase() {
+  if (db) return db;
+
+  try {
+    // Initialize SQL.js
+    SQL = await initSqlJs({
+      locateFile: file => `https://sql.js.org/dist/${file}`
+    });
+
+    // FORCE RESET - version bump to clear old data
+    const DB_VERSION = '4.5';
+    const savedVersion = localStorage.getItem('gpga_db_version');
+
+    if (savedVersion !== DB_VERSION) {
+      console.log('🔄 Forcing database reset to version', DB_VERSION);
+      localStorage.removeItem('gpga_sqlite_db');
+      localStorage.removeItem('gpga_authenticated');
+      localStorage.removeItem('gpga_current_user');
+      localStorage.setItem('gpga_db_version', DB_VERSION);
+    }
+
+    // Try to load existing database from localStorage
+    const savedDb = localStorage.getItem('gpga_sqlite_db');
+
+    if (savedDb) {
+      // Load existing database
+      const uint8Array = new Uint8Array(JSON.parse(savedDb));
+      db = new SQL.Database(uint8Array);
+      console.log('✅ Loaded existing database from localStorage');
+
+      // Check if schema needs migration
+      const needsMigration = checkSchemaMigration();
+      if (needsMigration) {
+        console.log('⚠️ Old schema detected. Resetting database...');
+        db = new SQL.Database();
+        await runSchema();
+        await runSeed();
+      }
+    } else {
+      // Create new database
+      db = new SQL.Database();
+      console.log('✅ Created new database');
+
+      // Run schema
+      await runSchema();
+
+      // Run seed data
+      await runSeed();
+    }
+
+    // Save database to localStorage whenever it changes
+    setupAutoSave();
+
+    return db;
+  } catch (error) {
+    console.error('Failed to initialize database:', error);
+    throw error;
+  }
+}
+
+// Check if database schema needs migration
+function checkSchemaMigration() {
+  try {
+    // Check if all required tables exist
+    const requiredTables = ['seasons', 'golf_courses', 'fine_types', 'player_fines'];
+
+    for (const tableName of requiredTables) {
+      const result = db.exec(`SELECT name FROM sqlite_master WHERE type='table' AND name='${tableName}'`);
+      if (!result.length || result[0].values.length === 0) {
+        console.log(`⚠️ Missing table: ${tableName}`);
+        return true;
+      }
+    }
+
+    // Check if scores table has new columns (handicap, stableford)
+    const scoresCheck = db.exec("PRAGMA table_info(scores)");
+    if (scoresCheck.length) {
+      const columns = scoresCheck[0].values.map(row => row[1]);
+      if (!columns.includes('handicap') || !columns.includes('stableford')) {
+        console.log('⚠️ Scores table missing new columns');
+        return true;
+      }
+    }
+
+    // Check if rounds table has new columns (course_id, course_name)
+    const roundsCheck = db.exec("PRAGMA table_info(rounds)");
+    if (roundsCheck.length) {
+      const columns = roundsCheck[0].values.map(row => row[1]);
+      if (!columns.includes('course_id') || !columns.includes('course_name')) {
+        console.log('⚠️ Rounds table missing new columns');
+        return true;
+      }
+    }
+
+    return false;
+  } catch (error) {
+    console.log('⚠️ Schema check error:', error.message);
+    return true;
+  }
+}
+
+// Run schema SQL
+async function runSchema() {
+  const schemaSQL = `
+    CREATE TABLE IF NOT EXISTS players (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        email TEXT UNIQUE NOT NULL,
+        password TEXT,
+        role TEXT DEFAULT 'player' CHECK(role IN ('admin', 'player')),
+        status TEXT DEFAULT 'active' CHECK(status IN ('active', 'inactive')),
+        avatar TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS seasons (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        year INTEGER UNIQUE NOT NULL,
+        name TEXT NOT NULL,
+        buy_in_amount INTEGER DEFAULT 0,
+        is_active INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS golf_courses (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        location TEXT NOT NULL,
+        par INTEGER DEFAULT 72,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS rounds (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        season_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        date TEXT NOT NULL,
+        course_id INTEGER NOT NULL,
+        course_name TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (season_id) REFERENCES seasons(id) ON DELETE CASCADE,
+        FOREIGN KEY (course_id) REFERENCES golf_courses(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS scores (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        player_id TEXT NOT NULL,
+        round_id INTEGER NOT NULL,
+        strokes INTEGER DEFAULT 0,
+        handicap INTEGER DEFAULT 0,
+        stableford INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE,
+        FOREIGN KEY (round_id) REFERENCES rounds(id) ON DELETE CASCADE,
+        UNIQUE(player_id, round_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS fine_types (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        season_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        amount INTEGER NOT NULL,
+        description TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (season_id) REFERENCES seasons(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS player_fines (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        player_id TEXT NOT NULL,
+        round_id INTEGER NOT NULL,
+        fine_type_id INTEGER NOT NULL,
+        quantity INTEGER DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE,
+        FOREIGN KEY (round_id) REFERENCES rounds(id) ON DELETE CASCADE,
+        FOREIGN KEY (fine_type_id) REFERENCES fine_types(id) ON DELETE CASCADE,
+        UNIQUE(player_id, round_id, fine_type_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS season_players (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        season_id INTEGER NOT NULL,
+        player_id TEXT NOT NULL,
+        buy_in_paid INTEGER DEFAULT 0,
+        buy_in_date TEXT,
+        FOREIGN KEY (season_id) REFERENCES seasons(id) ON DELETE CASCADE,
+        FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE,
+        UNIQUE(season_id, player_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_scores_player ON scores(player_id);
+    CREATE INDEX IF NOT EXISTS idx_scores_round ON scores(round_id);
+    CREATE INDEX IF NOT EXISTS idx_players_email ON players(email);
+    CREATE INDEX IF NOT EXISTS idx_rounds_date ON rounds(date);
+    CREATE INDEX IF NOT EXISTS idx_rounds_season ON rounds(season_id);
+    CREATE INDEX IF NOT EXISTS idx_fines_player ON player_fines(player_id);
+    CREATE INDEX IF NOT EXISTS idx_fines_round ON player_fines(round_id);
+    CREATE INDEX IF NOT EXISTS idx_season_players ON season_players(season_id, player_id);
+  `;
+
+  db.run(schemaSQL);
+  console.log('✅ Schema created');
+}
+
+// Run seed data
+async function runSeed() {
+  const seedSQL = `
+    INSERT OR IGNORE INTO players (id, name, email, password, role, status, avatar) VALUES
+    ('1', 'Wayne Windt', 'wayne@gpga.com', 'password', 'player', 'active', NULL),
+    ('2', 'Ryan Ambrose', 'ryan.a@gpga.com', 'password', 'player', 'active', NULL),
+    ('3', 'Duwayne Cowney', 'duwayne@gpga.com', 'password', 'admin', 'active', NULL),
+    ('4', 'Ryan Strauss', 'ryan.s@gpga.com', 'password', 'player', 'active', NULL),
+    ('5', 'Justin Fish', 'justin@gpga.com', 'password', 'player', 'active', NULL),
+    ('6', 'Gareth Williams', 'gareth.w@gpga.com', 'password', 'player', 'active', NULL),
+    ('7', 'Gareth Roos', 'gareth.r@gpga.com', 'password', 'player', 'active', NULL),
+    ('8', 'Charl Cordier', 'charl@gpga.com', 'password', 'player', 'active', NULL);
+
+    INSERT OR IGNORE INTO seasons (id, year, name, buy_in_amount, is_active) VALUES
+    (1, 2025, 'GPGA 2025 Season', 500, 1);
+
+    -- Golf Courses in Cape Town, Stellenbosch, and Paarl
+    INSERT OR IGNORE INTO golf_courses (id, name, location, par) VALUES
+    -- Cape Town - Southern Suburbs
+    (1, 'Royal Cape Golf Club', 'Cape Town', 72),
+    (2, 'Rondebosch Golf Club', 'Cape Town', 70),
+    (3, 'Mowbray Golf Club', 'Cape Town', 72),
+    (4, 'King David Mowbray Golf Club', 'Cape Town', 72),
+    (5, 'Westlake Golf Club', 'Cape Town', 72),
+    (6, 'Clovelly Country Club', 'Cape Town', 72),
+    (7, 'Steenberg Golf Club', 'Cape Town', 72),
+    (8, 'Retreat Golf Club', 'Cape Town', 71),
+    -- Cape Town - Northern Suburbs
+    (9, 'Durbanville Golf Club', 'Cape Town', 72),
+    (10, 'Bellville Golf Club', 'Cape Town', 72),
+    (11, 'Parow Golf Club', 'Cape Town', 72),
+    (12, 'Kuils River Golf Club', 'Cape Town', 72),
+    (13, 'Strand Golf Club', 'Cape Town', 72),
+    (14, 'Somerset West Golf Club', 'Cape Town', 72),
+    -- Cape Town - West Coast & Atlantic Seaboard
+    (15, 'Milnerton Golf Club', 'Cape Town', 72),
+    (16, 'Atlantic Beach Golf Club', 'Cape Town', 72),
+    (17, 'Metropolitan Golf Club', 'Cape Town', 72),
+    -- Cape Town - Other
+    (18, 'Silwerstroom Golf Estate', 'Cape Town', 72),
+    (19, 'Fisantekraal Golf Club', 'Cape Town', 72),
+    (20, 'Sunrise Golf Club', 'Cape Town', 71),
+    (21, 'Rocklands Golf Club', 'Cape Town', 72),
+    (22, 'Hermanus Golf Club', 'Hermanus', 72),
+    (23, 'Arabella Golf Club', 'Kleinmond', 72),
+    -- Stellenbosch
+    (24, 'Stellenbosch Golf Club', 'Stellenbosch', 72),
+    (25, 'Erinvale Estate Hotel & Spa', 'Stellenbosch', 72),
+    (26, 'De Zalze Golf Club', 'Stellenbosch', 72),
+    (27, 'Devonvale Golf & Wine Estate', 'Stellenbosch', 72),
+    -- Paarl
+    (28, 'Pearl Valley Golf Estate', 'Paarl', 72),
+    (29, 'Boschenmeer Golf Estate', 'Paarl', 72),
+    (30, 'Paarl Golf Club', 'Paarl', 72);
+
+    INSERT OR IGNORE INTO rounds (id, season_id, name, date, course_id, course_name) VALUES
+    (1, 1, 'Round 1', '2025-01-10', 9, 'Durbanville Golf Club'),
+    (2, 1, 'Round 2', '2025-02-14', 15, 'Milnerton Golf Club'),
+    (3, 1, 'Round 3', '2025-03-10', 6, 'Clovelly Country Club'),
+    (4, 1, 'Round 4', '2025-04-12', 30, 'Paarl Golf Club'),
+    (5, 1, 'Round 5', '2025-05-15', 25, 'Erinvale Estate Hotel & Spa'),
+    (6, 1, 'Round 6', '2025-06-20', 28, 'Pearl Valley Golf Estate');
+
+    INSERT OR IGNORE INTO fine_types (id, season_id, name, amount, description) VALUES
+    (1, 1, 'Late Arrival', 50, 'Arriving late to tee time'),
+    (2, 1, 'Slow Play', 100, 'Holding up the group'),
+    (3, 1, 'Lost Ball', 20, 'Per ball lost'),
+    (4, 1, 'No Show', 200, 'Missing a round without notice'),
+    (5, 1, 'Dress Code Violation', 30, 'Not adhering to dress code');
+
+    INSERT OR IGNORE INTO scores (player_id, round_id, strokes) VALUES
+    ('1', 1, 77), ('1', 2, 71), ('1', 3, 79), ('1', 4, 77), ('1', 5, 71), ('1', 6, 85),
+    ('2', 1, 74), ('2', 2, 77), ('2', 3, 73), ('2', 4, 79), ('2', 5, 79), ('2', 6, 84),
+    ('3', 1, 72), ('3', 2, 73), ('3', 3, 81), ('3', 4, 79), ('3', 5, 70), ('3', 6, 80),
+    ('4', 1, 76), ('4', 2, 69), ('4', 3, 75), ('4', 4, 80), ('4', 5, 73), ('4', 6, 77),
+    ('5', 1, 78), ('5', 2, 76), ('5', 3, 74), ('5', 4, 87), ('5', 5, 80), ('5', 6, 83),
+    ('6', 1, 78), ('6', 2, 77), ('6', 3, 88), ('6', 4, 79), ('6', 5, 75), ('6', 6, 79),
+    ('7', 1, 77), ('7', 2, 72), ('7', 3, 78), ('7', 4, 77), ('7', 5, 74), ('7', 6, 89),
+    ('8', 1, 72);
+
+    INSERT OR IGNORE INTO season_players (season_id, player_id, buy_in_paid, buy_in_date) VALUES
+    (1, '1', 1, '2025-01-05'),
+    (1, '2', 1, '2025-01-06'),
+    (1, '3', 1, '2025-01-05'),
+    (1, '4', 1, '2025-01-07'),
+    (1, '5', 0, NULL),
+    (1, '6', 1, '2025-01-08'),
+    (1, '7', 1, '2025-01-09'),
+    (1, '8', 0, NULL);
+  `;
+
+  db.run(seedSQL);
+  console.log('✅ Seed data inserted');
+}
+
+// Setup auto-save to localStorage
+function setupAutoSave() {
+  // Save immediately
+  saveDatabase();
+}
+
+// Save database to localStorage
+export function saveDatabase() {
+  if (!db) return;
+
+  try {
+    const data = db.export();
+    const buffer = JSON.stringify(Array.from(data));
+    localStorage.setItem('gpga_sqlite_db', buffer);
+  } catch (error) {
+    console.error('Failed to save database:', error);
+  }
+}
+
+// Query helpers
+export function getAllPlayers() {
+  const result = db.exec('SELECT * FROM players ORDER BY name');
+  if (!result.length) return [];
+
+  return result[0].values.map(row => ({
+    id: row[0],
+    name: row[1],
+    email: row[2],
+    password: row[3],
+    role: row[4],
+    status: row[5],
+    avatar: row[6]
+  }));
+}
+
+export function getActiveSeason() {
+  const result = db.exec('SELECT * FROM seasons WHERE is_active = 1 LIMIT 1');
+  if (!result.length) return null;
+
+  const row = result[0].values[0];
+  return {
+    id: row[0],
+    year: row[1],
+    name: row[2],
+    buy_in_amount: row[3],
+    is_active: row[4]
+  };
+}
+
+export function getAllSeasons() {
+  const result = db.exec('SELECT * FROM seasons ORDER BY year DESC');
+  if (!result.length) return [];
+
+  return result[0].values.map(row => ({
+    id: row[0],
+    year: row[1],
+    name: row[2],
+    buy_in_amount: row[3],
+    is_active: row[4]
+  }));
+}
+
+export function getAllRounds(seasonId = null) {
+  let sql = 'SELECT * FROM rounds';
+  let params = [];
+
+  if (seasonId) {
+    sql += ' WHERE season_id = ?';
+    params = [seasonId];
+  }
+
+  sql += ' ORDER BY date';
+
+  const result = db.exec(sql, params);
+  if (!result.length) return [];
+
+  return result[0].values.map(row => ({
+    id: row[0],
+    season_id: row[1],
+    name: row[2],
+    date: row[3],
+    course_id: row[4],
+    course_name: row[5],
+    course: row[5] // Keep for backwards compatibility
+  }));
+}
+
+export function getAllScores() {
+  const result = db.exec('SELECT player_id, round_id, strokes, handicap, stableford FROM scores');
+  if (!result.length) return {};
+
+  const scores = {};
+  result[0].values.forEach(row => {
+    const playerId = row[0];
+    const roundId = row[1];
+    const strokes = row[2];
+    const handicap = row[3] || 0;
+    const stableford = row[4] || 0;
+
+    if (!scores[playerId]) {
+      scores[playerId] = {};
+    }
+    scores[playerId][roundId] = { strokes, handicap, stableford };
+  });
+
+  return scores;
+}
+
+// Get total fines per player per round
+export function getPlayerFinesByRound() {
+  const sql = `
+    SELECT
+      pf.player_id,
+      pf.round_id,
+      SUM(ft.amount * pf.quantity) as total_fines
+    FROM player_fines pf
+    JOIN fine_types ft ON pf.fine_type_id = ft.id
+    GROUP BY pf.player_id, pf.round_id
+  `;
+
+  const result = db.exec(sql);
+  if (!result.length) return {};
+
+  const fines = {};
+  result[0].values.forEach(row => {
+    const playerId = row[0];
+    const roundId = row[1];
+    const totalFines = row[2] || 0;
+
+    if (!fines[playerId]) {
+      fines[playerId] = {};
+    }
+    fines[playerId][roundId] = totalFines;
+  });
+
+  return fines;
+}
+
+export function addPlayer(player) {
+  db.run(
+    'INSERT INTO players (id, name, email, password, role, status, avatar) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [player.id, player.name, player.email, player.password || 'password', player.role, player.status, player.avatar]
+  );
+  saveDatabase();
+}
+
+export function updatePlayer(id, updates) {
+  const fields = [];
+  const values = [];
+
+  if (updates.name !== undefined) { fields.push('name = ?'); values.push(updates.name); }
+  if (updates.avatar !== undefined) { fields.push('avatar = ?'); values.push(updates.avatar); }
+  if (updates.status !== undefined) { fields.push('status = ?'); values.push(updates.status); }
+  if (updates.role !== undefined) { fields.push('role = ?'); values.push(updates.role); }
+  if (updates.email !== undefined) { fields.push('email = ?'); values.push(updates.email); }
+  if (updates.password !== undefined) { fields.push('password = ?'); values.push(updates.password); }
+
+  values.push(id);
+
+  db.run(`UPDATE players SET ${fields.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, values);
+  saveDatabase();
+}
+
+export function deletePlayer(id) {
+  db.run('DELETE FROM players WHERE id = ?', [id]);
+  saveDatabase();
+}
+
+// Golf Courses Management
+export function getAllGolfCourses() {
+  const result = db.exec('SELECT * FROM golf_courses ORDER BY location, name');
+  if (!result.length) return [];
+
+  return result[0].values.map(row => ({
+    id: row[0],
+    name: row[1],
+    location: row[2],
+    par: row[3]
+  }));
+}
+
+export function searchGolfCourses(searchTerm) {
+  const sql = `
+    SELECT * FROM golf_courses
+    WHERE name LIKE ? OR location LIKE ?
+    ORDER BY location, name
+  `;
+  const result = db.exec(sql, [`%${searchTerm}%`, `%${searchTerm}%`]);
+  if (!result.length) return [];
+
+  return result[0].values.map(row => ({
+    id: row[0],
+    name: row[1],
+    location: row[2],
+    par: row[3]
+  }));
+}
+
+export function addRound(round, seasonId) {
+  db.run(
+    'INSERT INTO rounds (season_id, name, date, course_id, course_name) VALUES (?, ?, ?, ?, ?)',
+    [seasonId, round.name, round.date, round.courseId, round.courseName]
+  );
+  saveDatabase();
+
+  // Get the last inserted ID
+  const result = db.exec('SELECT last_insert_rowid()');
+  return result[0].values[0][0];
+}
+
+export function updateRound(id, updates) {
+  const fields = [];
+  const values = [];
+
+  if (updates.name !== undefined) { fields.push('name = ?'); values.push(updates.name); }
+  if (updates.date !== undefined) { fields.push('date = ?'); values.push(updates.date); }
+  if (updates.courseId !== undefined) { fields.push('course_id = ?'); values.push(updates.courseId); }
+  if (updates.courseName !== undefined) { fields.push('course_name = ?'); values.push(updates.courseName); }
+
+  values.push(id);
+
+  db.run(`UPDATE rounds SET ${fields.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, values);
+  saveDatabase();
+}
+
+export function deleteRound(id) {
+  db.run('DELETE FROM rounds WHERE id = ?', [id]);
+  saveDatabase();
+}
+
+export function updateScore(playerId, roundId, strokes, handicap = 0, stableford = 0) {
+  db.run(
+    'INSERT OR REPLACE INTO scores (player_id, round_id, strokes, handicap, stableford) VALUES (?, ?, ?, ?, ?)',
+    [playerId, roundId, strokes, handicap, stableford]
+  );
+  saveDatabase();
+}
+
+// Fine Types Management
+export function getFineTypes(seasonId) {
+  if (!db) {
+    console.warn('Database not initialized in getFineTypes');
+    return [];
+  }
+  const result = db.exec('SELECT * FROM fine_types WHERE season_id = ? ORDER BY name', [seasonId]);
+  if (!result.length) return [];
+
+  return result[0].values.map(row => ({
+    id: row[0],
+    season_id: row[1],
+    name: row[2],
+    amount: row[3],
+    description: row[4]
+  }));
+}
+
+export function addFineType(seasonId, name, amount, description = '') {
+  db.run(
+    'INSERT INTO fine_types (season_id, name, amount, description) VALUES (?, ?, ?, ?)',
+    [seasonId, name, amount, description]
+  );
+  saveDatabase();
+
+  const result = db.exec('SELECT last_insert_rowid()');
+  return result[0].values[0][0];
+}
+
+export function updateFineType(id, updates) {
+  const fields = [];
+  const values = [];
+
+  if (updates.name !== undefined) { fields.push('name = ?'); values.push(updates.name); }
+  if (updates.amount !== undefined) { fields.push('amount = ?'); values.push(updates.amount); }
+  if (updates.description !== undefined) { fields.push('description = ?'); values.push(updates.description); }
+
+  values.push(id);
+
+  db.run(`UPDATE fine_types SET ${fields.join(', ')} WHERE id = ?`, values);
+  saveDatabase();
+}
+
+export function deleteFineType(id) {
+  db.run('DELETE FROM fine_types WHERE id = ?', [id]);
+  saveDatabase();
+}
+
+// Player Fines Management
+export function getPlayerFinesForRound(playerId, roundId) {
+  if (!db) {
+    console.warn('Database not initialized in getPlayerFinesForRound');
+    return [];
+  }
+  const sql = `
+    SELECT
+      pf.id,
+      pf.fine_type_id,
+      ft.name,
+      ft.amount,
+      pf.quantity
+    FROM player_fines pf
+    JOIN fine_types ft ON pf.fine_type_id = ft.id
+    WHERE pf.player_id = ? AND pf.round_id = ?
+  `;
+
+  const result = db.exec(sql, [playerId, roundId]);
+  if (!result.length) return [];
+
+  return result[0].values.map(row => ({
+    id: row[0],
+    fine_type_id: row[1],
+    name: row[2],
+    amount: row[3],
+    quantity: row[4]
+  }));
+}
+
+export function setPlayerFine(playerId, roundId, fineTypeId, quantity) {
+  if (quantity <= 0) {
+    // Remove the fine if quantity is 0 or less
+    db.run(
+      'DELETE FROM player_fines WHERE player_id = ? AND round_id = ? AND fine_type_id = ?',
+      [playerId, roundId, fineTypeId]
+    );
+  } else {
+    // Check if record exists
+    const exists = db.exec(
+      'SELECT id FROM player_fines WHERE player_id = ? AND round_id = ? AND fine_type_id = ?',
+      [playerId, roundId, fineTypeId]
+    );
+
+    if (exists.length && exists[0].values.length > 0) {
+      // Update existing record
+      db.run(
+        'UPDATE player_fines SET quantity = ? WHERE player_id = ? AND round_id = ? AND fine_type_id = ?',
+        [quantity, playerId, roundId, fineTypeId]
+      );
+    } else {
+      // Insert new record
+      db.run(
+        'INSERT INTO player_fines (player_id, round_id, fine_type_id, quantity) VALUES (?, ?, ?, ?)',
+        [playerId, roundId, fineTypeId, quantity]
+      );
+    }
+  }
+  saveDatabase();
+}
+
+export function addPlayerFine(playerId, roundId, fineTypeId) {
+  // Get current quantity
+  const result = db.exec(
+    'SELECT quantity FROM player_fines WHERE player_id = ? AND round_id = ? AND fine_type_id = ?',
+    [playerId, roundId, fineTypeId]
+  );
+
+  const currentQuantity = result.length ? result[0].values[0][0] : 0;
+  setPlayerFine(playerId, roundId, fineTypeId, currentQuantity + 1);
+}
+
+export function removePlayerFine(playerId, roundId, fineTypeId) {
+  // Get current quantity
+  const result = db.exec(
+    'SELECT quantity FROM player_fines WHERE player_id = ? AND round_id = ? AND fine_type_id = ?',
+    [playerId, roundId, fineTypeId]
+  );
+
+  if (!result.length) return;
+
+  const currentQuantity = result[0].values[0][0];
+  setPlayerFine(playerId, roundId, fineTypeId, currentQuantity - 1);
+}
+
+export function resetDatabase() {
+  localStorage.removeItem('gpga_sqlite_db');
+  db.close();
+  db = null;
+  window.location.reload();
+}
+
+export function getCurrentUserId() {
+  return localStorage.getItem('gpga_current_user') || '1';
+}
+
+export function setCurrentUserId(id) {
+  localStorage.setItem('gpga_current_user', id);
+}
+
+// Authentication functions
+export function authenticateUser(email, password) {
+  if (!db) {
+    console.error('Database not initialized');
+    return null;
+  }
+
+  try {
+    // Debug: Check what's in the database
+    const allUsers = db.exec('SELECT id, name, email, password, role, status FROM players');
+    console.log('All users in database:', allUsers);
+    console.log('Attempting login with:', { email, password });
+
+    const result = db.exec(`
+      SELECT id, name, email, role, status
+      FROM players
+      WHERE email = ? AND password = ? AND status = 'active'
+    `, [email, password]);
+
+    console.log('Query result:', result);
+
+    if (result.length > 0 && result[0].values.length > 0) {
+      const user = result[0].values[0];
+      return {
+        id: user[0],
+        name: user[1],
+        email: user[2],
+        role: user[3],
+        status: user[4]
+      };
+    }
+    return null;
+  } catch (error) {
+    console.error('Authentication error:', error);
+    return null;
+  }
+}
+
+export function isAuthenticated() {
+  return localStorage.getItem('gpga_authenticated') === 'true';
+}
+
+export function setAuthenticated(value) {
+  localStorage.setItem('gpga_authenticated', value.toString());
+}
+
+export function logout() {
+  localStorage.removeItem('gpga_authenticated');
+  localStorage.removeItem('gpga_current_user');
+}

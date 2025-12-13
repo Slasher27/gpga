@@ -1,0 +1,149 @@
+import React, { useState } from 'react';
+import { Calendar, ChevronDown } from 'lucide-react';
+import type { DatePickerProps } from '../../types';
+
+export const DatePicker: React.FC<DatePickerProps> = ({ value, onChange, placeholder = 'Select date' }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+
+  const formatDate = (date: Date | null): string => {
+    if (!date) return '';
+    const d = new Date(date);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const formatDisplayDate = (date: string): string => {
+    if (!date) return '';
+    const d = new Date(date);
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+  };
+
+  const getDaysInMonth = (date: Date): (Date | null)[] => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDayOfWeek = firstDay.getDay();
+
+    const days: (Date | null)[] = [];
+    for (let i = 0; i < startingDayOfWeek; i++) {
+      days.push(null);
+    }
+    for (let i = 1; i <= daysInMonth; i++) {
+      days.push(new Date(year, month, i));
+    }
+    return days;
+  };
+
+  const handleDateSelect = (date: Date) => {
+    onChange(formatDate(date));
+    setIsOpen(false);
+  };
+
+  const nextMonth = () => {
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1));
+  };
+
+  const prevMonth = () => {
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1));
+  };
+
+  const isToday = (date: Date | null): boolean => {
+    const today = new Date();
+    return date ? date.toDateString() === today.toDateString() : false;
+  };
+
+  const isSelected = (date: Date | null): boolean => {
+    if (!value || !date) return false;
+    return formatDate(date) === value;
+  };
+
+  const days = getDaysInMonth(currentMonth);
+  const monthName = currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+  return (
+    <div className="relative">
+      <div
+        onClick={() => setIsOpen(!isOpen)}
+        className="input input-bordered w-full flex items-center justify-between cursor-pointer focus-within:input-primary"
+      >
+        <span className={value ? '' : 'opacity-50'}>
+          {value ? formatDisplayDate(value) : placeholder}
+        </span>
+        <Calendar size={18} className="opacity-50" />
+      </div>
+
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)}></div>
+          <div className="absolute z-50 mt-1 p-3 bg-base-100 border border-base-300 rounded-lg shadow-xl w-64">
+            <div className="flex items-center justify-between mb-2">
+              <button
+                type="button"
+                onClick={prevMonth}
+                className="btn btn-ghost btn-xs btn-circle"
+              >
+                <ChevronDown size={14} className="rotate-90" />
+              </button>
+              <div className="font-semibold text-sm">{monthName}</div>
+              <button
+                type="button"
+                onClick={nextMonth}
+                className="btn btn-ghost btn-xs btn-circle"
+              >
+                <ChevronDown size={14} className="-rotate-90" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-7 gap-0.5 mb-1">
+              {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(day => (
+                <div key={day} className="text-center text-[10px] font-semibold opacity-60 py-0.5">
+                  {day}
+                </div>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-7 gap-0.5">
+              {days.map((date, idx) => (
+                <div key={idx}>
+                  {date ? (
+                    <button
+                      type="button"
+                      onClick={() => handleDateSelect(date)}
+                      className={`btn btn-xs w-full h-7 min-h-0 text-xs ${
+                        isSelected(date)
+                          ? 'btn-primary'
+                          : isToday(date)
+                          ? 'btn-outline btn-primary'
+                          : 'btn-ghost'
+                      }`}
+                    >
+                      {date.getDate()}
+                    </button>
+                  ) : (
+                    <div></div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-2 pt-2 border-t border-base-300">
+              <button
+                type="button"
+                onClick={() => handleDateSelect(new Date())}
+                className="btn btn-xs btn-ghost w-full"
+              >
+                Today
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
