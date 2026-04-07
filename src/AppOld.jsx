@@ -1391,19 +1391,19 @@ export default function GPGAManager() {
       <div className="space-y-6 animate-in fade-in duration-500">
         <div className="flex justify-between items-center">
           <div>
-            <h2 className="text-2xl font-bold text-slate-800">Fines Management</h2>
-            <p className="text-slate-500">Track and manage fines for {activeSeason?.year}</p>
+            <h2 className="text-xl font-bold text-slate-800">Fines</h2>
+            <p className="text-sm text-slate-500">{activeSeason?.name || 'Season'}</p>
           </div>
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex gap-2 border-b border-slate-200">
+        <div className="flex border-b border-slate-200 overflow-x-auto scrollbar-hide">
           {/* Admin/Master Only Tabs — hidden for completed seasons */}
           {!isReadOnlySeason && (currentUser.role === 'master' || currentUser.role === 'admin') && (
             <>
               <button
                 onClick={() => setFinesTab('assign')}
-                className={`px-4 py-3 font-medium transition-colors border-b-2 ${
+                className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap min-h-[44px] ${
                   finesTab === 'assign'
                     ? 'border-emerald-600 text-emerald-600'
                     : 'border-transparent text-slate-500 hover:text-slate-700'
@@ -1413,7 +1413,7 @@ export default function GPGAManager() {
               </button>
               <button
                 onClick={() => setFinesTab('types')}
-                className={`px-4 py-3 font-medium transition-colors border-b-2 ${
+                className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap min-h-[44px] ${
                   finesTab === 'types'
                     ? 'border-emerald-600 text-emerald-600'
                     : 'border-transparent text-slate-500 hover:text-slate-700'
@@ -1427,7 +1427,7 @@ export default function GPGAManager() {
           {/* Tabs visible to all roles */}
           <button
             onClick={() => setFinesTab('leaderboard')}
-            className={`px-4 py-3 font-medium transition-colors border-b-2 ${
+            className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap min-h-[44px] ${
               finesTab === 'leaderboard'
                 ? 'border-emerald-600 text-emerald-600'
                 : 'border-transparent text-slate-500 hover:text-slate-700'
@@ -1437,7 +1437,7 @@ export default function GPGAManager() {
           </button>
           <button
             onClick={() => setFinesTab('roundview')}
-            className={`px-4 py-3 font-medium transition-colors border-b-2 ${
+            className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap min-h-[44px] ${
               finesTab === 'roundview'
                 ? 'border-emerald-600 text-emerald-600'
                 : 'border-transparent text-slate-500 hover:text-slate-700'
@@ -1447,7 +1447,7 @@ export default function GPGAManager() {
           </button>
           <button
             onClick={() => setFinesTab('payments')}
-            className={`px-4 py-3 font-medium transition-colors border-b-2 ${
+            className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap min-h-[44px] ${
               finesTab === 'payments'
                 ? 'border-emerald-600 text-emerald-600'
                 : 'border-transparent text-slate-500 hover:text-slate-700'
@@ -3877,7 +3877,7 @@ export default function GPGAManager() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 font-sans">
+    <div className="min-h-screen bg-slate-100 font-sans overflow-x-hidden">
       <DesktopSidebar />
       <MobileNav />
 
