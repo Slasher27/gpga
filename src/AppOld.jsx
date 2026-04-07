@@ -974,384 +974,264 @@ export default function GPGAManager() {
       return leaderboardData;
     }, [leaderboardTab, leaderboardData]);
 
-    return (
-      <div className="space-y-6 animate-in fade-in duration-500">
-        {leaderboardData.length === 0 ? (
-          <NoScoresEmptyState />
-        ) : (
-          <>
-            <div className="flex justify-between items-end">
-              <div>
-                <h2 className="text-2xl font-bold text-slate-800">Season Leaderboard</h2>
-                <p className="text-slate-500">{leaderboardTab === 'medal' ? 'Medal Rankings' : leaderboardTab === 'stableford' ? 'Stableford Rankings' : 'Team Rankings'} • {activeSeason?.name || 'Season'}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-sm text-slate-500">Leader</p>
-                <p className="text-xl font-bold text-emerald-600">{sortedLeaderboard[0]?.name}</p>
-              </div>
-            </div>
+    const stablefordSorted = useMemo(() => {
+      return [...leaderboardData].sort((a, b) => {
+        if (a.isDisqualified && !b.isDisqualified) return 1;
+        if (!a.isDisqualified && b.isDisqualified) return -1;
+        if (a.netStableford === 0 && b.netStableford === 0) return 0;
+        if (a.netStableford === 0) return 1;
+        if (b.netStableford === 0) return -1;
+        return b.netStableford - a.netStableford;
+      });
+    }, [leaderboardData]);
 
-            {/* Leader Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-              {/* Medal Leader */}
-              <Card className="p-4 border-l-4 border-emerald-500">
-                <p className="text-xs text-slate-500 uppercase font-bold mb-3">Medal Leader</p>
-                <div className="flex items-center gap-3">
-                  {leaderboardData[0]?.avatar ? (
-                    <img src={leaderboardData[0].avatar} alt={leaderboardData[0].name} className="w-12 h-12 rounded-full object-cover" />
-                  ) : (
-                    <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-bold text-lg">
-                      {leaderboardData[0]?.name?.charAt(0) || '?'}
-                    </div>
-                  )}
-                  <div>
-                    <p className="font-bold text-slate-800">{leaderboardData[0]?.name || 'N/A'}</p>
-                    <p className="text-2xl font-bold text-emerald-600">{leaderboardData[0]?.netTotal || '-'}</p>
-                  </div>
-                </div>
-              </Card>
+    const finesSorted = useMemo(() =>
+      [...leaderboardData].sort((a, b) => b.totalFines - a.totalFines),
+    [leaderboardData]);
 
-              {/* Stableford Leader */}
-              <Card className="p-4 border-l-4 border-blue-500">
-                <p className="text-xs text-slate-500 uppercase font-bold mb-3">Stableford Leader</p>
-                <div className="flex items-center gap-3">
-                  {sortedLeaderboard[0]?.avatar ? (
-                    <img src={sortedLeaderboard[0].avatar} alt={sortedLeaderboard[0].name} className="w-12 h-12 rounded-full object-cover" />
-                  ) : (
-                    <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-lg">
-                      {sortedLeaderboard[0]?.name?.charAt(0) || '?'}
-                    </div>
-                  )}
-                  <div>
-                    <p className="font-bold text-slate-800">{sortedLeaderboard[0]?.name || 'N/A'}</p>
-                    <p className="text-2xl font-bold text-blue-600">{sortedLeaderboard[0]?.netStableford || '-'}</p>
-                  </div>
-                </div>
-              </Card>
+    const totalFinesPot = leaderboardData.reduce((acc, curr) => acc + curr.totalFines, 0);
 
-              {/* Team Leader */}
-              <Card className="p-4 border-l-4 border-purple-500">
-                <p className="text-xs text-slate-500 uppercase font-bold mb-3">Team Leader</p>
-                {teamLeaderboard.length > 0 ? (
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 font-bold text-lg">
-                      {teamLeaderboard[0].name.charAt(0)}
-                    </div>
-                    <div>
-                      <p className="font-bold text-slate-800">{teamLeaderboard[0].name}</p>
-                      <p className="text-xs text-slate-500">{teamLeaderboard[0].player1_name} & {teamLeaderboard[0].player2_name}</p>
-                      <p className="text-2xl font-bold text-purple-600">{teamLeaderboard[0].total}</p>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-slate-400 text-sm">No teams yet</p>
-                )}
-              </Card>
-
-              {/* Most Fines Leader */}
-              <Card className="p-4 border-l-4 border-red-500">
-                <p className="text-xs text-slate-500 uppercase font-bold mb-3">Most Fines</p>
-                <div className="flex items-center gap-3">
-                  {[...leaderboardData].sort((a,b) => b.totalFines - a.totalFines)[0]?.avatar ? (
-                    <img src={[...leaderboardData].sort((a,b) => b.totalFines - a.totalFines)[0].avatar} alt={[...leaderboardData].sort((a,b) => b.totalFines - a.totalFines)[0].name} className="w-12 h-12 rounded-full object-cover" />
-                  ) : (
-                    <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold text-lg">
-                      {[...leaderboardData].sort((a,b) => b.totalFines - a.totalFines)[0]?.name?.charAt(0) || '?'}
-                    </div>
-                  )}
-                  <div>
-                    <p className="font-bold text-slate-800">{[...leaderboardData].sort((a,b) => b.totalFines - a.totalFines)[0]?.name || 'N/A'}</p>
-                    <p className="text-2xl font-bold text-red-600">R{[...leaderboardData].sort((a,b) => b.totalFines - a.totalFines)[0]?.totalFines?.toLocaleString() || '0'}</p>
-                  </div>
-                </div>
-              </Card>
-
-              {/* Total Fines */}
-              <Card className="p-4 border-l-4 border-amber-500">
-                <p className="text-xs text-slate-500 uppercase font-bold mb-3">Total Fines</p>
-                <div>
-                  <p className="text-3xl font-bold text-amber-600">
-                    R{leaderboardData.reduce((acc, curr) => acc + curr.totalFines, 0).toLocaleString()}
-                  </p>
-                  <p className="text-sm text-slate-500 mt-1">{rounds.length} Rounds</p>
-                </div>
-              </Card>
-            </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Scores Leaderboard */}
-          <div className="lg:col-span-2">
-            <Card className="overflow-hidden">
-              <div className="p-4 bg-slate-50">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="font-semibold text-slate-700">Scores Leaderboard</h3>
-
-                {/* Tab Buttons */}
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setLeaderboardTab('medal')}
-                    className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
-                      leaderboardTab === 'medal'
-                        ? 'bg-emerald-600 text-white shadow-md'
-                        : 'bg-white text-slate-600 border border-slate-200 hover:border-emerald-300'
-                    }`}
-                  >
-                    Medal
-                  </button>
-                  <button
-                    onClick={() => setLeaderboardTab('stableford')}
-                    className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
-                      leaderboardTab === 'stableford'
-                        ? 'bg-emerald-600 text-white shadow-md'
-                        : 'bg-white text-slate-600 border border-slate-200 hover:border-emerald-300'
-                    }`}
-                  >
-                    Stableford
-                  </button>
-                  <button
-                    onClick={() => setLeaderboardTab('teams')}
-                    className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
-                      leaderboardTab === 'teams'
-                        ? 'bg-emerald-600 text-white shadow-md'
-                        : 'bg-white text-slate-600 border border-slate-200 hover:border-emerald-300'
-                    }`}
-                  >
-                    Teams
-                  </button>
-                </div>
-              </div>
-
-              {/* Medal Table */}
-              {leaderboardTab === 'medal' && (
-                <div className="overflow-x-auto -mx-4 md:mx-0">
-                  <table className="w-full text-sm text-left min-w-max">
-                    <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
-                      <tr>
-                        <th className="px-3 md:px-6 py-4 font-semibold">Rank</th>
-                        <th className="px-3 md:px-6 py-4 font-semibold">Player</th>
-                        {rounds.map((r, i) => (
-                          <th key={r.id} className="px-2 py-4 text-center text-xs text-slate-400">R{i+1}</th>
-                        ))}
-                        <th className="px-4 py-4 text-center font-semibold bg-slate-100">Total</th>
-                        <th className="px-4 py-4 text-center font-semibold text-red-400">Worst</th>
-                        <th className="px-4 py-4 text-center font-bold text-emerald-700 bg-emerald-50">Net</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {sortedLeaderboard.map((player, idx) => (
-                        <tr key={player.id} className="hover:bg-slate-50 transition-colors">
-                          <td className="px-3 md:px-6 py-4">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm
-                              ${idx === 0 ? 'bg-amber-100 text-amber-700' :
-                                idx === 1 ? 'bg-slate-200 text-slate-700' :
-                                idx === 2 ? 'bg-orange-100 text-orange-800' : 'text-slate-500'}`}>
-                              {idx + 1}
-                            </div>
-                          </td>
-                          <td className={`px-3 md:px-6 py-4 font-medium ${player.isDisqualified ? 'text-slate-400' : 'text-slate-800'}`}>
-                            <div className="flex items-center gap-2">
-                              {player.avatar && <img src={player.avatar} className="w-6 h-6 rounded-full object-cover" alt="" />}
-                              {player.name}
-                              {player.isDisqualified && <span className="text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-bold">DQ</span>}
-                              {player.status === 'inactive' && <span className="text-xs text-red-400">(Inactive)</span>}
-                            </div>
-                          </td>
-                          {rounds.map(r => {
-                            const score = player.pScores[r.id]?.strokes;
-                            return (
-                              <td key={r.id} className="px-2 py-4 text-center text-slate-600">
-                                {score || '-'}
-                              </td>
-                            );
-                          })}
-                          <td className="px-4 py-4 text-center font-semibold bg-slate-50">
-                            {player.totalStrokes}
-                          </td>
-                          <td className="px-4 py-4 text-center text-red-400">
-                            {player.canDropWorstRound ? player.worstRound : '-'}
-                          </td>
-                          <td className="px-4 py-4 text-center font-bold text-emerald-700 bg-emerald-50 text-lg">
-                            {player.netTotal}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {/* Stableford Table */}
-              {leaderboardTab === 'stableford' && (
-                <div className="overflow-x-auto -mx-4 md:mx-0">
-                  <table className="w-full text-sm text-left min-w-max">
-                    <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
-                      <tr>
-                        <th className="px-3 md:px-6 py-4 font-semibold">Rank</th>
-                        <th className="px-3 md:px-6 py-4 font-semibold">Player</th>
-                        {rounds.map((r, i) => (
-                          <th key={r.id} className="px-2 py-4 text-center text-xs text-slate-400">R{i+1}</th>
-                        ))}
-                        <th className="px-4 py-4 text-center font-semibold bg-slate-100">Total</th>
-                        <th className="px-4 py-4 text-center font-bold text-emerald-700 bg-emerald-50">Points</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {sortedLeaderboard.map((player, idx) => (
-                        <tr key={player.id} className="hover:bg-slate-50 transition-colors">
-                          <td className="px-3 md:px-6 py-4">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm
-                              ${idx === 0 ? 'bg-amber-100 text-amber-700' :
-                                idx === 1 ? 'bg-slate-200 text-slate-700' :
-                                idx === 2 ? 'bg-orange-100 text-orange-800' : 'text-slate-500'}`}>
-                              {idx + 1}
-                            </div>
-                          </td>
-                          <td className={`px-3 md:px-6 py-4 font-medium ${player.isDisqualified ? 'text-slate-400' : 'text-slate-800'}`}>
-                            <div className="flex items-center gap-2">
-                              {player.avatar && <img src={player.avatar} className="w-6 h-6 rounded-full object-cover" alt="" />}
-                              {player.name}
-                              {player.isDisqualified && <span className="text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-bold">DQ</span>}
-                              {player.status === 'inactive' && <span className="text-xs text-red-400">(Inactive)</span>}
-                            </div>
-                          </td>
-                          {rounds.map(r => {
-                            const score = player.pScores[r.id]?.stableford;
-                            return (
-                              <td key={r.id} className="px-2 py-4 text-center text-slate-600">
-                                {score || '-'}
-                              </td>
-                            );
-                          })}
-                          <td className="px-4 py-4 text-center font-semibold bg-slate-50">{player.totalStableford}</td>
-                          <td className="px-4 py-4 text-center font-bold text-emerald-700 bg-emerald-50 text-lg">
-                            {player.netStableford}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {/* Teams Table */}
-              {leaderboardTab === 'teams' && (
-                <div className="overflow-x-auto -mx-4 md:mx-0">
-                  {teamLeaderboard.length === 0 ? (
-                    <div className="p-8 text-center text-slate-400">No teams set up for this season</div>
-                  ) : (
-                    <table className="w-full text-sm text-left min-w-max">
-                      <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
-                        <tr>
-                          <th className="px-3 md:px-6 py-4 font-semibold">Rank</th>
-                          <th className="px-3 md:px-6 py-4 font-semibold">Team</th>
-                          {rounds.map(r => (
-                            <th key={r.id} className="px-2 py-4 font-semibold text-center">{r.name.replace('Round ', 'R')}</th>
-                          ))}
-                          <th className="px-3 md:px-6 py-4 font-semibold text-center">Total</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {teamLeaderboard.map((team, idx) => (
-                          <tr key={team.id} className={`border-b border-slate-100 ${idx === 0 ? 'bg-emerald-50' : 'hover:bg-slate-50'}`}>
-                            <td className="px-3 md:px-6 py-4">
-                              <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold ${
-                                idx === 0 ? 'bg-yellow-400 text-yellow-900' :
-                                idx === 1 ? 'bg-slate-300 text-slate-700' :
-                                idx === 2 ? 'bg-amber-600 text-white' : 'bg-slate-100 text-slate-600'
-                              }`}>{idx + 1}</span>
-                            </td>
-                            <td className="px-3 md:px-6 py-4">
-                              <p className="font-bold text-slate-800">{team.name}</p>
-                              <p className="text-xs text-slate-500">{team.player1_name} & {team.player2_name}</p>
-                            </td>
-                            {rounds.map(r => (
-                              <td key={r.id} className="px-2 py-4 text-center font-medium text-slate-700">
-                                {team.roundTotals[r.id] || '-'}
-                              </td>
-                            ))}
-                            <td className="px-3 md:px-6 py-4 text-center">
-                              <span className="font-bold text-emerald-700 text-lg">{team.total}</span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              )}
+    // Empty state for new season
+    if (rounds.length === 0) {
+      return (
+        <div className="space-y-4 animate-in fade-in duration-300">
+          <h2 className="text-xl font-bold text-slate-800">{activeSeason?.name || 'Season'}</h2>
+          <Card>
+            <div className="p-8 md:p-12 text-center">
+              <Trophy size={48} className="text-slate-300 mx-auto mb-4" />
+              <h3 className="text-lg font-bold text-slate-700 mb-2">Season hasn't started yet</h3>
+              <p className="text-sm text-slate-500 max-w-sm mx-auto">
+                No rounds have been played. Once the first round is created and scores are entered, the leaderboard will appear here.
+              </p>
             </div>
           </Card>
         </div>
+      );
+    }
 
-        {/* Fines Leaderboard */}
-        <div>
-          <Card className="overflow-hidden">
-            <div className="p-4 border-b border-slate-100 bg-red-50">
-              <h3 className="font-semibold text-red-800">Fines Leaderboard</h3>
-              <p className="text-xs text-red-600 mt-1">Who owes the most?</p>
-            </div>
-            <div className="divide-y divide-slate-100">
-              {[...leaderboardData].sort((a,b) => b.totalFines - a.totalFines).slice(0, 8).map((player, idx) => (
-                <div key={player.id} className="p-3 flex items-center justify-between hover:bg-slate-50">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs
-                      ${idx === 0 ? 'bg-red-100 text-red-700' :
-                        idx === 1 ? 'bg-orange-100 text-orange-700' :
-                        idx === 2 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>
-                      {idx + 1}
-                    </div>
-                    <div>
-                      <p className="font-medium text-slate-800 text-sm">{player.name}</p>
-                      <p className="text-xs text-slate-500">{player.roundsPlayed} rounds</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-bold text-red-600">R{player.totalFines.toLocaleString()}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </div>
+    // Rank badge helper
+    const RankBadge = ({ idx, dq }) => (
+      <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold flex-shrink-0 ${
+        dq ? 'bg-slate-100 text-slate-400' :
+        idx === 0 ? 'bg-yellow-400 text-yellow-900' :
+        idx === 1 ? 'bg-slate-300 text-slate-700' :
+        idx === 2 ? 'bg-amber-600 text-white' : 'bg-slate-100 text-slate-600'
+      }`}>{dq ? '-' : idx + 1}</span>
+    );
+
+    // Player name cell helper
+    const PlayerCell = ({ player }) => (
+      <div className="flex items-center gap-2 min-w-0">
+        <span className={`truncate ${player.isDisqualified ? 'text-slate-400 line-through' : 'font-medium text-slate-800'}`}>
+          {player.name}
+        </span>
+        {player.isDisqualified && <span className="text-[10px] bg-red-100 text-red-500 px-1.5 py-0.5 rounded font-bold flex-shrink-0">DQ</span>}
       </div>
+    );
 
-      {/* Fines Distribution Chart */}
-      <Card className="p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="font-semibold text-slate-700">Fines Distribution Over Time</h3>
-          <div className="text-right">
-            <p className="text-xs text-slate-500">Total Pot</p>
-            <p className="text-2xl font-bold text-red-600">
-              R {leaderboardData.reduce((acc, curr) => acc + curr.totalFines, 0).toLocaleString()}
-            </p>
+    return (
+      <div className="space-y-4 animate-in fade-in duration-300">
+        {/* Header + Season Summary */}
+        <div>
+          <h2 className="text-xl font-bold text-slate-800">{activeSeason?.name || 'Leaderboard'}</h2>
+          <div className="flex flex-wrap gap-2 mt-2 text-xs">
+            <span className="bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-full font-semibold">Medal: {leaderboardData[0]?.name || '-'} ({leaderboardData[0]?.netTotal || '-'})</span>
+            <span className="bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full font-semibold">Stableford: {stablefordSorted[0]?.name || '-'} ({stablefordSorted[0]?.netStableford || '-'})</span>
+            {teamLeaderboard.length > 0 && (
+              <span className="bg-purple-50 text-purple-700 px-2.5 py-1 rounded-full font-semibold">Teams: {teamLeaderboard[0].name} ({teamLeaderboard[0].total})</span>
+            )}
+            <span className="bg-red-50 text-red-600 px-2.5 py-1 rounded-full font-semibold">Fines Pot: R{totalFinesPot.toLocaleString()}</span>
           </div>
         </div>
-        {rounds.length > 0 ? (
-          <>
-            <div style={{ width: '100%', height: '256px' }}>
-              <ResponsiveContainer>
-                <LineChart data={rounds}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                  <XAxis dataKey="name" tick={{fontSize: 12}} stroke="#94a3b8" />
-                  <YAxis tick={{fontSize: 12}} stroke="#94a3b8" />
-                  <RechartsTooltip
-                    contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}
-                  />
-                  <Line type="monotone" dataKey={(r) => {
-                    return players.reduce((acc, p) => acc + (scores[p.id]?.[r.id]?.fines || 0), 0);
-                  }} name="Total Fines" stroke="#ef4444" strokeWidth={3} dot={{r: 4}} />
-                </LineChart>
-              </ResponsiveContainer>
+
+        {/* Tab Navigation */}
+        <div className="flex border-b border-slate-200 overflow-x-auto scrollbar-hide">
+          {[
+            { id: 'medal', label: 'Medal' },
+            { id: 'stableford', label: 'Stableford' },
+            { id: 'teams', label: 'Teams' },
+            { id: 'fines', label: 'Fines' },
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setLeaderboardTab(tab.id)}
+              className={`flex-1 min-w-[70px] px-3 py-3 text-sm font-medium text-center transition-colors whitespace-nowrap min-h-[44px] ${
+                leaderboardTab === tab.id
+                  ? 'text-emerald-600 border-b-2 border-emerald-600'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Medal Tab */}
+        {leaderboardTab === 'medal' && (
+          <Card>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[600px]">
+                <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
+                  <tr>
+                    <th className="px-3 py-3 text-left w-10">#</th>
+                    <th className="px-3 py-3 text-left">Player</th>
+                    {rounds.map((r, i) => (
+                      <th key={r.id} className="px-1.5 py-3 text-center text-xs">R{i+1}</th>
+                    ))}
+                    <th className="px-3 py-3 text-center bg-slate-100">Total</th>
+                    <th className="px-3 py-3 text-center text-red-400">Drop</th>
+                    <th className="px-3 py-3 text-center font-bold bg-emerald-50 text-emerald-700">Net</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {leaderboardData.map((player, idx) => (
+                    <tr key={player.id} className={`${player.isDisqualified ? 'opacity-50' : idx === 0 ? 'bg-emerald-50/30' : 'hover:bg-slate-50'}`}>
+                      <td className="px-3 py-3"><RankBadge idx={idx} dq={player.isDisqualified} /></td>
+                      <td className="px-3 py-3"><PlayerCell player={player} /></td>
+                      {rounds.map(r => (
+                        <td key={r.id} className="px-1.5 py-3 text-center text-slate-600 text-xs">
+                          {player.pScores[r.id]?.strokes || <span className="text-slate-300">-</span>}
+                        </td>
+                      ))}
+                      <td className="px-3 py-3 text-center font-semibold bg-slate-50">{player.totalStrokes || '-'}</td>
+                      <td className="px-3 py-3 text-center text-red-400 text-xs">{player.canDropWorstRound ? `-${player.worstRound}` : '-'}</td>
+                      <td className="px-3 py-3 text-center font-bold text-emerald-700 bg-emerald-50">{player.netTotal || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            <p className="text-xs text-slate-400 mt-4 text-center">Total fines collected per round</p>
-          </>
-        ) : (
-          <div className="h-64 flex items-center justify-center">
-            <p className="text-slate-400">No rounds available yet</p>
-          </div>
+          </Card>
         )}
-      </Card>
-      </>
+
+        {/* Stableford Tab */}
+        {leaderboardTab === 'stableford' && (
+          <Card>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[600px]">
+                <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
+                  <tr>
+                    <th className="px-3 py-3 text-left w-10">#</th>
+                    <th className="px-3 py-3 text-left">Player</th>
+                    {rounds.map((r, i) => (
+                      <th key={r.id} className="px-1.5 py-3 text-center text-xs">R{i+1}</th>
+                    ))}
+                    <th className="px-3 py-3 text-center bg-slate-100">Total</th>
+                    <th className="px-3 py-3 text-center font-bold bg-emerald-50 text-emerald-700">Net</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {stablefordSorted.map((player, idx) => (
+                    <tr key={player.id} className={`${player.isDisqualified ? 'opacity-50' : idx === 0 ? 'bg-blue-50/30' : 'hover:bg-slate-50'}`}>
+                      <td className="px-3 py-3"><RankBadge idx={idx} dq={player.isDisqualified} /></td>
+                      <td className="px-3 py-3"><PlayerCell player={player} /></td>
+                      {rounds.map(r => (
+                        <td key={r.id} className="px-1.5 py-3 text-center text-slate-600 text-xs">
+                          {player.pScores[r.id]?.stableford || <span className="text-slate-300">-</span>}
+                        </td>
+                      ))}
+                      <td className="px-3 py-3 text-center font-semibold bg-slate-50">{player.totalStableford || '-'}</td>
+                      <td className="px-3 py-3 text-center font-bold text-emerald-700 bg-emerald-50">{player.netStableford || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        )}
+
+        {/* Teams Tab */}
+        {leaderboardTab === 'teams' && (
+          <Card>
+            {teamLeaderboard.length === 0 ? (
+              <div className="p-8 text-center text-slate-400 text-sm">No teams set up for this season</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm min-w-[500px]">
+                  <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
+                    <tr>
+                      <th className="px-3 py-3 text-left w-10">#</th>
+                      <th className="px-3 py-3 text-left">Team</th>
+                      {rounds.map((r, i) => (
+                        <th key={r.id} className="px-1.5 py-3 text-center text-xs">R{i+1}</th>
+                      ))}
+                      <th className="px-3 py-3 text-center font-bold bg-emerald-50 text-emerald-700">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {teamLeaderboard.map((team, idx) => (
+                      <tr key={team.id} className={idx === 0 ? 'bg-purple-50/30' : 'hover:bg-slate-50'}>
+                        <td className="px-3 py-3"><RankBadge idx={idx} /></td>
+                        <td className="px-3 py-3">
+                          <p className="font-medium text-slate-800">{team.name}</p>
+                          <p className="text-xs text-slate-400">{team.player1_name} & {team.player2_name}</p>
+                        </td>
+                        {rounds.map(r => (
+                          <td key={r.id} className="px-1.5 py-3 text-center text-slate-600 text-xs">
+                            {team.roundTotals[r.id] || <span className="text-slate-300">-</span>}
+                          </td>
+                        ))}
+                        <td className="px-3 py-3 text-center font-bold text-emerald-700 bg-emerald-50">{team.total}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+        )}
+
+        {/* Fines Tab */}
+        {leaderboardTab === 'fines' && (
+          <div className="space-y-4">
+            {/* Fines Summary */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-red-50 rounded-xl p-4 text-center">
+                <p className="text-xs text-red-500 uppercase font-medium">Fines Pot</p>
+                <p className="text-2xl font-bold text-red-700 mt-1">R{totalFinesPot.toLocaleString()}</p>
+                <p className="text-xs text-red-400 mt-1">{rounds.length} rounds</p>
+              </div>
+              <div className="bg-amber-50 rounded-xl p-4 text-center">
+                <p className="text-xs text-amber-500 uppercase font-medium">Most Fines</p>
+                <p className="text-lg font-bold text-amber-700 mt-1">{finesSorted[0]?.name || '-'}</p>
+                <p className="text-xs text-amber-500 mt-1">R{finesSorted[0]?.totalFines?.toLocaleString() || '0'}</p>
+              </div>
+            </div>
+
+            {/* Fines Ranking */}
+            <Card>
+              <div className="divide-y divide-slate-50">
+                {finesSorted.map((player, idx) => (
+                  <div key={player.id} className="flex items-center gap-3 p-3">
+                    <RankBadge idx={idx} />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-slate-800 text-sm truncate">{player.name}</p>
+                      <p className="text-xs text-slate-400">{player.roundsPlayed} rounds</p>
+                    </div>
+                    <p className="font-bold text-red-600 text-sm flex-shrink-0">R{player.totalFines.toLocaleString()}</p>
+                  </div>
+                ))}
+              </div>
+            </Card>
+
+            {/* Chart */}
+            {rounds.length > 0 && (
+              <Card className="p-4">
+                <p className="text-xs text-slate-500 uppercase font-medium mb-3">Fines per Round</p>
+                <div style={{ width: '100%', height: '200px' }}>
+                  <ResponsiveContainer>
+                    <LineChart data={rounds}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis dataKey="name" tick={{fontSize: 11}} stroke="#94a3b8" tickFormatter={v => v.replace('Round ', 'R')} />
+                      <YAxis tick={{fontSize: 11}} stroke="#94a3b8" />
+                      <RechartsTooltip contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px'}} />
+                      <Line type="monotone" dataKey={(r) => players.reduce((acc, p) => acc + (scores[p.id]?.[r.id]?.fines || 0), 0)} name="Total Fines" stroke="#ef4444" strokeWidth={2} dot={{r: 3}} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </Card>
+            )}
+          </div>
         )}
       </div>
     );
