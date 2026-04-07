@@ -1032,16 +1032,20 @@ export default function GPGAManager() {
               {/* Team Leader */}
               <Card className="p-4 border-l-4 border-purple-500">
                 <p className="text-xs text-slate-500 uppercase font-bold mb-3">Team Leader</p>
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 font-bold text-lg">
-                    {teamLeaderboard[0]?.name?.charAt(0) || '?'}
+                {teamLeaderboard.length > 0 ? (
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 font-bold text-lg">
+                      {teamLeaderboard[0].name.charAt(0)}
+                    </div>
+                    <div>
+                      <p className="font-bold text-slate-800">{teamLeaderboard[0].name}</p>
+                      <p className="text-xs text-slate-500">{teamLeaderboard[0].player1_name} & {teamLeaderboard[0].player2_name}</p>
+                      <p className="text-2xl font-bold text-purple-600">{teamLeaderboard[0].total}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-bold text-slate-800">{teamLeaderboard[0]?.name || 'N/A'}</p>
-                    <p className="text-xs text-slate-500">{teamLeaderboard[0]?.player1_name} & {teamLeaderboard[0]?.player2_name}</p>
-                    <p className="text-2xl font-bold text-purple-600">{teamLeaderboard[0]?.total || '-'}</p>
-                  </div>
-                </div>
+                ) : (
+                  <p className="text-slate-400 text-sm">No teams yet</p>
+                )}
               </Card>
 
               {/* Most Fines Leader */}
