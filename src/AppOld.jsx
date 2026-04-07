@@ -3379,7 +3379,9 @@ export default function GPGAManager() {
                       {/* Buy-In Status - Desktop */}
                       <button
                         onClick={async () => {
-                          await DB.markBuyInPaid(p.id, activeSeason?.id, !buyInStatus.isPaid);
+                          if (!activeSeason?.id) return;
+                          await DB.markBuyInPaid(p.id, activeSeason.id, !buyInStatus.isPaid);
+                          setBuyInStatusCache(prev => ({ ...prev, [p.id]: { isPaid: !buyInStatus.isPaid, date: !buyInStatus.isPaid ? new Date().toISOString().split('T')[0] : null } }));
                           await loadData();
                           showToast(`Buy-in ${!buyInStatus.isPaid ? 'marked as paid' : 'marked as outstanding'}`, 'success');
                         }}
@@ -3479,7 +3481,9 @@ export default function GPGAManager() {
                   {/* Buy-In Status - Mobile */}
                   <button
                     onClick={async () => {
-                      await DB.markBuyInPaid(p.id, activeSeason?.id, !buyInStatus.isPaid);
+                      if (!activeSeason?.id) return;
+                      await DB.markBuyInPaid(p.id, activeSeason.id, !buyInStatus.isPaid);
+                      setBuyInStatusCache(prev => ({ ...prev, [p.id]: { isPaid: !buyInStatus.isPaid, date: !buyInStatus.isPaid ? new Date().toISOString().split('T')[0] : null } }));
                       await loadData();
                       showToast(`Buy-in ${!buyInStatus.isPaid ? 'marked as paid' : 'marked as outstanding'}`, 'success');
                     }}
@@ -3892,7 +3896,9 @@ export default function GPGAManager() {
                       <div className="pt-3 border-t border-slate-200">
                         <button
                           onClick={async () => {
-                            await DB.markBuyInPaid(p.id, activeSeason?.id, !buyInStatus.isPaid);
+                            if (!activeSeason?.id) return;
+                            await DB.markBuyInPaid(p.id, activeSeason.id, !buyInStatus.isPaid);
+                            setDirectoryBuyInCache(prev => ({ ...prev, [p.id]: { isPaid: !buyInStatus.isPaid, date: !buyInStatus.isPaid ? new Date().toISOString().split('T')[0] : null } }));
                             await loadData();
                           }}
                           className={`w-full flex items-center justify-between p-2 rounded-lg transition-all ${
