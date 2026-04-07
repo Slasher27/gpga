@@ -2155,192 +2155,148 @@ export default function GPGAManager() {
       setSearchTerm('');
     };
 
+    const currentRound = rounds.find(r => r.id === selectedRound);
+    const [roundsTab, setRoundsTab] = useState('scores');
+
     return (
-      <div className="space-y-6 animate-in fade-in duration-500">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h2 className="text-3xl font-bold">Rounds Management</h2>
-            <p className="text-base-content/60 mt-1">Create rounds, select courses, and manage player scores</p>
-          </div>
+      <div className="space-y-4 animate-in fade-in duration-300">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-bold text-slate-800">Rounds</h2>
+          <button
+            onClick={() => setIsAddRoundModalOpen(true)}
+            className="bg-emerald-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-emerald-700 transition-colors flex items-center gap-2 text-sm min-h-[44px]"
+          >
+            <Plus size={16} /> Add Round
+          </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Quick Actions */}
-          <div className="space-y-4">
-             <div className="card bg-base-100 shadow-xl">
-               <div className="card-body">
-                 <h3 className="card-title text-lg mb-3">Manage Rounds</h3>
-                 <div className="space-y-2">
-                   {rounds.map(r => (
-                     <div key={r.id} className="flex items-start gap-2">
-                       <button
-                        onClick={() => setSelectedRound(r.id)}
-                        className={`flex-1 text-left px-4 py-3 rounded-lg text-sm transition-all ${
-                          selectedRound === r.id
-                            ? 'bg-emerald-50 text-emerald-700 border-2 border-emerald-500 shadow-md'
-                            : 'bg-base-200 hover:bg-base-300 border-2 border-transparent'
-                        }`}
-                       >
-                         <div className="font-semibold">{r.name}</div>
-                         <div className={`text-xs mt-1 flex items-center gap-2 ${selectedRound === r.id ? 'opacity-90' : 'opacity-60'}`}>
-                           <span>{r.date}</span>
-                           {r.course && (
-                             <>
-                               <span>•</span>
-                               <span>{r.course}</span>
-                             </>
-                           )}
-                         </div>
-                       </button>
-                       <div className="flex flex-col gap-1">
-                         <button
-                           onClick={() => handleEditRound(r)}
-                           className="btn btn-ghost btn-xs btn-square"
-                           title="Edit Round"
-                         >
-                           <Edit size={14} />
-                         </button>
-                         <button
-                           onClick={() => handleDeleteRound(r.id, r.name)}
-                           className="btn btn-ghost btn-xs btn-square text-error hover:bg-error hover:text-error-content"
-                           title="Delete Round"
-                         >
-                           <Trash2 size={14} />
-                         </button>
-                       </div>
-                     </div>
-                   ))}
-                   <button
-                     onClick={() => setIsAddRoundModalOpen(true)}
-                     className="w-full mt-3 bg-emerald-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-emerald-700 flex items-center justify-center gap-2"
-                   >
-                     <Plus size={18} /> Add Round
-                   </button>
-                 </div>
-               </div>
-             </div>
+        {/* Round Selector — horizontal scroll */}
+        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+          {rounds.map(r => (
+            <button
+              key={r.id}
+              onClick={() => setSelectedRound(r.id)}
+              className={`flex-shrink-0 px-4 py-2.5 rounded-lg text-sm font-medium transition-all min-h-[44px] ${
+                selectedRound === r.id
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'bg-white text-slate-600 border border-slate-200 hover:border-emerald-300'
+              }`}
+            >
+              {r.name}
+            </button>
+          ))}
+          {rounds.length === 0 && <p className="text-sm text-slate-400 py-2">No rounds created yet</p>}
+        </div>
+
+        {/* Round Info Bar */}
+        {currentRound && (
+          <div className="flex items-center justify-between bg-slate-50 rounded-lg px-4 py-2.5 text-sm">
+            <div className="flex items-center gap-3 text-slate-600 min-w-0">
+              <MapPin size={14} className="flex-shrink-0 text-slate-400" />
+              <span className="truncate">{currentRound.course_name}</span>
+              <span className="text-slate-300">|</span>
+              <Calendar size={14} className="flex-shrink-0 text-slate-400" />
+              <span>{currentRound.date}</span>
+            </div>
+            <div className="flex items-center gap-1 flex-shrink-0">
+              <button onClick={() => handleEditRound(currentRound)} className="p-2 rounded-lg text-slate-400 hover:bg-slate-200 hover:text-slate-600 transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center" aria-label="Edit round">
+                <Edit size={14} />
+              </button>
+              <button onClick={() => handleDeleteRound(currentRound.id, currentRound.name)} className="p-2 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center" aria-label="Delete round">
+                <Trash2 size={14} />
+              </button>
+            </div>
           </div>
+        )}
 
-          {/* Data Entry */}
-          <div className="md:col-span-2">
-            <Card className="p-6">
-              <div className="mb-6 flex justify-between items-start">
-                <div>
-                  <h3 className="font-bold text-lg text-slate-800">Enter Scores</h3>
-                  <p className="text-sm text-slate-500">Editing: {rounds.find(r => r.id === selectedRound)?.name}</p>
-                </div>
-                <div>
-                  {!isAnyPlayerEditing ? (
-                    <button
-                      onClick={editAllPlayers}
-                      className="bg-emerald-600 text-white px-4 py-2 rounded text-sm font-semibold hover:bg-emerald-700 flex items-center gap-2"
-                    >
-                      <Edit size={16} />
-                      Edit All
-                    </button>
-                  ) : (
-                    <button
-                      onClick={saveAllPlayers}
-                      className="bg-emerald-600 text-white px-4 py-2 rounded text-sm font-semibold hover:bg-emerald-700 flex items-center gap-2"
-                    >
-                      <Save size={16} />
-                      Save All
-                    </button>
-                  )}
-                </div>
-              </div>
+        {/* Scores Card */}
+        {currentRound && (
+          <Card>
+            {/* Scores Header */}
+            <div className="flex items-center justify-between p-4 border-b border-slate-100">
+              <h3 className="font-semibold text-slate-800 text-sm">Scores — {currentRound.name}</h3>
+              {!isAnyPlayerEditing ? (
+                <button onClick={editAllPlayers} className="bg-emerald-600 text-white px-3 py-2 rounded-lg text-xs font-semibold hover:bg-emerald-700 flex items-center gap-1.5 min-h-[36px]">
+                  <Edit size={13} /> Edit All
+                </button>
+              ) : (
+                <button onClick={saveAllPlayers} className="bg-emerald-600 text-white px-3 py-2 rounded-lg text-xs font-semibold hover:bg-emerald-700 flex items-center gap-1.5 min-h-[36px]">
+                  <Save size={13} /> Save All
+                </button>
+              )}
+            </div>
 
-              <div className="space-y-3 overflow-x-auto">
-                 <div className="grid grid-cols-[2fr_1fr_1fr_1fr_100px] gap-3 text-xs font-bold text-slate-500 uppercase px-2 min-w-[700px]">
-                   <div>Player</div>
-                   <div className="text-center">Medal Score</div>
-                   <div className="text-center">Handicap</div>
-                   <div className="text-center">Stableford</div>
-                   <div className="text-center">Actions</div>
-                 </div>
+            {/* Score Rows */}
+            <div className="divide-y divide-slate-50">
+              {players.filter(p => p.status === 'active').map(p => {
+                const currentScore = scores[p.id]?.[selectedRound] || { strokes: 0, handicap: 0, stableford: 0 };
+                const isEditing = editingPlayers[p.id];
+                const isEdited = editScores[p.id] !== undefined;
 
-                 {players.filter(p => p.status === 'active').map(p => {
-                    const currentScore = scores[p.id]?.[selectedRound] || { strokes: 0, handicap: 0, stableford: 0 };
-                    const isEditing = editingPlayers[p.id];
-                    const isEdited = editScores[p.id] !== undefined;
+                const getDisplayValue = (field, currentValue) => {
+                  if (editScores[p.id]?.[field] !== undefined) {
+                    return editScores[p.id][field] === '' ? '' : editScores[p.id][field];
+                  }
+                  return isEditing && currentValue === 0 ? '' : currentValue;
+                };
 
-                    // Show empty string for 0 values when editing, otherwise show actual value
-                    const getDisplayValue = (field, currentValue) => {
-                      if (editScores[p.id]?.[field] !== undefined) {
-                        return editScores[p.id][field] === '' ? '' : editScores[p.id][field];
-                      }
-                      return isEditing && currentValue === 0 ? '' : currentValue;
-                    };
-
-                    const displayStrokes = getDisplayValue('strokes', currentScore.strokes);
-                    const displayHandicap = getDisplayValue('handicap', currentScore.handicap);
-                    const displayStableford = getDisplayValue('stableford', currentScore.stableford);
-
-                    return (
-                      <div key={p.id} className={`grid grid-cols-[2fr_1fr_1fr_1fr_100px] gap-3 items-center p-2 rounded-md border transition-all min-w-[700px] ${isEdited ? 'bg-emerald-50 border-emerald-300' : 'bg-slate-50 border-slate-100'}`}>
-                        <div className="font-medium text-slate-700">{p.name}</div>
-                        <div>
-                          <input
-                            type="number"
-                            min="40"
-                            max="150"
-                            value={displayStrokes}
-                            onChange={(e) => handleScoreChange(p.id, 'strokes', e.target.value)}
-                            disabled={!isEditing}
-                            className={`w-full text-center border-2 rounded px-2 py-1 focus:ring-2 focus:ring-emerald-500 outline-none ${isEditing ? 'border-emerald-500 bg-white' : 'border-slate-400 bg-slate-100'}`}
-                            placeholder="72"
-                          />
-                        </div>
-                        <div>
-                          <input
-                            type="number"
-                            min="0"
-                            max="36"
-                            value={displayHandicap}
-                            onChange={(e) => handleScoreChange(p.id, 'handicap', e.target.value)}
-                            disabled={!isEditing}
-                            className={`w-full text-center border-2 rounded px-2 py-1 focus:ring-2 focus:ring-emerald-500 outline-none ${isEditing ? 'border-emerald-500 bg-white' : 'border-slate-400 bg-slate-100'}`}
-                            placeholder="0"
-                          />
-                        </div>
-                        <div>
-                          <input
-                            type="number"
-                            min="0"
-                            max="50"
-                            value={displayStableford}
-                            onChange={(e) => handleScoreChange(p.id, 'stableford', e.target.value)}
-                            disabled={!isEditing}
-                            className={`w-full text-center border-2 rounded px-2 py-1 focus:ring-2 focus:ring-emerald-500 outline-none ${isEditing ? 'border-emerald-500 bg-white' : 'border-slate-400 bg-slate-100'}`}
-                            placeholder="36"
-                          />
-                        </div>
-                        <div className="flex items-center justify-center gap-1">
-                          {!isEditing ? (
-                            <button
-                              onClick={() => toggleEditPlayer(p.id)}
-                              className="bg-emerald-600 text-white px-3 py-1 rounded text-xs font-semibold hover:bg-emerald-700 flex items-center gap-1"
-                            >
-                              <Edit size={12} />
-                              Edit
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => savePlayerScore(p.id, p.name)}
-                              className="bg-emerald-600 text-white px-3 py-1 rounded text-xs font-semibold hover:bg-emerald-700 flex items-center gap-1"
-                            >
-                              <Save size={12} />
-                              Save
-                            </button>
-                          )}
-                        </div>
+                return (
+                  <div key={p.id} className={`p-3 ${isEdited ? 'bg-emerald-50/50' : ''}`}>
+                    {/* Player Name + Action */}
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-medium text-slate-800 text-sm">{p.name}</span>
+                      {!isEditing ? (
+                        <button onClick={() => toggleEditPlayer(p.id)} className="text-xs text-emerald-600 font-semibold min-h-[32px] px-2">Edit</button>
+                      ) : (
+                        <button onClick={() => savePlayerScore(p.id, p.name)} className="text-xs text-emerald-600 font-semibold min-h-[32px] px-2">Save</button>
+                      )}
+                    </div>
+                    {/* Score Inputs */}
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <label className="text-[10px] text-slate-400 uppercase block mb-0.5">Score</label>
+                        <input
+                          type="number" min="40" max="150"
+                          id={`score-${p.id}-strokes`} name={`score-${p.id}-strokes`}
+                          value={getDisplayValue('strokes', currentScore.strokes)}
+                          onChange={(e) => handleScoreChange(p.id, 'strokes', e.target.value)}
+                          disabled={!isEditing}
+                          className={`w-full text-center rounded-lg px-2 py-2 text-sm min-h-[40px] border ${isEditing ? 'border-emerald-300 bg-white' : 'border-slate-200 bg-slate-50 text-slate-500'}`}
+                          placeholder="72"
+                        />
                       </div>
-                    );
-                 })}
-              </div>
-            </Card>
-          </div>
-        </div>
+                      <div>
+                        <label className="text-[10px] text-slate-400 uppercase block mb-0.5">HC</label>
+                        <input
+                          type="number" min="0" max="36"
+                          id={`score-${p.id}-hc`} name={`score-${p.id}-hc`}
+                          value={getDisplayValue('handicap', currentScore.handicap)}
+                          onChange={(e) => handleScoreChange(p.id, 'handicap', e.target.value)}
+                          disabled={!isEditing}
+                          className={`w-full text-center rounded-lg px-2 py-2 text-sm min-h-[40px] border ${isEditing ? 'border-emerald-300 bg-white' : 'border-slate-200 bg-slate-50 text-slate-500'}`}
+                          placeholder="0"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-slate-400 uppercase block mb-0.5">Stableford</label>
+                        <input
+                          type="number" min="0" max="50"
+                          id={`score-${p.id}-sf`} name={`score-${p.id}-sf`}
+                          value={getDisplayValue('stableford', currentScore.stableford)}
+                          onChange={(e) => handleScoreChange(p.id, 'stableford', e.target.value)}
+                          disabled={!isEditing}
+                          className={`w-full text-center rounded-lg px-2 py-2 text-sm min-h-[40px] border ${isEditing ? 'border-emerald-300 bg-white' : 'border-slate-200 bg-slate-50 text-slate-500'}`}
+                          placeholder="36"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+        )}
       </div>
     );
   };
