@@ -19,7 +19,9 @@
       "Bash(git commit -m ':*)",
       "Bash(curl -s http://localhost:3001/api/teams?season_id=1)",
       "Bash(curl -s -X POST http://localhost:3001/api/seasons -H 'Content-Type: application/json' -d '{\"year\":2026,\"name\":\"GPGA 2026 Season\",\"buy_in_amount\":2500,\"is_active\":true}')",
-      "Bash(curl -s http://localhost:3001/api/seasons)"
+      "Bash(curl -s http://localhost:3001/api/seasons)",
+      "Bash(npm list:*)",
+      "Bash(node -e ':*)"
     ],
     "deny": [],
     "ask": []
