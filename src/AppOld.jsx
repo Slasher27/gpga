@@ -507,8 +507,6 @@ export default function GPGAManager() {
 
   const currentUser = players.find(p => p.id === currentUserId) || players[0];
 
-  console.log('DEBUG - Current User:', currentUser?.name, 'Role:', currentUser?.role, 'ID:', currentUserId);
-
   // Reload data when navigating away from fines view to refresh leaderboard
   useEffect(() => {
     const previousView = localStorage.getItem('gpga_previous_view');
@@ -728,8 +726,8 @@ export default function GPGAManager() {
     return <LoginPage onLogin={handleLogin} />;
   }
 
-  // Show loading state
-  if (!dbReady || !currentUser) {
+  // Show loading state while DB or player data is not ready
+  if (!dbReady || !currentUser || players.length === 0) {
     return (
       <div className="min-h-screen bg-slate-100 p-8">
         <DashboardSkeleton />
