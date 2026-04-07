@@ -11,7 +11,6 @@ import {
   User,
   Camera,
   Trash2,
-  RefreshCw,
   Edit,
   MoreVertical,
   ChevronDown,
@@ -21,11 +20,8 @@ import {
   LogOut,
   Eye,
   EyeOff,
-  Moon,
-  Sun,
   CheckCircle,
   XCircle,
-  Menu,
   DollarSign,
   CreditCard,
   AlertCircle
@@ -373,9 +369,6 @@ const LoginPage = ({ onLogin }) => {
 
 export default function GPGAManager() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [theme, setTheme] = useState(() => {
-    return localStorage.getItem('gpga_theme') || 'emerald';
-  });
   const [view, setView] = useState(() => {
     return localStorage.getItem('gpga_current_view') || 'dashboard';
   });
@@ -396,7 +389,6 @@ export default function GPGAManager() {
   const [isAddFineTypeModalOpen, setIsAddFineTypeModalOpen] = useState(false);
   const [deleteRoundConfirm, setDeleteRoundConfirm] = useState(null); // { id, name }
   const [managingPlayerId, setManagingPlayerId] = useState(null); // For full player profile page
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Golf course selection states
   const [selectedCourse, setSelectedCourse] = useState(null);
@@ -424,19 +416,6 @@ export default function GPGAManager() {
     setToast({ show: true, message, type });
     setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
   };
-
-  // Theme toggle
-  const toggleTheme = () => {
-    const newTheme = theme === 'emerald' ? 'forest' : 'emerald';
-    setTheme(newTheme);
-    localStorage.setItem('gpga_theme', newTheme);
-    document.documentElement.setAttribute('data-theme', newTheme);
-  };
-
-  // Set theme on mount
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-  }, [theme]);
 
   // Initialize database and load data
   useEffect(() => {
@@ -818,7 +797,6 @@ export default function GPGAManager() {
   const setNavView = (id) => {
     setView(id);
     localStorage.setItem('gpga_current_view', id);
-    setIsMobileMenuOpen(false);
   };
 
   // Desktop sidebar
@@ -893,14 +871,9 @@ export default function GPGAManager() {
             <p className="text-sm font-medium text-slate-800 truncate">{currentUser.name}</p>
             <p className="text-[10px] text-slate-400 capitalize">{currentUser.role}</p>
           </div>
-          <div className="flex gap-1">
-            <button onClick={toggleTheme} className="p-1.5 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors" aria-label="Toggle theme">
-              {theme === 'emerald' ? <Moon size={14} /> : <Sun size={14} />}
-            </button>
-            <button onClick={handleLogout} className="p-1.5 rounded text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors" aria-label="Sign out">
-              <LogOut size={14} />
-            </button>
-          </div>
+          <button onClick={handleLogout} className="p-1.5 rounded text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors" aria-label="Sign out">
+            <LogOut size={14} />
+          </button>
         </div>
       </div>
     </div>
@@ -930,9 +903,6 @@ export default function GPGAManager() {
               ))}
             </select>
           )}
-          <button onClick={toggleTheme} className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 min-h-[36px] min-w-[36px] flex items-center justify-center" aria-label="Toggle theme">
-            {theme === 'emerald' ? <Moon size={16} /> : <Sun size={16} />}
-          </button>
           <button onClick={handleLogout} className="p-2 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-500 min-h-[36px] min-w-[36px] flex items-center justify-center" aria-label="Sign out">
             <LogOut size={16} />
           </button>
@@ -4308,7 +4278,7 @@ export default function GPGAManager() {
                 name="date"
                 type="date"
                 defaultValue={editingRound.date}
-                className="input input-bordered w-full focus:input-primary [color-scheme:light] dark:[color-scheme:dark]"
+                className="input input-bordered w-full focus:input-primary [color-scheme:light]"
               />
             </div>
 
