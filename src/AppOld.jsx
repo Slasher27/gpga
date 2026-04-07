@@ -518,16 +518,20 @@ export default function GPGAManager() {
 
   // Load buy-in status cache for Players Directory view
   useEffect(() => {
+    let cancelled = false;
     const loadDirectoryBuyIn = async () => {
+      if (!activeSeason?.id) return;
       const cache = {};
       for (const p of players) {
-        cache[p.id] = await DB.getPlayerBuyInStatus(p.id, activeSeason?.id);
+        if (cancelled) return;
+        cache[p.id] = await DB.getPlayerBuyInStatus(p.id, activeSeason.id);
       }
-      setDirectoryBuyInCache(cache);
+      if (!cancelled) setDirectoryBuyInCache(cache);
     };
     if (players.length > 0) {
       loadDirectoryBuyIn();
     }
+    return () => { cancelled = true; };
   }, [players, activeSeason?.id]);
 
   // Filter golf courses based on search term
@@ -3195,19 +3199,23 @@ export default function GPGAManager() {
     const [buyInStatusCache, setBuyInStatusCache] = useState({});
 
     useEffect(() => {
+      let cancelled = false;
       const loadBuyInStatuses = async () => {
+        if (!activeSeason?.id) return;
         const cache = {};
         for (const p of players) {
-          cache[p.id] = await DB.getPlayerBuyInStatus(p.id, activeSeason?.id);
+          if (cancelled) return;
+          cache[p.id] = await DB.getPlayerBuyInStatus(p.id, activeSeason.id);
         }
-        setBuyInStatusCache(cache);
+        if (!cancelled) setBuyInStatusCache(cache);
       };
       loadBuyInStatuses();
+      return () => { cancelled = true; };
     }, [players, activeSeason?.id]);
 
     // Calculate player statistics (only for current season's rounds)
-    const seasonRoundIds = new Set(rounds.map(r => r.id));
     const playersWithStats = useMemo(() => {
+      const seasonRoundIds = new Set(rounds.map(r => r.id));
       return players.map(player => {
         const playerScores = scores[player.id] || {};
         // Only count scores for rounds in the active season
