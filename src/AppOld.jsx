@@ -3881,7 +3881,7 @@ export default function GPGAManager() {
       <DesktopSidebar />
       <MobileNav />
 
-      <main className="p-4 md:p-8 md:ml-56 pt-16 pb-20 md:pt-8 md:pb-8">
+      <main className="p-4 md:p-8 md:ml-56 pt-20 pb-24 md:pt-8 md:pb-8">
         {view === 'dashboard' && <DashboardView />}
         {view === 'fines' && <FinesView />}
         {view === 'rounds' && <RoundsManagementView />}
