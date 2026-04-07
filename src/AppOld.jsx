@@ -3922,239 +3922,277 @@ export default function GPGAManager() {
       reader.readAsDataURL(file);
     };
 
+    const [profileTab, setProfileTab] = useState('stats');
+
+    const tabs = [
+      { id: 'stats', label: 'Stats' },
+      { id: 'rounds', label: 'Rounds' },
+      { id: 'fines', label: 'Fines' },
+      { id: 'edit', label: 'Edit' },
+    ];
+
     return (
-      <div className="space-y-6 animate-in fade-in duration-300">
+      <div className="animate-in fade-in duration-300 max-w-2xl mx-auto">
         {/* Back Button */}
         <button
           onClick={() => { setManagingPlayerId(null); setView('admin'); }}
-          className="flex items-center gap-2 text-slate-500 hover:text-slate-800 transition-colors"
+          className="flex items-center gap-2 text-slate-500 hover:text-slate-800 transition-colors mb-4 min-h-[44px]"
         >
           <ChevronDown size={16} className="rotate-90" /> Back to Players
         </button>
 
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-slate-800">Player Profile</h2>
-          <Badge type={player.status === 'active' ? 'success' : 'danger'}>{player.status}</Badge>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column: Avatar & Quick Stats */}
-          <div className="space-y-4">
-            {/* Avatar */}
-            <Card>
-              <div className="p-6 flex flex-col items-center">
-                <div className="relative group mb-4">
-                  {avatarPreview ? (
-                    <img src={avatarPreview} alt={player.name} className="w-28 h-28 rounded-full object-cover border-4 border-emerald-200" />
-                  ) : (
-                    <div className="w-28 h-28 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-bold text-3xl border-4 border-emerald-200">
-                      {player.name.split(' ').map(n => n.charAt(0)).slice(0, 2).join('')}
-                    </div>
-                  )}
-                  <label className="absolute bottom-0 right-0 bg-emerald-600 text-white rounded-full p-2 cursor-pointer hover:bg-emerald-700 transition-colors shadow-lg">
-                    <Camera size={16} />
-                    <input type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
-                  </label>
-                </div>
-                <h3 className="font-bold text-lg text-slate-800">{player.name}</h3>
-                <p className="text-sm text-slate-500">{player.email}</p>
-                <div className="flex gap-2 mt-2">
-                  <Badge type={player.role === 'master' ? 'warning' : player.role === 'admin' ? 'warning' : 'neutral'}>
+        {/* Unified Profile Card */}
+        <Card>
+          {/* Profile Header */}
+          <div className="p-5 pb-4">
+            <div className="flex items-center gap-4">
+              <div className="relative flex-shrink-0">
+                {avatarPreview ? (
+                  <img src={avatarPreview} alt={player.name} className="w-16 h-16 rounded-full object-cover ring-2 ring-emerald-200" />
+                ) : (
+                  <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-bold text-xl ring-2 ring-emerald-200">
+                    {player.name.split(' ').map(n => n.charAt(0)).slice(0, 2).join('')}
+                  </div>
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <h2 className="text-lg font-bold text-slate-800 truncate">{player.name}</h2>
+                <p className="text-sm text-slate-500 truncate">{player.email}</p>
+                <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                  <Badge type={player.role === 'master' || player.role === 'admin' ? 'warning' : 'neutral'}>
                     {player.role === 'master' ? 'Master' : player.role}
                   </Badge>
-                </div>
-              </div>
-            </Card>
-
-            {/* Season Stats */}
-            <Card>
-              <div className="p-4 border-b border-slate-100 bg-emerald-50">
-                <h4 className="font-semibold text-emerald-800 text-sm">{activeSeason?.name || 'Season'} Stats</h4>
-              </div>
-              <div className="p-4 space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-500">Rounds Played</span>
-                  <span className="font-bold text-slate-800">{roundsPlayed} / {rounds.length}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-500">Total Strokes</span>
-                  <span className="font-bold text-slate-800">{totalStrokes || '-'}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-500">Average Score</span>
-                  <span className="font-bold text-slate-800">{avgScore || '-'}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-500">Total Stableford</span>
-                  <span className="font-bold text-slate-800">{totalStableford || '-'}</span>
-                </div>
-                <div className="border-t border-slate-100 pt-3 flex justify-between items-center">
-                  <span className="text-sm text-slate-500">Total Fines</span>
-                  <span className="font-bold text-red-600">R{playerFinesSummary.total_fines.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-500">Fines Paid</span>
-                  <span className="font-bold text-emerald-600">R{playerFinesSummary.paid_fines.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-500">Fines Outstanding</span>
-                  <span className="font-bold text-amber-600">R{playerFinesSummary.outstanding_fines.toLocaleString()}</span>
-                </div>
-              </div>
-            </Card>
-
-            {/* Buy-In Status */}
-            <Card>
-              <div className="p-4 border-b border-slate-100 bg-blue-50">
-                <h4 className="font-semibold text-blue-800 text-sm">Buy-In Status</h4>
-              </div>
-              <div className="p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <p className="font-bold text-slate-800">R{activeSeason?.buy_in_amount?.toLocaleString() || '2,500'}</p>
-                    <p className="text-xs text-slate-500">{activeSeason?.name}</p>
-                  </div>
-                  <span className={`px-3 py-1 rounded-full text-sm font-bold ${playerBuyIn.isPaid ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                    {playerBuyIn.isPaid ? 'Paid' : 'Outstanding'}
+                  <Badge type={player.status === 'active' ? 'success' : 'danger'}>{player.status}</Badge>
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
+                    playerBuyIn.isPaid ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                  }`}>
+                    Buy-In: {playerBuyIn.isPaid ? 'Paid' : 'Due'}
                   </span>
                 </div>
-                {playerBuyIn.date && (
-                  <p className="text-xs text-slate-400 mb-3">Paid on {playerBuyIn.date}</p>
-                )}
-                <button
-                  onClick={async () => {
-                    if (!activeSeason?.id) return;
-                    await DB.markBuyInPaid(player.id, activeSeason.id, !playerBuyIn.isPaid);
-                    const newStatus = { isPaid: !playerBuyIn.isPaid, date: !playerBuyIn.isPaid ? new Date().toISOString().split('T')[0] : null };
-                    setPlayerBuyIn(newStatus);
-                    showToast(`Buy-in ${!playerBuyIn.isPaid ? 'marked as paid' : 'marked as outstanding'}`, 'success');
-                  }}
-                  className={`w-full py-2 rounded-lg font-semibold text-sm transition-all ${
-                    playerBuyIn.isPaid
-                      ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
-                      : 'bg-emerald-600 text-white hover:bg-emerald-700'
-                  }`}
-                >
-                  {playerBuyIn.isPaid ? 'Mark as Unpaid' : 'Mark as Paid'}
-                </button>
               </div>
-            </Card>
+            </div>
+
+            {/* Stat Pills */}
+            <div className="flex flex-wrap gap-2 mt-4 text-xs">
+              <span className="bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full font-medium">{roundsPlayed}/{rounds.length} Rounds</span>
+              <span className="bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full font-medium">Avg {avgScore || '-'}</span>
+              <span className="bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full font-medium">SF {totalStableford || '-'}</span>
+              <span className="bg-red-50 text-red-600 px-2.5 py-1 rounded-full font-medium">Fines R{playerFinesSummary.total_fines.toLocaleString()}</span>
+            </div>
           </div>
 
-          {/* Right Column: Edit Form & Round History */}
-          <div className="lg:col-span-2 space-y-4">
-            {/* Edit Form */}
-            <Card>
-              <div className="p-4 border-b border-slate-100 bg-slate-50">
-                <h4 className="font-semibold text-slate-800">Edit Details</h4>
-              </div>
-              <form onSubmit={handleSave} className="p-4 space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="form-control">
-                    <label className="label"><span className="label-text font-semibold">Full Name</span></label>
-                    <input
-                      name="playerName"
-                      required
-                      value={formData.name || ''}
-                      onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                      className="input input-bordered w-full focus:input-primary"
-                    />
+          {/* Tab Navigation */}
+          <div className="flex border-t border-b border-slate-200 overflow-x-auto scrollbar-hide">
+            {tabs.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setProfileTab(tab.id)}
+                className={`flex-1 min-w-[80px] px-4 py-3 text-sm font-medium text-center transition-colors whitespace-nowrap min-h-[44px] ${
+                  profileTab === tab.id
+                    ? 'text-emerald-600 border-b-2 border-emerald-600 bg-emerald-50/50'
+                    : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Tab Content */}
+          <div className="p-4">
+            {/* Stats Tab */}
+            {profileTab === 'stats' && (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-slate-50 rounded-lg p-3 text-center">
+                    <p className="text-xs text-slate-500">Rounds Played</p>
+                    <p className="text-xl font-bold text-slate-800 mt-0.5">{roundsPlayed} <span className="text-sm font-normal text-slate-400">/ {rounds.length}</span></p>
                   </div>
-                  <div className="form-control">
-                    <label className="label"><span className="label-text font-semibold">Email Address</span></label>
-                    <input
-                      name="playerEmail"
-                      required
-                      type="email"
-                      value={formData.email || ''}
-                      onChange={e => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                      className="input input-bordered w-full focus:input-primary"
-                    />
+                  <div className="bg-slate-50 rounded-lg p-3 text-center">
+                    <p className="text-xs text-slate-500">Average Score</p>
+                    <p className="text-xl font-bold text-slate-800 mt-0.5">{avgScore || '-'}</p>
                   </div>
-                  <div className="form-control">
-                    <label className="label"><span className="label-text font-semibold">New Password</span></label>
-                    <input
-                      name="playerPassword"
-                      type="password"
-                      placeholder="Leave blank to keep current"
-                      value={formData.password || ''}
-                      onChange={e => setFormData(prev => ({ ...prev, password: e.target.value }))}
-                      className="input input-bordered w-full focus:input-primary"
-                    />
+                  <div className="bg-slate-50 rounded-lg p-3 text-center">
+                    <p className="text-xs text-slate-500">Total Strokes</p>
+                    <p className="text-xl font-bold text-slate-800 mt-0.5">{totalStrokes || '-'}</p>
                   </div>
-                  {currentUser.role === 'master' && player.role !== 'master' && (
-                    <div className="form-control">
-                      <label className="label"><span className="label-text font-semibold">Role</span></label>
-                      <select
-                        name="playerRole"
-                        value={formData.role || 'player'}
-                        onChange={e => setFormData(prev => ({ ...prev, role: e.target.value }))}
-                        className="select select-bordered w-full focus:select-primary"
-                      >
-                        <option value="player">Player</option>
-                        <option value="admin">Admin</option>
-                      </select>
-                    </div>
-                  )}
-                  <div className="form-control">
-                    <label className="label"><span className="label-text font-semibold">Status</span></label>
-                    <select
-                      name="playerStatus"
-                      value={formData.status || 'active'}
-                      onChange={e => setFormData(prev => ({ ...prev, status: e.target.value }))}
-                      className="select select-bordered w-full focus:select-primary"
-                    >
-                      <option value="active">Active</option>
-                      <option value="inactive">Inactive</option>
-                    </select>
+                  <div className="bg-slate-50 rounded-lg p-3 text-center">
+                    <p className="text-xs text-slate-500">Stableford Points</p>
+                    <p className="text-xl font-bold text-slate-800 mt-0.5">{totalStableford || '-'}</p>
                   </div>
                 </div>
-                <button type="submit" className="btn bg-emerald-600 text-white hover:bg-emerald-700 border-0 gap-2">
-                  <Save size={16} /> Save Changes
-                </button>
-              </form>
-            </Card>
-
-            {/* Round History */}
-            <Card>
-              <div className="p-4 border-b border-slate-100 bg-slate-50">
-                <h4 className="font-semibold text-slate-800">Round History — {activeSeason?.name}</h4>
               </div>
-              <div className="overflow-x-auto">
+            )}
+
+            {/* Rounds Tab */}
+            {profileTab === 'rounds' && (
+              <div className="overflow-x-auto -mx-4">
                 {rounds.length > 0 ? (
-                  <table className="table table-sm">
+                  <table className="w-full text-sm">
                     <thead>
-                      <tr>
-                        <th>Round</th>
-                        <th>Course</th>
-                        <th className="text-center">Strokes</th>
-                        <th className="text-center">Handicap</th>
-                        <th className="text-center">Stableford</th>
+                      <tr className="text-left text-xs text-slate-500 uppercase border-b border-slate-100">
+                        <th className="px-4 py-2 font-medium">Round</th>
+                        <th className="px-4 py-2 font-medium">Course</th>
+                        <th className="px-4 py-2 font-medium text-center">Score</th>
+                        <th className="px-4 py-2 font-medium text-center">HC</th>
+                        <th className="px-4 py-2 font-medium text-center">SF</th>
                       </tr>
                     </thead>
                     <tbody>
                       {rounds.map(r => {
                         const s = playerScores[r.id];
                         return (
-                          <tr key={r.id} className={!s?.strokes ? 'opacity-40' : ''}>
-                            <td className="font-medium">{r.name}</td>
-                            <td className="text-slate-500 text-sm">{r.course_name}</td>
-                            <td className="text-center font-bold">{s?.strokes || '-'}</td>
-                            <td className="text-center">{s?.handicap || '-'}</td>
-                            <td className="text-center">{s?.stableford || '-'}</td>
+                          <tr key={r.id} className={`border-b border-slate-50 ${!s?.strokes ? 'opacity-30' : ''}`}>
+                            <td className="px-4 py-2.5 font-medium text-slate-800">{r.name}</td>
+                            <td className="px-4 py-2.5 text-slate-500 text-xs">{r.course_name}</td>
+                            <td className="px-4 py-2.5 text-center font-bold text-slate-800">{s?.strokes || '-'}</td>
+                            <td className="px-4 py-2.5 text-center text-slate-600">{s?.handicap || '-'}</td>
+                            <td className="px-4 py-2.5 text-center text-slate-600">{s?.stableford || '-'}</td>
                           </tr>
                         );
                       })}
                     </tbody>
                   </table>
                 ) : (
-                  <div className="p-8 text-center text-slate-400">No rounds in this season yet</div>
+                  <div className="py-12 text-center text-slate-400">No rounds in this season yet</div>
                 )}
               </div>
-            </Card>
+            )}
+
+            {/* Fines Tab */}
+            {profileTab === 'fines' && (
+              <div className="space-y-4">
+                {/* Fines Summary */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="bg-red-50 rounded-lg p-3 text-center">
+                    <p className="text-xs text-red-500">Total</p>
+                    <p className="text-lg font-bold text-red-700 mt-0.5">R{playerFinesSummary.total_fines.toLocaleString()}</p>
+                  </div>
+                  <div className="bg-emerald-50 rounded-lg p-3 text-center">
+                    <p className="text-xs text-emerald-500">Paid</p>
+                    <p className="text-lg font-bold text-emerald-700 mt-0.5">R{playerFinesSummary.paid_fines.toLocaleString()}</p>
+                  </div>
+                  <div className="bg-amber-50 rounded-lg p-3 text-center">
+                    <p className="text-xs text-amber-500">Outstanding</p>
+                    <p className="text-lg font-bold text-amber-700 mt-0.5">R{playerFinesSummary.outstanding_fines.toLocaleString()}</p>
+                  </div>
+                </div>
+
+                {/* Buy-In */}
+                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">Season Buy-In</p>
+                    <p className="text-xs text-slate-500">R{activeSeason?.buy_in_amount?.toLocaleString() || '2,500'} — {activeSeason?.name}</p>
+                    {playerBuyIn.date && <p className="text-xs text-slate-400 mt-0.5">Paid {playerBuyIn.date}</p>}
+                  </div>
+                  <button
+                    onClick={async () => {
+                      if (!activeSeason?.id) return;
+                      await DB.markBuyInPaid(player.id, activeSeason.id, !playerBuyIn.isPaid);
+                      setPlayerBuyIn({ isPaid: !playerBuyIn.isPaid, date: !playerBuyIn.isPaid ? new Date().toISOString().split('T')[0] : null });
+                      showToast(`Buy-in ${!playerBuyIn.isPaid ? 'marked as paid' : 'marked as outstanding'}`, 'success');
+                    }}
+                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all min-h-[44px] ${
+                      playerBuyIn.isPaid
+                        ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                        : 'bg-amber-500 text-white hover:bg-amber-600'
+                    }`}
+                  >
+                    {playerBuyIn.isPaid ? 'Paid' : 'Mark Paid'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Edit Tab */}
+            {profileTab === 'edit' && (
+              <form onSubmit={handleSave} className="space-y-4">
+                {/* Avatar Upload */}
+                <div className="flex items-center gap-4">
+                  <div className="relative">
+                    {avatarPreview ? (
+                      <img src={avatarPreview} alt="" className="w-14 h-14 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-14 h-14 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-bold">
+                        {player.name.charAt(0)}
+                      </div>
+                    )}
+                  </div>
+                  <label className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg cursor-pointer transition-colors text-sm text-slate-600 min-h-[44px]">
+                    <Camera size={16} /> Change Photo
+                    <input type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
+                  </label>
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-sm font-medium text-slate-700 mb-1 block">Full Name</label>
+                    <input
+                      name="playerName"
+                      required
+                      value={formData.name || ''}
+                      onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                      className="input input-bordered w-full min-h-[44px]"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-slate-700 mb-1 block">Email Address</label>
+                    <input
+                      name="playerEmail"
+                      required
+                      type="email"
+                      value={formData.email || ''}
+                      onChange={e => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                      className="input input-bordered w-full min-h-[44px]"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-slate-700 mb-1 block">New Password</label>
+                    <input
+                      name="playerPassword"
+                      type="password"
+                      placeholder="Leave blank to keep current"
+                      value={formData.password || ''}
+                      onChange={e => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                      className="input input-bordered w-full min-h-[44px]"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    {currentUser.role === 'master' && player.role !== 'master' && (
+                      <div>
+                        <label className="text-sm font-medium text-slate-700 mb-1 block">Role</label>
+                        <select
+                          name="playerRole"
+                          value={formData.role || 'player'}
+                          onChange={e => setFormData(prev => ({ ...prev, role: e.target.value }))}
+                          className="select select-bordered w-full min-h-[44px]"
+                        >
+                          <option value="player">Player</option>
+                          <option value="admin">Admin</option>
+                        </select>
+                      </div>
+                    )}
+                    <div>
+                      <label className="text-sm font-medium text-slate-700 mb-1 block">Status</label>
+                      <select
+                        name="playerStatus"
+                        value={formData.status || 'active'}
+                        onChange={e => setFormData(prev => ({ ...prev, status: e.target.value }))}
+                        className="select select-bordered w-full min-h-[44px]"
+                      >
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                <button type="submit" className="w-full bg-emerald-600 text-white py-3 rounded-lg font-semibold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 min-h-[48px]">
+                  <Save size={16} /> Save Changes
+                </button>
+              </form>
+            )}
           </div>
-        </div>
+        </Card>
       </div>
     );
   };
