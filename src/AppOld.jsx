@@ -1019,18 +1019,68 @@ export default function GPGAManager() {
       }`}>{dq ? '-' : idx + 1}</span>
     );
 
-    // Player name cell helper
-    const PlayerCell = ({ player }) => (
+    // Player name cell helper — shows trophy for winners in completed seasons
+    const isCompletedSeason = activeSeason && !activeSeason.is_active;
+
+    const PlayerCell = ({ player, isWinner }) => (
       <div className="flex items-center gap-2 min-w-0">
+        {isWinner && <Trophy size={14} className="text-yellow-500 flex-shrink-0" />}
         <span className={`truncate ${player.isDisqualified ? 'text-slate-400 line-through' : 'font-medium text-slate-800'}`}>
           {player.name}
         </span>
+        {isWinner && <span className="text-[10px] bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded font-bold flex-shrink-0">WINNER</span>}
         {player.isDisqualified && <span className="text-[10px] bg-red-100 text-red-500 px-1.5 py-0.5 rounded font-bold flex-shrink-0">DQ</span>}
       </div>
     );
 
     return (
       <div className="space-y-4 animate-in fade-in duration-300">
+        {/* Winners Banner for completed seasons */}
+        {isCompletedSeason && (
+          <Card className="bg-gradient-to-r from-yellow-50 to-amber-50 border-yellow-200">
+            <div className="p-4 md:p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <Trophy size={20} className="text-yellow-500" />
+                <h3 className="font-bold text-slate-800">{activeSeason.name} Champions</h3>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="flex items-center gap-3 bg-white/70 rounded-lg p-3">
+                  <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                    <Trophy size={18} className="text-emerald-600" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] text-slate-500 uppercase font-medium">Medal</p>
+                    <p className="font-bold text-slate-800 text-sm truncate">{leaderboardData[0]?.name || '-'}</p>
+                    <p className="text-xs text-emerald-600 font-semibold">{leaderboardData[0]?.netTotal || '-'} net</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 bg-white/70 rounded-lg p-3">
+                  <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                    <Trophy size={18} className="text-blue-600" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] text-slate-500 uppercase font-medium">Stableford</p>
+                    <p className="font-bold text-slate-800 text-sm truncate">{stablefordSorted[0]?.name || '-'}</p>
+                    <p className="text-xs text-blue-600 font-semibold">{stablefordSorted[0]?.netStableford || '-'} pts</p>
+                  </div>
+                </div>
+                {teamLeaderboard.length > 0 && (
+                  <div className="flex items-center gap-3 bg-white/70 rounded-lg p-3">
+                    <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0">
+                      <Trophy size={18} className="text-purple-600" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[10px] text-slate-500 uppercase font-medium">Teams</p>
+                      <p className="font-bold text-slate-800 text-sm truncate">{teamLeaderboard[0].name}</p>
+                      <p className="text-xs text-purple-600 font-semibold">{teamLeaderboard[0].total} pts</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </Card>
+        )}
+
         {/* Header + Season Summary */}
         <div>
           <h2 className="text-xl font-bold text-slate-800">{activeSeason?.name || 'Leaderboard'}</h2>
@@ -1087,7 +1137,7 @@ export default function GPGAManager() {
                   {leaderboardData.map((player, idx) => (
                     <tr key={player.id} className={`${player.isDisqualified ? 'opacity-50' : idx === 0 ? 'bg-emerald-50/30' : 'hover:bg-slate-50'}`}>
                       <td className="px-3 py-3"><RankBadge idx={idx} dq={player.isDisqualified} /></td>
-                      <td className="px-3 py-3"><PlayerCell player={player} /></td>
+                      <td className="px-3 py-3"><PlayerCell player={player} isWinner={isCompletedSeason && idx === 0 && !player.isDisqualified} /></td>
                       {rounds.map(r => (
                         <td key={r.id} className="px-1.5 py-3 text-center text-slate-600 text-xs">
                           {player.pScores[r.id]?.strokes || <span className="text-slate-300">-</span>}
@@ -1124,7 +1174,7 @@ export default function GPGAManager() {
                   {stablefordSorted.map((player, idx) => (
                     <tr key={player.id} className={`${player.isDisqualified ? 'opacity-50' : idx === 0 ? 'bg-blue-50/30' : 'hover:bg-slate-50'}`}>
                       <td className="px-3 py-3"><RankBadge idx={idx} dq={player.isDisqualified} /></td>
-                      <td className="px-3 py-3"><PlayerCell player={player} /></td>
+                      <td className="px-3 py-3"><PlayerCell player={player} isWinner={isCompletedSeason && idx === 0 && !player.isDisqualified} /></td>
                       {rounds.map(r => (
                         <td key={r.id} className="px-1.5 py-3 text-center text-slate-600 text-xs">
                           {player.pScores[r.id]?.stableford || <span className="text-slate-300">-</span>}
@@ -1163,8 +1213,16 @@ export default function GPGAManager() {
                       <tr key={team.id} className={idx === 0 ? 'bg-purple-50/30' : 'hover:bg-slate-50'}>
                         <td className="px-3 py-3"><RankBadge idx={idx} /></td>
                         <td className="px-3 py-3">
-                          <p className="font-medium text-slate-800">{team.name}</p>
-                          <p className="text-xs text-slate-400">{team.player1_name} & {team.player2_name}</p>
+                          <div className="flex items-center gap-2">
+                            {isCompletedSeason && idx === 0 && <Trophy size={14} className="text-yellow-500 flex-shrink-0" />}
+                            <div className="min-w-0">
+                              <p className="font-medium text-slate-800 flex items-center gap-1.5">
+                                {team.name}
+                                {isCompletedSeason && idx === 0 && <span className="text-[10px] bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded font-bold">WINNER</span>}
+                              </p>
+                              <p className="text-xs text-slate-400">{team.player1_name} & {team.player2_name}</p>
+                            </div>
+                          </div>
                         </td>
                         {rounds.map(r => (
                           <td key={r.id} className="px-1.5 py-3 text-center text-slate-600 text-xs">
