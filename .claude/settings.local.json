@@ -7,7 +7,19 @@
       "Bash(git add:*)",
       "Bash(git push:*)",
       "Bash(npx tsx:*)",
-      "Bash(curl -s http://localhost:3001/api/health)"
+      "Bash(curl -s http://localhost:3001/api/health)",
+      "Bash(npx vite:*)",
+      "Bash(taskkill //F //IM node.exe)",
+      "Bash(curl -s http://localhost:3001/api/players)",
+      "Bash(curl -s http://localhost:3001/api/seasons/active)",
+      "Bash(curl -s http://localhost:3001/api/scores)",
+      "Bash(curl -s -X POST http://localhost:3001/api/auth/login -H 'Content-Type: application/json' -d '{\"email\":\"duwayne@gpga.com\",\"password\":\"password\"}')",
+      "Bash(curl -s http://localhost:3001/api/fines/types?season_id=1)",
+      "Bash(curl -s http://localhost:3001/api/buy-in/1/1)",
+      "Bash(git commit -m ':*)",
+      "Bash(curl -s http://localhost:3001/api/teams?season_id=1)",
+      "Bash(curl -s -X POST http://localhost:3001/api/seasons -H 'Content-Type: application/json' -d '{\"year\":2026,\"name\":\"GPGA 2026 Season\",\"buy_in_amount\":2500,\"is_active\":true}')",
+      "Bash(curl -s http://localhost:3001/api/seasons)"
     ],
     "deny": [],
     "ask": []
