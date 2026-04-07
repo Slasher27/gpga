@@ -3932,7 +3932,7 @@ export default function GPGAManager() {
     ];
 
     return (
-      <div className="animate-in fade-in duration-300 max-w-2xl mx-auto">
+      <div className="animate-in fade-in duration-300">
         {/* Back Button */}
         <button
           onClick={() => { setManagingPlayerId(null); setView('admin'); }}
@@ -4003,7 +4003,7 @@ export default function GPGAManager() {
             {/* Stats Tab */}
             {profileTab === 'stats' && (
               <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   <div className="bg-slate-50 rounded-lg p-3 text-center">
                     <p className="text-xs text-slate-500">Rounds Played</p>
                     <p className="text-xl font-bold text-slate-800 mt-0.5">{roundsPlayed} <span className="text-sm font-normal text-slate-400">/ {rounds.length}</span></p>
