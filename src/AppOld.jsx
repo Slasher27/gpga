@@ -1045,6 +1045,7 @@ export default function GPGAManager() {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="flex items-center gap-3 bg-slate-50 rounded-lg p-3">
+                  <Trophy size={18} className="text-yellow-500 flex-shrink-0" />
                   <div className="min-w-0">
                     <p className="text-[10px] text-slate-400 uppercase font-medium">Medal</p>
                     <p className="font-bold text-slate-800 text-sm truncate">{leaderboardData[0]?.name || '-'}</p>
@@ -1052,6 +1053,7 @@ export default function GPGAManager() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3 bg-slate-50 rounded-lg p-3">
+                  <Trophy size={18} className="text-yellow-500 flex-shrink-0" />
                   <div className="min-w-0">
                     <p className="text-[10px] text-slate-400 uppercase font-medium">Stableford</p>
                     <p className="font-bold text-slate-800 text-sm truncate">{stablefordSorted[0]?.name || '-'}</p>
@@ -1060,6 +1062,7 @@ export default function GPGAManager() {
                 </div>
                 {teamLeaderboard.length > 0 && (
                   <div className="flex items-center gap-3 bg-slate-50 rounded-lg p-3">
+                    <Trophy size={18} className="text-yellow-500 flex-shrink-0" />
                     <div className="min-w-0">
                       <p className="text-[10px] text-slate-400 uppercase font-medium">Teams</p>
                       <p className="font-bold text-slate-800 text-sm truncate">{teamLeaderboard[0].name}</p>
