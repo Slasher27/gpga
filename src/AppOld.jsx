@@ -3328,7 +3328,7 @@ export default function GPGAManager() {
       <div className="space-y-4 animate-in fade-in duration-300">
         {/* Header: Title + Action Button (consistent across tabs) */}
         <div className="flex items-center justify-between min-h-[44px]">
-          <h2 className="text-xl font-bold text-slate-800">Manage</h2>
+          <h2 className="text-xl font-bold text-slate-800">Players & Teams</h2>
           {adminTab === 'players' && (
             <button
               onClick={() => setIsAddPlayerModalOpen(true)}
