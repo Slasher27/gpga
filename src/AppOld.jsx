@@ -847,9 +847,13 @@ export default function GPGAManager() {
                 {activeSeason?.is_active === 1 && (
                   <button
                     onClick={() => {
+                      const roundCount = rounds.length;
+                      const warning = roundCount < 9
+                        ? `The season has only completed ${roundCount} of 9 rounds. Are you sure you want to end it early?\n\nThis will close the season. Scores, fines, and standings will be locked. This cannot be undone.`
+                        : 'This will close the season. Scores, fines, and standings will be locked. You can still view the data but cannot make changes. This cannot be undone.';
                       showConfirm(
                         `End ${activeSeason.name}?`,
-                        'This will close the season. Scores, fines, and standings will be locked. You can still view the data but cannot make changes. This cannot be undone.',
+                        warning,
                         async () => {
                           await fetch('/api/seasons/' + activeSeason.id, {
                             method: 'PUT',
