@@ -275,7 +275,7 @@ const LoginPage = ({ onLogin }) => {
                 <Trophy size={48} className="text-white" />
               </div>
             </div>
-            <h1 className="text-3xl font-bold text-white mb-2">GPGA {activeSeason?.year || ''}</h1>
+            <h1 className="text-3xl font-bold text-white mb-2">GPGA</h1>
             <p className="text-emerald-100">Golf Pro Golf Association</p>
           </div>
 
