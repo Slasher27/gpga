@@ -2253,44 +2253,59 @@ export default function GPGAManager() {
                       )}
                     </div>
                     {/* Score Inputs */}
-                    <div className="grid grid-cols-3 gap-2">
-                      <div>
-                        <label className="text-[10px] text-slate-400 uppercase block mb-0.5">Score</label>
-                        <input
-                          type="number" min="40" max="150"
-                          id={`score-${p.id}-strokes`} name={`score-${p.id}-strokes`}
-                          value={getDisplayValue('strokes', currentScore.strokes)}
-                          onChange={(e) => handleScoreChange(p.id, 'strokes', e.target.value)}
-                          disabled={!isEditing}
-                          className={`w-full text-center rounded-lg px-2 py-2 text-sm min-h-[40px] border ${isEditing ? 'border-emerald-300 bg-white' : 'border-slate-200 bg-slate-50 text-slate-500'}`}
-                          placeholder="72"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] text-slate-400 uppercase block mb-0.5">HC</label>
-                        <input
-                          type="number" min="0" max="36"
-                          id={`score-${p.id}-hc`} name={`score-${p.id}-hc`}
-                          value={getDisplayValue('handicap', currentScore.handicap)}
-                          onChange={(e) => handleScoreChange(p.id, 'handicap', e.target.value)}
-                          disabled={!isEditing}
-                          className={`w-full text-center rounded-lg px-2 py-2 text-sm min-h-[40px] border ${isEditing ? 'border-emerald-300 bg-white' : 'border-slate-200 bg-slate-50 text-slate-500'}`}
-                          placeholder="0"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] text-slate-400 uppercase block mb-0.5">Stableford</label>
-                        <input
-                          type="number" min="0" max="50"
-                          id={`score-${p.id}-sf`} name={`score-${p.id}-sf`}
-                          value={getDisplayValue('stableford', currentScore.stableford)}
-                          onChange={(e) => handleScoreChange(p.id, 'stableford', e.target.value)}
-                          disabled={!isEditing}
-                          className={`w-full text-center rounded-lg px-2 py-2 text-sm min-h-[40px] border ${isEditing ? 'border-emerald-300 bg-white' : 'border-slate-200 bg-slate-50 text-slate-500'}`}
-                          placeholder="36"
-                        />
-                      </div>
-                    </div>
+                    {(() => {
+                      const netVal = getDisplayValue('strokes', currentScore.strokes);
+                      const hcVal = getDisplayValue('handicap', currentScore.handicap);
+                      const gross = (Number(netVal) || 0) > 0 && (Number(hcVal) || 0) !== 0
+                        ? (Number(netVal) || 0) + (Number(hcVal) || 0)
+                        : (Number(netVal) || 0) > 0 ? Number(netVal) : '';
+                      return (
+                        <div className="grid grid-cols-4 gap-2">
+                          <div>
+                            <label className="text-[10px] text-slate-400 uppercase block mb-0.5">Gross</label>
+                            <div className="w-full text-center rounded-lg px-2 py-2 text-sm min-h-[40px] border border-slate-200 bg-slate-100 text-slate-500 flex items-center justify-center">
+                              {gross || '-'}
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-slate-400 uppercase block mb-0.5">Net</label>
+                            <input
+                              type="number" min="40" max="150"
+                              id={`score-${p.id}-strokes`} name={`score-${p.id}-strokes`}
+                              value={netVal}
+                              onChange={(e) => handleScoreChange(p.id, 'strokes', e.target.value)}
+                              disabled={!isEditing}
+                              className={`w-full text-center rounded-lg px-2 py-2 text-sm min-h-[40px] border ${isEditing ? 'border-emerald-300 bg-white' : 'border-slate-200 bg-slate-50 text-slate-500'}`}
+                              placeholder="72"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-slate-400 uppercase block mb-0.5">HC</label>
+                            <input
+                              type="number" min="-5" max="36"
+                              id={`score-${p.id}-hc`} name={`score-${p.id}-hc`}
+                              value={hcVal}
+                              onChange={(e) => handleScoreChange(p.id, 'handicap', e.target.value)}
+                              disabled={!isEditing}
+                              className={`w-full text-center rounded-lg px-2 py-2 text-sm min-h-[40px] border ${isEditing ? 'border-emerald-300 bg-white' : 'border-slate-200 bg-slate-50 text-slate-500'}`}
+                              placeholder="0"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-slate-400 uppercase block mb-0.5">SF</label>
+                            <input
+                              type="number" min="0" max="50"
+                              id={`score-${p.id}-sf`} name={`score-${p.id}-sf`}
+                              value={getDisplayValue('stableford', currentScore.stableford)}
+                              onChange={(e) => handleScoreChange(p.id, 'stableford', e.target.value)}
+                              disabled={!isEditing}
+                              className={`w-full text-center rounded-lg px-2 py-2 text-sm min-h-[40px] border ${isEditing ? 'border-emerald-300 bg-white' : 'border-slate-200 bg-slate-50 text-slate-500'}`}
+                              placeholder="36"
+                            />
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               })}
