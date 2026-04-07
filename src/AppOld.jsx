@@ -507,11 +507,24 @@ export default function GPGAManager() {
 
   const currentUser = players.find(p => p.id === currentUserId) || players[0];
 
-  // Reload data when navigating away from fines view to refresh leaderboard
+  // Refresh fines data when navigating away from fines view
   useEffect(() => {
     const previousView = localStorage.getItem('gpga_previous_view');
     if (previousView === 'fines' && view !== 'fines') {
-      loadData(); // Refresh all data when leaving fines management (fire-and-forget in useEffect)
+      // Only reload fines data, not everything
+      DB.getPlayerFinesByRound().then(finesData => {
+        setScores(prev => {
+          const merged = { ...prev };
+          Object.keys(finesData).forEach(pid => {
+            if (!merged[pid]) merged[pid] = {};
+            Object.keys(finesData[pid]).forEach(rid => {
+              if (!merged[pid][rid]) merged[pid][rid] = { strokes: 0, fines: 0 };
+              merged[pid][rid] = { ...merged[pid][rid], fines: finesData[pid][rid] };
+            });
+          });
+          return merged;
+        });
+      });
     }
     localStorage.setItem('gpga_previous_view', view);
   }, [view]);
@@ -647,7 +660,7 @@ export default function GPGAManager() {
     };
 
     await DB.addPlayer(newPlayer);
-    await loadData();
+    setPlayers(prev => [...prev, newPlayer].sort((a, b) => a.name.localeCompare(b.name)));
     setIsAddPlayerModalOpen(false);
     showToast(`Player ${newPlayer.name} added successfully!`);
   };
@@ -671,7 +684,7 @@ export default function GPGAManager() {
 
     await DB.updatePlayer(currentUser.id, updates);
 
-    await loadData();
+    setPlayers(prev => prev.map(p => p.id === currentUser.id ? { ...p, name: updatedName, email: updatedEmail, ...(updatedPassword ? { password: updatedPassword } : {}) } : p));
     showToast("Profile updated successfully!");
 
     // Exit edit mode after saving
@@ -690,7 +703,7 @@ export default function GPGAManager() {
       const reader = new FileReader();
       reader.onloadend = async () => {
         await DB.updatePlayer(currentUser.id, { avatar: reader.result });
-        await loadData();
+        setPlayers(prev => prev.map(p => p.id === currentUser.id ? { ...p, avatar: reader.result } : p));
       };
       reader.readAsDataURL(file);
     }
@@ -1606,7 +1619,6 @@ export default function GPGAManager() {
                               onClick={async () => {
                                 await DB.confirmPlayerRoundFines(selectedPlayer, selectedRound, !isRoundConfirmed);
                                 setIsRoundConfirmed(!isRoundConfirmed);
-                                await loadData();
                                 showToast(
                                   isRoundConfirmed
                                     ? 'Fines reopened for editing'
@@ -2011,7 +2023,6 @@ export default function GPGAManager() {
                                             await DB.markRoundFinesPaid(summary.player_id, round.round_id, !round.paid);
                                             const updated = await DB.getPlayerRoundFines(summary.player_id);
                                             setPlayerRoundFinesCache(prev => ({ ...prev, [summary.player_id]: updated }));
-                                            await loadData();
                                             showToast(
                                               `${round.round_name} marked as ${!round.paid ? 'paid' : 'unpaid'} for ${summary.player_name}`,
                                               !round.paid ? 'success' : 'info'
@@ -2093,7 +2104,12 @@ export default function GPGAManager() {
 
       await DB.updateScore(playerId, selectedRound, strokes, handicap, stableford);
 
-      await loadData();
+      setScores(prev => {
+        const updated = { ...prev };
+        if (!updated[playerId]) updated[playerId] = {};
+        updated[playerId] = { ...updated[playerId], [selectedRound]: { strokes, handicap, stableford } };
+        return updated;
+      });
 
       // Remove from edit state
       setEditScores(prev => {
@@ -2144,7 +2160,17 @@ export default function GPGAManager() {
         }
       }
 
-      await loadData();
+      setScores(prev => {
+        const updated = { ...prev };
+        for (const [pid, vals] of Object.entries(editScores)) {
+          if (!updated[pid]) updated[pid] = {};
+          const s = Number(vals.strokes) || 0;
+          const h = Number(vals.handicap) || 0;
+          const sf = Number(vals.stableford) || 0;
+          if (s > 0) updated[pid] = { ...updated[pid], [selectedRound]: { strokes: s, handicap: h, stableford: sf } };
+        }
+        return updated;
+      });
       setEditScores({});
       setEditingPlayers({});
       showToast(`Saved scores for ${savedCount} player${savedCount !== 1 ? 's' : ''}!`);
@@ -2173,8 +2199,8 @@ export default function GPGAManager() {
         courseName: selectedCourse.name
       };
 
-      await DB.addRound(newRound, activeSeason.id);
-      await loadData();
+      const result = await DB.addRound(newRound, activeSeason.id);
+      setRounds(prev => [...prev, { id: result.id, season_id: activeSeason.id, name: newRound.name, date: newRound.date, course_id: newRound.courseId, course_name: newRound.courseName }]);
       showToast(`Round created successfully at ${selectedCourse.name}!`);
       setShowCreateForm(false);
       setRoundName('');
@@ -2879,8 +2905,8 @@ export default function GPGAManager() {
         courseName: selectedCourse.name
       };
 
-      await DB.addRound(newRound, activeSeason.id);
-      await loadData();
+      const result = await DB.addRound(newRound, activeSeason.id);
+      setRounds(prev => [...prev, { id: result.id, season_id: activeSeason.id, name: newRound.name, date: newRound.date, course_id: newRound.courseId, course_name: newRound.courseName }]);
       showToast(`Round created successfully at ${selectedCourse.name}!`);
       setView('admin');
       localStorage.setItem('gpga_current_view', 'admin');
@@ -3060,8 +3086,8 @@ export default function GPGAManager() {
       courseName: selectedCourse.name
     };
 
-    await DB.addRound(newRound, activeSeason.id);
-    await loadData();
+    const result = await DB.addRound(newRound, activeSeason.id);
+    setRounds(prev => [...prev, { id: result.id, season_id: activeSeason.id, name: newRound.name, date: newRound.date, course_id: newRound.courseId, course_name: newRound.courseName }]);
     setIsAddRoundModalOpen(false);
     setSelectedCourse(null);
     setSearchTerm('');
@@ -3101,7 +3127,7 @@ export default function GPGAManager() {
 
     await DB.updatePlayer(editingPlayer.id, updates);
 
-    await loadData();
+    setPlayers(prev => prev.map(p => p.id === editingPlayer.id ? { ...p, ...updates } : p));
     setIsEditPlayerModalOpen(false);
     showToast(`Player ${formData.get('name')} updated successfully!`);
     setEditingPlayer(null);
@@ -3113,7 +3139,7 @@ export default function GPGAManager() {
       `This will permanently remove ${name} and all their scores, fines, and history. This action cannot be undone.`,
       async () => {
         await DB.deletePlayer(id);
-        await loadData();
+        setPlayers(prev => prev.filter(p => p.id !== id));
         showToast(`Player ${name} deleted successfully!`, 'success');
       },
       'danger'
@@ -3134,14 +3160,15 @@ export default function GPGAManager() {
     e.preventDefault();
     const formData = new FormData(e.target);
 
-    await DB.updateRound(editingRound.id, {
+    const roundUpdates = {
       name: formData.get('name'),
       date: formData.get('date'),
       courseId: selectedCourse?.id,
       courseName: selectedCourse?.name
-    });
+    };
+    await DB.updateRound(editingRound.id, roundUpdates);
 
-    await loadData();
+    setRounds(prev => prev.map(r => r.id === editingRound.id ? { ...r, name: roundUpdates.name || r.name, date: roundUpdates.date || r.date, course_id: roundUpdates.courseId || r.course_id, course_name: roundUpdates.courseName || r.course_name } : r));
     setIsEditRoundModalOpen(false);
     setSelectedCourse(null);
     setSearchTerm('');
@@ -3156,7 +3183,7 @@ export default function GPGAManager() {
   const confirmDeleteRound = async () => {
     if (deleteRoundConfirm) {
       await DB.deleteRound(deleteRoundConfirm.id);
-      await loadData();
+      setRounds(prev => prev.filter(r => r.id !== deleteRoundConfirm.id));
       showToast(`Round "${deleteRoundConfirm.name}" deleted successfully!`, 'success');
       setDeleteRoundConfirm(null);
     }
@@ -3178,7 +3205,6 @@ export default function GPGAManager() {
       formData.get('description')
     );
 
-    await loadData();
     setIsAddFineTypeModalOpen(false);
   };
 
@@ -3188,7 +3214,6 @@ export default function GPGAManager() {
       `This will permanently delete this fine type. Any existing fines of this type will remain. This action cannot be undone.`,
       async () => {
         await DB.deleteFineType(id);
-        await loadData();
         showToast(`Fine type "${name}" deleted`, 'success');
       },
       'danger'
@@ -3454,7 +3479,7 @@ export default function GPGAManager() {
                       onClick={async () => {
                         const newStatus = p.status === 'active' ? 'inactive' : 'active';
                         await DB.updatePlayer(p.id, { status: newStatus });
-                        await loadData();
+                        setPlayers(prev => prev.map(pl => pl.id === p.id ? { ...pl, status: newStatus } : pl));
                         showToast(`Player ${newStatus === 'active' ? 'activated' : 'deactivated'}`, 'success');
                       }}
                       className={`p-2.5 rounded-lg transition-colors ${
@@ -3553,7 +3578,7 @@ export default function GPGAManager() {
                       onClick={async () => {
                         const newStatus = p.status === 'active' ? 'inactive' : 'active';
                         await DB.updatePlayer(p.id, { status: newStatus });
-                        await loadData();
+                        setPlayers(prev => prev.map(pl => pl.id === p.id ? { ...pl, status: newStatus } : pl));
                         showToast(`Player ${newStatus === 'active' ? 'activated' : 'deactivated'}`, 'success');
                       }}
                       className={`p-2.5 rounded-lg transition-colors ${
