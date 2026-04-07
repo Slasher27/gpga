@@ -512,6 +512,9 @@ export default function GPGAManager() {
 
   const currentUser = players.find(p => p.id === currentUserId) || players[0];
 
+  // Read-only mode for completed (non-active) seasons
+  const isReadOnlySeason = activeSeason && !activeSeason.is_active;
+
   // Refresh fines data when navigating away from fines view
   useEffect(() => {
     const previousView = localStorage.getItem('gpga_previous_view');
@@ -841,6 +844,31 @@ export default function GPGAManager() {
                   <Plus size={18} />
                   <span className="font-medium text-sm">New Season</span>
                 </button>
+                {activeSeason?.is_active === 1 && (
+                  <button
+                    onClick={() => {
+                      showConfirm(
+                        `End ${activeSeason.name}?`,
+                        'This will close the season. Scores, fines, and standings will be locked. You can still view the data but cannot make changes. This cannot be undone.',
+                        async () => {
+                          await fetch('/api/seasons/' + activeSeason.id, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ is_active: false })
+                          });
+                          setActiveSeason(prev => ({ ...prev, is_active: 0 }));
+                          setAllSeasons(prev => prev.map(s => s.id === activeSeason.id ? { ...s, is_active: 0 } : s));
+                          showToast(`${activeSeason.name} has ended`, 'success');
+                        },
+                        'danger'
+                      );
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors hover:bg-red-900/30 text-red-400"
+                  >
+                    <XCircle size={18} />
+                    <span className="font-medium text-sm">End Season</span>
+                  </button>
+                )}
               </>
             )}
           </>
@@ -1392,8 +1420,8 @@ export default function GPGAManager() {
 
         {/* Tab Navigation */}
         <div className="flex gap-2 border-b border-slate-200">
-          {/* Admin/Master Only Tabs */}
-          {(currentUser.role === 'master' || currentUser.role === 'admin') && (
+          {/* Admin/Master Only Tabs — hidden for completed seasons */}
+          {!isReadOnlySeason && (currentUser.role === 'master' || currentUser.role === 'admin') && (
             <>
               <button
                 onClick={() => setFinesTab('assign')}
@@ -2163,12 +2191,14 @@ export default function GPGAManager() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold text-slate-800">Rounds</h2>
-          <button
-            onClick={() => setIsAddRoundModalOpen(true)}
-            className="bg-emerald-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-emerald-700 transition-colors flex items-center gap-2 text-sm min-h-[44px]"
-          >
-            <Plus size={16} /> Add Round
-          </button>
+          {!isReadOnlySeason && (
+            <button
+              onClick={() => setIsAddRoundModalOpen(true)}
+              className="bg-emerald-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-emerald-700 transition-colors flex items-center gap-2 text-sm min-h-[44px]"
+            >
+              <Plus size={16} /> Add Round
+            </button>
+          )}
         </div>
 
         {/* Round Selector — horizontal scroll */}
@@ -2199,14 +2229,16 @@ export default function GPGAManager() {
               <Calendar size={14} className="flex-shrink-0 text-slate-400" />
               <span>{currentRound.date}</span>
             </div>
-            <div className="flex items-center gap-1 flex-shrink-0">
-              <button onClick={() => handleEditRound(currentRound)} className="p-2 rounded-lg text-slate-400 hover:bg-slate-200 hover:text-slate-600 transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center" aria-label="Edit round">
-                <Edit size={14} />
-              </button>
-              <button onClick={() => handleDeleteRound(currentRound.id, currentRound.name)} className="p-2 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center" aria-label="Delete round">
-                <Trash2 size={14} />
-              </button>
-            </div>
+            {!isReadOnlySeason && (
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <button onClick={() => handleEditRound(currentRound)} className="p-2 rounded-lg text-slate-400 hover:bg-slate-200 hover:text-slate-600 transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center" aria-label="Edit round">
+                  <Edit size={14} />
+                </button>
+                <button onClick={() => handleDeleteRound(currentRound.id, currentRound.name)} className="p-2 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center" aria-label="Delete round">
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -2216,14 +2248,16 @@ export default function GPGAManager() {
             {/* Scores Header */}
             <div className="flex items-center justify-between p-4 border-b border-slate-100">
               <h3 className="font-semibold text-slate-800 text-sm">Scores — {currentRound.name}</h3>
-              {!isAnyPlayerEditing ? (
-                <button onClick={editAllPlayers} className="bg-emerald-600 text-white px-3 py-2 rounded-lg text-xs font-semibold hover:bg-emerald-700 flex items-center gap-1.5 min-h-[36px]">
-                  <Edit size={13} /> Edit All
-                </button>
-              ) : (
-                <button onClick={saveAllPlayers} className="bg-emerald-600 text-white px-3 py-2 rounded-lg text-xs font-semibold hover:bg-emerald-700 flex items-center gap-1.5 min-h-[36px]">
-                  <Save size={13} /> Save All
-                </button>
+              {!isReadOnlySeason && (
+                !isAnyPlayerEditing ? (
+                  <button onClick={editAllPlayers} className="bg-emerald-600 text-white px-3 py-2 rounded-lg text-xs font-semibold hover:bg-emerald-700 flex items-center gap-1.5 min-h-[36px]">
+                    <Edit size={13} /> Edit All
+                  </button>
+                ) : (
+                  <button onClick={saveAllPlayers} className="bg-emerald-600 text-white px-3 py-2 rounded-lg text-xs font-semibold hover:bg-emerald-700 flex items-center gap-1.5 min-h-[36px]">
+                    <Save size={13} /> Save All
+                  </button>
+                )
               )}
             </div>
 
@@ -2246,10 +2280,12 @@ export default function GPGAManager() {
                     {/* Player Name + Action */}
                     <div className="flex items-center justify-between mb-2">
                       <span className="font-medium text-slate-800 text-sm">{p.name}</span>
-                      {!isEditing ? (
-                        <button onClick={() => toggleEditPlayer(p.id)} className="text-xs text-emerald-600 font-semibold min-h-[32px] px-2">Edit</button>
-                      ) : (
-                        <button onClick={() => savePlayerScore(p.id, p.name)} className="text-xs text-emerald-600 font-semibold min-h-[32px] px-2">Save</button>
+                      {!isReadOnlySeason && (
+                        !isEditing ? (
+                          <button onClick={() => toggleEditPlayer(p.id)} className="text-xs text-emerald-600 font-semibold min-h-[32px] px-2">Edit</button>
+                        ) : (
+                          <button onClick={() => savePlayerScore(p.id, p.name)} className="text-xs text-emerald-600 font-semibold min-h-[32px] px-2">Save</button>
+                        )
                       )}
                     </div>
                     {/* Score Inputs */}
@@ -3231,7 +3267,7 @@ export default function GPGAManager() {
         {/* Header: Title + Action Button (consistent across tabs) */}
         <div className="flex items-center justify-between min-h-[44px]">
           <h2 className="text-xl font-bold text-slate-800">Players & Teams</h2>
-          {adminTab === 'players' && (
+          {!isReadOnlySeason && adminTab === 'players' && (
             <button
               onClick={() => setIsAddPlayerModalOpen(true)}
               className="bg-emerald-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-emerald-700 transition-colors flex items-center gap-2 text-sm min-h-[44px]"
@@ -3239,7 +3275,7 @@ export default function GPGAManager() {
               <Plus size={16} /> Add Player
             </button>
           )}
-          {adminTab === 'teams' && !isAddingTeam && teamsList.length < 4 && (
+          {!isReadOnlySeason && adminTab === 'teams' && !isAddingTeam && teamsList.length < 4 && (
             <button
               onClick={() => setIsAddingTeam(true)}
               className="bg-purple-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-purple-700 transition-colors flex items-center gap-2 text-sm min-h-[44px]"
