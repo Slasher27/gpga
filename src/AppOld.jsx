@@ -3237,6 +3237,7 @@ export default function GPGAManager() {
 
   // Player Management View - Admin CRUD for players
   const PlayerManagementView = () => {
+    const [adminTab, setAdminTab] = useState('players');
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
     const [sortBy, setSortBy] = useState('name');
@@ -3319,21 +3320,45 @@ export default function GPGAManager() {
 
     return (
       <div className="space-y-4 animate-in fade-in duration-300">
-        {/* Header */}
+        {/* Header + Tabs */}
         <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-bold text-slate-800">Players</h2>
-            <p className="text-sm text-slate-500">{filteredPlayers.length} of {players.length} players</p>
-          </div>
+          <h2 className="text-xl font-bold text-slate-800">Manage</h2>
+          {adminTab === 'players' && (
+            <button
+              onClick={() => setIsAddPlayerModalOpen(true)}
+              className="bg-emerald-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-emerald-700 transition-colors flex items-center gap-2 text-sm min-h-[44px]"
+            >
+              <Plus size={16} /> Add Player
+            </button>
+          )}
+        </div>
+
+        {/* Tab Navigation */}
+        <div className="flex border-b border-slate-200">
           <button
-            onClick={() => setIsAddPlayerModalOpen(true)}
-            className="bg-emerald-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-emerald-700 transition-colors flex items-center gap-2 text-sm min-h-[44px]"
+            onClick={() => setAdminTab('players')}
+            className={`flex-1 px-4 py-3 text-sm font-medium text-center transition-colors min-h-[44px] ${
+              adminTab === 'players'
+                ? 'text-emerald-600 border-b-2 border-emerald-600'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
           >
-            <Plus size={16} /> Add Player
+            Players ({players.length})
+          </button>
+          <button
+            onClick={() => setAdminTab('teams')}
+            className={`flex-1 px-4 py-3 text-sm font-medium text-center transition-colors min-h-[44px] ${
+              adminTab === 'teams'
+                ? 'text-purple-600 border-b-2 border-purple-600'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            Teams
           </button>
         </div>
 
-        {/* Search + Filters (collapsible on mobile) */}
+        {/* Players Tab */}
+        {adminTab === 'players' && <>
         <div className="flex flex-col sm:flex-row gap-2">
           <div className="flex-1 relative">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -3446,8 +3471,10 @@ export default function GPGAManager() {
           </Card>
         )}
 
-        {/* Team Management Section */}
-        <TeamManagementSection />
+        </>}
+
+        {/* Teams Tab */}
+        {adminTab === 'teams' && <TeamManagementSection />}
       </div>
     );
   };
@@ -3502,7 +3529,7 @@ export default function GPGAManager() {
     };
 
     return (
-      <div className="mt-6">
+      <div>
         {/* Header */}
         <div className="flex items-center justify-between mb-3">
           <div>
