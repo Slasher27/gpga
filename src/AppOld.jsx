@@ -3084,6 +3084,12 @@ export default function GPGAManager() {
       status: formData.get('status')
     };
 
+    // Include password if provided
+    const newPassword = formData.get('password');
+    if (newPassword && newPassword.trim() !== '') {
+      updates.password = newPassword;
+    }
+
     // Only master can update roles
     if (currentUser.role === 'master') {
       const newRole = formData.get('role');
@@ -4163,6 +4169,17 @@ export default function GPGAManager() {
                 name="email"
                 type="email"
                 defaultValue={editingPlayer.email}
+                className="input input-bordered w-full focus:input-primary"
+              />
+            </div>
+            <div className="form-control">
+              <label className="label">
+                <span className="label-text font-semibold">Reset Password</span>
+              </label>
+              <input
+                name="password"
+                type="password"
+                placeholder="Leave blank to keep current"
                 className="input input-bordered w-full focus:input-primary"
               />
             </div>
