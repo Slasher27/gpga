@@ -3239,9 +3239,7 @@ export default function GPGAManager() {
   const PlayerManagementView = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
-    const [roleFilter, setRoleFilter] = useState('all');
     const [sortBy, setSortBy] = useState('name');
-    const [viewingPlayer, setViewingPlayer] = useState(null);
     const [buyInStatusCache, setBuyInStatusCache] = useState({});
     const [buyInLoaded, setBuyInLoaded] = useState(false);
 
@@ -3297,8 +3295,7 @@ export default function GPGAManager() {
         const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                              p.email.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesStatus = statusFilter === 'all' || p.status === statusFilter;
-        const matchesRole = roleFilter === 'all' || p.role === roleFilter;
-        return matchesSearch && matchesStatus && matchesRole;
+        return matchesSearch && matchesStatus;
       });
 
       // Sort
@@ -3318,425 +3315,135 @@ export default function GPGAManager() {
       });
 
       return filtered;
-    }, [playersWithStats, searchTerm, statusFilter, roleFilter, sortBy]);
+    }, [playersWithStats, searchTerm, statusFilter, sortBy]);
 
     return (
-      <div className="space-y-6 animate-in fade-in duration-500">
+      <div className="space-y-4 animate-in fade-in duration-300">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+        <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-slate-800">Player Management</h2>
-            <p className="text-slate-500">Manage player accounts, roles, and access</p>
+            <h2 className="text-xl font-bold text-slate-800">Players</h2>
+            <p className="text-sm text-slate-500">{filteredPlayers.length} of {players.length} players</p>
           </div>
           <button
             onClick={() => setIsAddPlayerModalOpen(true)}
-            className="bg-emerald-600 text-white px-4 md:px-6 py-2.5 md:py-3 rounded-lg font-semibold hover:bg-emerald-700 transition-colors flex items-center gap-2 text-sm md:text-base shadow-none"
+            className="bg-emerald-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-emerald-700 transition-colors flex items-center gap-2 text-sm min-h-[44px]"
           >
-            <Plus size={18} /> <span className="hidden sm:inline">Add New Player</span><span className="sm:hidden">Add Player</span>
+            <Plus size={16} /> Add Player
           </button>
         </div>
 
-        {/* Search and Filters */}
-        <Card className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {/* Search */}
-            <div>
-              <label htmlFor="pm-search" className="block text-xs font-bold text-slate-500 uppercase mb-2">Search</label>
-              <input
-                id="pm-search"
-                name="pm-search"
-                type="text"
-                placeholder="Search by name or email..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="input input-bordered w-full"
-              />
-            </div>
-
-            {/* Status Filter */}
-            <div>
-              <label htmlFor="pm-status" className="block text-xs font-bold text-slate-500 uppercase mb-2">Status</label>
-              <select
-                id="pm-status"
-                name="pm-status"
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="select select-bordered w-full pr-10"
-              >
-                <option value="all">All Status</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
-            </div>
-
-            {/* Role Filter */}
-            <div>
-              <label htmlFor="pm-role" className="block text-xs font-bold text-slate-500 uppercase mb-2">Role</label>
-              <select
-                id="pm-role"
-                name="pm-role"
-                value={roleFilter}
-                onChange={(e) => setRoleFilter(e.target.value)}
-                className="select select-bordered w-full pr-10"
-              >
-                <option value="all">All Roles</option>
-                <option value="admin">Admin</option>
-                <option value="player">Player</option>
-              </select>
-            </div>
-
-            {/* Sort By */}
-            <div>
-              <label htmlFor="pm-sort" className="block text-xs font-bold text-slate-500 uppercase mb-2">Sort By</label>
-              <select
-                id="pm-sort"
-                name="pm-sort"
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className="select select-bordered w-full pr-10"
-              >
-                <option value="name">Name</option>
-                <option value="rounds">Rounds Played</option>
-                <option value="fines">Total Fines</option>
-                <option value="avg">Average Score</option>
-              </select>
-            </div>
+        {/* Search + Filters (collapsible on mobile) */}
+        <div className="flex flex-col sm:flex-row gap-2">
+          <div className="flex-1 relative">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              id="pm-search"
+              name="pm-search"
+              type="text"
+              placeholder="Search players..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="input input-bordered w-full pl-9 min-h-[44px]"
+              aria-label="Search players"
+            />
           </div>
-        </Card>
-
-        {/* Results Count */}
-        <div className="text-sm text-slate-500">
-          Showing {filteredPlayers.length} of {players.length} player(s)
+          <select
+            id="pm-status"
+            name="pm-status"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="select select-bordered min-h-[44px]"
+            aria-label="Filter by status"
+          >
+            <option value="all">All</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+          <select
+            id="pm-sort"
+            name="pm-sort"
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="select select-bordered min-h-[44px]"
+            aria-label="Sort by"
+          >
+            <option value="name">Name</option>
+            <option value="rounds">Rounds</option>
+            <option value="fines">Fines</option>
+            <option value="avg">Average</option>
+          </select>
         </div>
 
-        {/* Players Grid */}
+        {/* Player List */}
         {filteredPlayers.length === 0 && players.length === 0 ? (
           <NoPlayersEmptyState onAddPlayer={() => setIsAddPlayerModalOpen(true)} />
         ) : filteredPlayers.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-slate-500">No players match your search criteria.</p>
-          </div>
+          <div className="text-center py-12 text-slate-400">No players match your search.</div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-            {filteredPlayers.map(p => {
-              const buyInStatus = buyInStatusCache[p.id] || { isPaid: false };
-              return (
-            <Card key={p.id} className="hover:shadow-lg transition-shadow">
-              <div className="p-4">
-                {/* Desktop Layout */}
-                <div className="hidden md:flex items-center gap-6">
-                  {/* Left Side: Avatar + Info + Stats */}
-                  <div className="flex items-center gap-4 flex-1 min-w-0 pr-6 border-r border-slate-200">
+          <Card>
+            <div className="divide-y divide-slate-100">
+              {filteredPlayers.map(p => {
+                const buyInStatus = buyInStatusCache[p.id] || { isPaid: false };
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => setManagingPlayerId(p.id)}
+                    className="w-full flex items-center gap-3 p-3 md:p-4 hover:bg-slate-50 transition-colors text-left min-h-[64px]"
+                  >
                     {/* Avatar */}
-                    <div className="avatar placeholder flex-shrink-0">
-                      <div className="bg-emerald-500 text-white rounded-full w-14 h-14 flex items-center justify-center">
-                        {p.avatar ? (
-                          <img src={p.avatar} alt={p.name} className="w-full h-full object-cover rounded-full" />
-                        ) : (
-                          <span className="text-lg font-bold">
-                            {p.name.split(' ').map(n => n.charAt(0)).slice(0, 2).join('')}
-                          </span>
-                        )}
-                      </div>
+                    <div className="flex-shrink-0">
+                      {p.avatar ? (
+                        <img src={p.avatar} alt="" className="w-11 h-11 rounded-full object-cover" />
+                      ) : (
+                        <div className="w-11 h-11 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-bold text-sm">
+                          {p.name.split(' ').map(n => n.charAt(0)).slice(0, 2).join('')}
+                        </div>
+                      )}
                     </div>
 
-                    {/* Player Info */}
+                    {/* Info */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="font-bold text-base text-slate-800">{p.name}</h3>
-                        <Badge type={p.status === 'active' ? 'success' : 'danger'}>
-                          {p.status}
-                        </Badge>
-                        {p.role === 'admin' && <Badge type="warning">Admin</Badge>}
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-semibold text-slate-800 text-sm truncate">{p.name}</span>
+                        {p.role === 'master' && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-bold">Master</span>}
+                        {p.role === 'admin' && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-bold">Admin</span>}
+                        {p.status === 'inactive' && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-600 font-bold">Inactive</span>}
                       </div>
-                      <p className="text-sm text-slate-500 truncate">{p.email}</p>
-                      {/* Buy-In Status - Desktop (read-only) */}
-                      <span className={`mt-2 inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold ${
-                        !buyInLoaded ? 'bg-slate-100 text-slate-400' :
-                        buyInStatus.isPaid ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                      }`}>
-                        Buy-In: {!buyInLoaded ? '...' : buyInStatus.isPaid ? 'Paid ✓' : 'Outstanding'}
-                      </span>
+                      <p className="text-xs text-slate-400 truncate">{p.email}</p>
                     </div>
 
-                    {/* Stats - Inline */}
-                    <div className="flex items-center gap-8 flex-shrink-0">
-                      <div className="text-center">
-                        <p className="text-xs text-slate-500 mb-1">Rounds</p>
-                        <p className="font-bold text-slate-800">{p.roundsPlayed}</p>
+                    {/* Quick Stats (desktop) */}
+                    <div className="hidden md:flex items-center gap-6 flex-shrink-0 text-center">
+                      <div>
+                        <p className="text-[10px] text-slate-400 uppercase">Rounds</p>
+                        <p className="text-sm font-bold text-slate-700">{p.roundsPlayed}</p>
                       </div>
-                      <div className="text-center">
-                        <p className="text-xs text-slate-500 mb-1">Avg</p>
-                        <p className="font-bold text-slate-800">{p.avgScore || '-'}</p>
+                      <div>
+                        <p className="text-[10px] text-slate-400 uppercase">Avg</p>
+                        <p className="text-sm font-bold text-slate-700">{p.avgScore || '-'}</p>
                       </div>
-                      <div className="text-center">
-                        <p className="text-xs text-slate-500 mb-1">Fines</p>
-                        <p className="font-bold text-red-600">R{p.totalFines}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Right Side: Actions */}
-                  <div className="flex gap-3 flex-shrink-0">
-                    <button
-                      onClick={() => setManagingPlayerId(p.id)}
-                      className="p-2.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-blue-100 hover:text-blue-600 transition-colors"
-                      title="View Details"
-                    >
-                      <Eye size={20} />
-                    </button>
-                    <button
-                      onClick={() => handleEditPlayer(p)}
-                      className="p-2.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-emerald-100 hover:text-emerald-600 transition-colors"
-                      title="Edit"
-                    >
-                      <Edit size={20} />
-                    </button>
-                    <button
-                      onClick={async () => {
-                        const newStatus = p.status === 'active' ? 'inactive' : 'active';
-                        await DB.updatePlayer(p.id, { status: newStatus });
-                        setPlayers(prev => prev.map(pl => pl.id === p.id ? { ...pl, status: newStatus } : pl));
-                        showToast(`Player ${newStatus === 'active' ? 'activated' : 'deactivated'}`, 'success');
-                      }}
-                      className={`p-2.5 rounded-lg transition-colors ${
-                        p.status === 'active'
-                          ? 'bg-amber-100 text-amber-600 hover:bg-amber-200 hover:text-amber-700'
-                          : 'bg-emerald-100 text-emerald-600 hover:bg-emerald-200 hover:text-emerald-700'
-                      }`}
-                      title={p.status === 'active' ? 'Deactivate' : 'Activate'}
-                    >
-                      {p.status === 'active' ? <XCircle size={20} /> : <CheckCircle size={20} />}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Mobile Layout */}
-                <div className="md:hidden space-y-4">
-                  {/* Top Row: Avatar + Name + Email */}
-                  <div className="flex items-center gap-3">
-                    {/* Avatar */}
-                    <div className="avatar placeholder flex-shrink-0">
-                      <div className="bg-emerald-500 text-white rounded-full w-14 h-14 flex items-center justify-center">
-                        {p.avatar ? (
-                          <img src={p.avatar} alt={p.name} className="w-full h-full object-cover rounded-full" />
-                        ) : (
-                          <span className="text-lg font-bold">
-                            {p.name.split(' ').map(n => n.charAt(0)).slice(0, 2).join('')}
-                          </span>
-                        )}
+                      <div>
+                        <p className="text-[10px] text-slate-400 uppercase">Fines</p>
+                        <p className="text-sm font-bold text-red-600">R{p.totalFines}</p>
                       </div>
                     </div>
 
-                    {/* Player Info */}
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-bold text-base text-slate-800 truncate">{p.name}</h3>
-                      <p className="text-sm text-slate-500 truncate">{p.email}</p>
-                      <div className="flex gap-2 mt-1">
-                        <Badge type={p.status === 'active' ? 'success' : 'danger'}>
-                          {p.status}
-                        </Badge>
-                        {p.role === 'admin' && <Badge type="warning">Admin</Badge>}
-                      </div>
-                    </div>
-                  </div>
+                    {/* Buy-In Badge */}
+                    <span className={`flex-shrink-0 text-[10px] px-2 py-1 rounded-full font-bold ${
+                      !buyInLoaded ? 'bg-slate-100 text-slate-400' :
+                      buyInStatus.isPaid ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                    }`}>
+                      {!buyInLoaded ? '...' : buyInStatus.isPaid ? 'Paid' : 'Due'}
+                    </span>
 
-                  {/* Buy-In Status - Mobile (read-only) */}
-                  <div className={`w-full inline-flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-sm font-semibold ${
-                    !buyInLoaded ? 'bg-slate-100 text-slate-400' :
-                    buyInStatus.isPaid ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                  }`}>
-                    Buy-In: {!buyInLoaded ? '...' : buyInStatus.isPaid ? 'Paid ✓' : 'Outstanding'}
-                  </div>
-
-                  {/* Stats Row */}
-                  <div className="grid grid-cols-3 gap-3 py-3 border-t border-b border-slate-100">
-                    <div className="text-center">
-                      <p className="text-xs text-slate-500 mb-1">Rounds</p>
-                      <p className="font-bold text-slate-800">{p.roundsPlayed}</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-xs text-slate-500 mb-1">Avg Score</p>
-                      <p className="font-bold text-slate-800">{p.avgScore || '-'}</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-xs text-slate-500 mb-1">Fines</p>
-                      <p className="font-bold text-red-600">R{p.totalFines}</p>
-                    </div>
-                  </div>
-
-                  {/* Actions Footer */}
-                  <div className="flex gap-2 justify-center">
-                    <button
-                      onClick={() => setManagingPlayerId(p.id)}
-                      className="p-2.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-blue-100 hover:text-blue-600 transition-colors"
-                      title="View Details"
-                    >
-                      <Eye size={20} />
-                    </button>
-                    <button
-                      onClick={() => handleEditPlayer(p)}
-                      className="p-2.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-emerald-100 hover:text-emerald-600 transition-colors"
-                      title="Edit"
-                    >
-                      <Edit size={20} />
-                    </button>
-                    <button
-                      onClick={async () => {
-                        const newStatus = p.status === 'active' ? 'inactive' : 'active';
-                        await DB.updatePlayer(p.id, { status: newStatus });
-                        setPlayers(prev => prev.map(pl => pl.id === p.id ? { ...pl, status: newStatus } : pl));
-                        showToast(`Player ${newStatus === 'active' ? 'activated' : 'deactivated'}`, 'success');
-                      }}
-                      className={`p-2.5 rounded-lg transition-colors ${
-                        p.status === 'active'
-                          ? 'bg-amber-100 text-amber-600 hover:bg-amber-200 hover:text-amber-700'
-                          : 'bg-emerald-100 text-emerald-600 hover:bg-emerald-200 hover:text-emerald-700'
-                      }`}
-                      title={p.status === 'active' ? 'Deactivate' : 'Activate'}
-                    >
-                      {p.status === 'active' ? <XCircle size={20} /> : <CheckCircle size={20} />}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </Card>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Player Details Modal */}
-        {viewingPlayer && (
-          <div className="modal modal-open">
-            <div className="modal-box max-w-4xl">
-              <button
-                onClick={() => setViewingPlayer(null)}
-                className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2"
-              >
-                ✕
-              </button>
-
-              <h3 className="font-bold text-2xl text-slate-800 mb-4">Player Details</h3>
-
-              {/* Player Header */}
-              <div className="flex items-center gap-4 mb-6 p-4 bg-slate-50 rounded-lg">
-                <div className="avatar placeholder">
-                  <div className="bg-emerald-500 text-white rounded-full w-20 h-20 flex items-center justify-center">
-                    {viewingPlayer.avatar ? (
-                      <img src={viewingPlayer.avatar} alt={viewingPlayer.name} className="w-full h-full object-cover rounded-full" />
-                    ) : (
-                      <span className="text-2xl font-bold">
-                        {viewingPlayer.name.split(' ').map(n => n.charAt(0)).slice(0, 2).join('')}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div className="flex-1">
-                  <h4 className="font-bold text-xl text-slate-800">{viewingPlayer.name}</h4>
-                  <p className="text-slate-500">{viewingPlayer.email}</p>
-                  <div className="flex gap-2 mt-2">
-                    <Badge type={viewingPlayer.status === 'active' ? 'success' : 'danger'}>
-                      {viewingPlayer.status}
-                    </Badge>
-                    {viewingPlayer.role === 'admin' && <Badge type="warning">Admin</Badge>}
-                  </div>
-                </div>
-              </div>
-
-              {/* Stats Overview */}
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-                <div className="stat bg-slate-50 rounded-lg p-4">
-                  <div className="stat-title text-xs">Rounds Played</div>
-                  <div className="stat-value text-2xl text-emerald-600">{viewingPlayer.roundsPlayed}</div>
-                </div>
-                <div className="stat bg-slate-50 rounded-lg p-4">
-                  <div className="stat-title text-xs">Average Score</div>
-                  <div className="stat-value text-2xl text-blue-600">{viewingPlayer.avgScore || '-'}</div>
-                </div>
-                <div className="stat bg-slate-50 rounded-lg p-4">
-                  <div className="stat-title text-xs">Total Fines</div>
-                  <div className="stat-value text-2xl text-red-600">R{viewingPlayer.totalFines}</div>
-                </div>
-                <div className="stat bg-slate-50 rounded-lg p-4">
-                  <div className="stat-title text-xs">Buy-In ({activeSeason?.year || '-'})</div>
-                  <div className="stat-value text-2xl">
-                    {buyInStatusCache[viewingPlayer.id]?.isPaid ? (
-                      <span className="text-emerald-600">Paid</span>
-                    ) : (
-                      <span className="text-amber-600">Due</span>
-                    )}
-                  </div>
-                  {(currentUser.role === 'master' || currentUser.role === 'admin') && (
-                    <button
-                      onClick={async () => {
-                        if (!activeSeason?.id) return;
-                        const current = buyInStatusCache[viewingPlayer.id]?.isPaid || false;
-                        await DB.markBuyInPaid(viewingPlayer.id, activeSeason.id, !current);
-                        setBuyInStatusCache(prev => ({ ...prev, [viewingPlayer.id]: { isPaid: !current, date: !current ? new Date().toISOString().split('T')[0] : null } }));
-                        showToast(`Buy-in ${!current ? 'marked as paid' : 'marked as outstanding'}`, 'success');
-                      }}
-                      className={`mt-2 text-xs font-semibold px-2 py-1 rounded transition-all ${
-                        buyInStatusCache[viewingPlayer.id]?.isPaid
-                          ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
-                          : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-                      }`}
-                    >
-                      {buyInStatusCache[viewingPlayer.id]?.isPaid ? 'Mark Unpaid' : 'Mark Paid'}
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Round History */}
-              <div className="mb-6">
-                <h4 className="font-bold text-lg text-slate-800 mb-3">Round History</h4>
-                <div className="overflow-x-auto">
-                  <table className="table table-sm">
-                    <thead>
-                      <tr>
-                        <th>Round</th>
-                        <th>Course</th>
-                        <th className="text-center">Strokes</th>
-                        <th className="text-center">Handicap</th>
-                        <th className="text-center">Stableford</th>
-                        <th className="text-right">Fines</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rounds.map(round => {
-                        const score = scores[viewingPlayer.id]?.[round.id];
-                        if (!score) return null;
-                        return (
-                          <tr key={round.id}>
-                            <td className="font-medium">{round.name}</td>
-                            <td className="text-slate-500">{round.course}</td>
-                            <td className="text-center font-semibold">{score.strokes || '-'}</td>
-                            <td className="text-center">{score.handicap || '-'}</td>
-                            <td className="text-center">{score.stableford || '-'}</td>
-                            <td className="text-right text-red-600 font-semibold">
-                              {score.fines ? `R${score.fines}` : '-'}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                  {viewingPlayer.roundsPlayed === 0 && (
-                    <div className="text-center py-8 text-slate-400">
-                      <p>No rounds played yet</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="modal-action">
-                <button onClick={() => setViewingPlayer(null)} className="btn">
-                  Close
-                </button>
-              </div>
+                    {/* Chevron */}
+                    <ChevronDown size={16} className="-rotate-90 text-slate-300 flex-shrink-0" />
+                  </button>
+                );
+              })}
             </div>
-          </div>
+          </Card>
         )}
 
         {/* Team Management Section */}
