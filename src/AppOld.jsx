@@ -3205,13 +3205,23 @@ export default function GPGAManager() {
       loadBuyInStatuses();
     }, [players, activeSeason?.id]);
 
-    // Calculate player statistics
+    // Calculate player statistics (only for current season's rounds)
+    const seasonRoundIds = new Set(rounds.map(r => r.id));
     const playersWithStats = useMemo(() => {
       return players.map(player => {
         const playerScores = scores[player.id] || {};
-        const roundsPlayed = Object.keys(playerScores).length;
-        const totalFines = Object.values(playerScores).reduce((sum, s) => sum + (s.fines || 0), 0);
-        const totalStrokes = Object.values(playerScores).reduce((sum, s) => sum + (s.strokes || 0), 0);
+        // Only count scores for rounds in the active season
+        let roundsPlayed = 0;
+        let totalFines = 0;
+        let totalStrokes = 0;
+        for (const [roundId, s] of Object.entries(playerScores)) {
+          if (!seasonRoundIds.has(Number(roundId))) continue;
+          if (s.strokes > 0) {
+            roundsPlayed++;
+            totalStrokes += s.strokes;
+          }
+          totalFines += s.fines || 0;
+        }
         const avgScore = roundsPlayed > 0 ? Math.round(totalStrokes / roundsPlayed) : 0;
 
         return {
@@ -3221,7 +3231,7 @@ export default function GPGAManager() {
           avgScore
         };
       });
-    }, [players, scores]);
+    }, [players, scores, rounds]);
 
     // Filter and sort players
     const filteredPlayers = useMemo(() => {
