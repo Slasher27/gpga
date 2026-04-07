@@ -999,7 +999,9 @@ export default function GPGAManager() {
     if (rounds.length === 0) {
       return (
         <div className="space-y-4 animate-in fade-in duration-300">
-          <h2 className="text-xl font-bold text-slate-800">{activeSeason?.name || 'Season'}</h2>
+          <div className="flex items-center justify-between h-10">
+            <h2 className="text-xl font-bold text-slate-800">{activeSeason?.name || 'Season'}</h2>
+          </div>
           <Card>
             <div className="p-8 md:p-12 text-center">
               <Trophy size={48} className="text-slate-300 mx-auto mb-4" />
@@ -1077,7 +1079,9 @@ export default function GPGAManager() {
 
         {/* Header + Season Summary */}
         <div>
-          <h2 className="text-xl font-bold text-slate-800">{activeSeason?.name || 'Leaderboard'}</h2>
+          <div className="flex items-center justify-between h-10">
+            <h2 className="text-xl font-bold text-slate-800">{activeSeason?.name || 'Leaderboard'}</h2>
+          </div>
           <div className="flex flex-wrap gap-2 mt-2 text-xs">
             <span className="bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-full font-semibold">Medal: {leaderboardData[0]?.name || '-'} ({leaderboardData[0]?.netTotal || '-'})</span>
             <span className="bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full font-semibold">Stableford: {stablefordSorted[0]?.name || '-'} ({stablefordSorted[0]?.netStableford || '-'})</span>
@@ -1387,11 +1391,8 @@ export default function GPGAManager() {
 
     return (
       <div className="space-y-6 animate-in fade-in duration-500">
-        <div className="flex justify-between items-center">
-          <div>
-            <h2 className="text-xl font-bold text-slate-800">Fines</h2>
-            <p className="text-sm text-slate-500">{activeSeason?.name || 'Season'}</p>
-          </div>
+        <div className="flex items-center justify-between h-10">
+          <h2 className="text-xl font-bold text-slate-800">Fines</h2>
         </div>
 
         {/* Tab Navigation */}
@@ -2165,7 +2166,7 @@ export default function GPGAManager() {
     return (
       <div className="space-y-4 animate-in fade-in duration-300">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between h-10">
           <h2 className="text-xl font-bold text-slate-800">Rounds</h2>
           {!isReadOnlySeason && (
             <button
@@ -2370,7 +2371,9 @@ export default function GPGAManager() {
 
     return (
       <div className="space-y-4 animate-in fade-in duration-300">
-        <h2 className="text-xl font-bold text-slate-800">My Profile</h2>
+        <div className="flex items-center justify-between h-10">
+          <h2 className="text-xl font-bold text-slate-800">My Profile</h2>
+        </div>
 
         <Card>
           {/* Profile Header */}
@@ -2604,11 +2607,8 @@ export default function GPGAManager() {
 
     return (
       <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in duration-500">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-bold text-slate-800">Create New Round</h2>
-            <p className="text-slate-500">Set up a new round for {activeSeason?.year}</p>
-          </div>
+        <div className="flex items-center justify-between h-10">
+          <h2 className="text-xl font-bold text-slate-800">Create Round</h2>
           <button
             onClick={() => {
               setView('admin');
@@ -3001,7 +3001,7 @@ export default function GPGAManager() {
     return (
       <div className="space-y-4 animate-in fade-in duration-300">
         {/* Header: Title + Action Button (consistent across tabs) */}
-        <div className="flex items-center justify-between min-h-[44px]">
+        <div className="flex items-center justify-between h-10">
           <h2 className="text-xl font-bold text-slate-800">Players & Teams</h2>
           {!isReadOnlySeason && adminTab === 'players' && (
             <button
@@ -3648,7 +3648,7 @@ export default function GPGAManager() {
         {view === 'profile' && <ProfileView />}
         {view === 'players' && (
           <div className="space-y-6 animate-in fade-in duration-500">
-             <div className="flex justify-between items-center">
+             <div className="flex items-center justify-between h-10">
                <h2 className="text-xl font-bold text-slate-800">Players Directory</h2>
                {currentUser.role === 'master' && (
                  <button
