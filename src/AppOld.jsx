@@ -592,8 +592,11 @@ export default function GPGAManager() {
         }
       });
 
+      // Disqualified if missed more than 1 round
+      const roundsMissed = totalRoundsCreated - roundsPlayed;
+      const isDisqualified = roundsMissed > 1;
+
       // Player can drop worst round if they haven't missed any rounds
-      // If they've played all rounds that have been created, they can drop worst
       const hasntMissedAnyRound = roundsPlayed === totalRoundsCreated;
       const canDropWorstRound = hasntMissedAnyRound && roundsPlayed > 0;
       const netTotal = canDropWorstRound ? totalStrokes - worstRound : totalStrokes;
@@ -609,14 +612,19 @@ export default function GPGAManager() {
         worstStableford: canDropWorstRound ? worstStableford : 0,
         totalFines,
         roundsPlayed,
+        roundsMissed,
+        isDisqualified,
         pScores,
         canDropWorstRound
       };
     }).sort((a, b) => {
+        // DQ'd players always sort below qualifying players
+        if (a.isDisqualified && !b.isDisqualified) return 1;
+        if (!a.isDisqualified && b.isDisqualified) return -1;
         if (a.netTotal === 0 && b.netTotal === 0) return 0;
         if (a.netTotal === 0) return 1;
         if (b.netTotal === 0) return -1;
-        return a.netTotal - b.netTotal
+        return a.netTotal - b.netTotal;
     });
   }, [players, scores, rounds]);
 
@@ -928,7 +936,10 @@ export default function GPGAManager() {
     const sortedLeaderboard = useMemo(() => {
       if (leaderboardTab === 'stableford') {
         // Stableford: Higher points is better, sort descending
+        // DQ'd players always sort below qualifying players
         return [...leaderboardData].sort((a, b) => {
+          if (a.isDisqualified && !b.isDisqualified) return 1;
+          if (!a.isDisqualified && b.isDisqualified) return -1;
           if (a.netStableford === 0 && b.netStableford === 0) return 0;
           if (a.netStableford === 0) return 1;
           if (b.netStableford === 0) return -1;
@@ -1109,10 +1120,11 @@ export default function GPGAManager() {
                               {idx + 1}
                             </div>
                           </td>
-                          <td className="px-3 md:px-6 py-4 font-medium text-slate-800">
+                          <td className={`px-3 md:px-6 py-4 font-medium ${player.isDisqualified ? 'text-slate-400' : 'text-slate-800'}`}>
                             <div className="flex items-center gap-2">
                               {player.avatar && <img src={player.avatar} className="w-6 h-6 rounded-full object-cover" alt="" />}
                               {player.name}
+                              {player.isDisqualified && <span className="text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-bold">DQ</span>}
                               {player.status === 'inactive' && <span className="text-xs text-red-400">(Inactive)</span>}
                             </div>
                           </td>
@@ -1166,10 +1178,11 @@ export default function GPGAManager() {
                               {idx + 1}
                             </div>
                           </td>
-                          <td className="px-3 md:px-6 py-4 font-medium text-slate-800">
+                          <td className={`px-3 md:px-6 py-4 font-medium ${player.isDisqualified ? 'text-slate-400' : 'text-slate-800'}`}>
                             <div className="flex items-center gap-2">
                               {player.avatar && <img src={player.avatar} className="w-6 h-6 rounded-full object-cover" alt="" />}
                               {player.name}
+                              {player.isDisqualified && <span className="text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-bold">DQ</span>}
                               {player.status === 'inactive' && <span className="text-xs text-red-400">(Inactive)</span>}
                             </div>
                           </td>
