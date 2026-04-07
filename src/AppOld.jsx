@@ -275,7 +275,7 @@ const LoginPage = ({ onLogin }) => {
                 <Trophy size={48} className="text-white" />
               </div>
             </div>
-            <h1 className="text-3xl font-bold text-white mb-2">GPGA 2025</h1>
+            <h1 className="text-3xl font-bold text-white mb-2">GPGA {activeSeason?.year || ''}</h1>
             <p className="text-emerald-100">Golf Pro Golf Association</p>
           </div>
 
@@ -3591,7 +3591,7 @@ export default function GPGAManager() {
                 </div>
                 <div className="stat bg-slate-50 rounded-lg p-4">
                   <div className="stat-title text-xs">Member Since</div>
-                  <div className="stat-value text-2xl text-slate-600">2025</div>
+                  <div className="stat-value text-2xl text-slate-600">{activeSeason?.year || '-'}</div>
                 </div>
               </div>
 
@@ -3814,7 +3814,7 @@ export default function GPGAManager() {
         </button>
         <h1 className="text-lg font-bold text-slate-800 flex items-center gap-2">
           <Trophy className="text-emerald-500" size={20} />
-          GPGA 2025
+          GPGA {activeSeason?.year || ''}
         </h1>
         <div className="w-10" /> {/* Spacer for centering */}
       </div>
