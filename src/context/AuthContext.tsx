@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect, ReactNode } from 'react';
-import * as DB from '../db';
+import * as DB from '../api';
 import type { AuthContextType, AuthUser, LoginCredentials } from '../types';
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);

@@ -257,23 +257,3 @@ export interface ToastContextType {
 
 export type ViewType = 'dashboard' | 'fines' | 'rounds' | 'profile' | 'players' | 'create-round';
 export type ViewKey = 'dashboard' | 'fines' | 'rounds' | 'profile' | 'players';
-
-// ========================================
-// SQL.JS TYPES
-// ========================================
-
-export interface Database {
-  exec(sql: string, params?: any[]): QueryExecResult[];
-  run(sql: string, params?: any[]): void;
-  export(): Uint8Array;
-  close(): void;
-}
-
-export interface QueryExecResult {
-  columns: string[];
-  values: any[][];
-}
-
-export interface SqlJsStatic {
-  Database: new (data?: ArrayLike<number> | Buffer | null) => Database;
-}

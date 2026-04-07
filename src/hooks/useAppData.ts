@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import * as DB from '../db';
+import * as DB from '../api';
 import { calculateLeaderboard } from '../services';
 import type { Player, Round, Season, GolfCourse, PlayerScores, PlayerFines } from '../types';
 

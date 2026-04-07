@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect, ReactNode } from 'react';
-import * as DB from '../db';
+import * as DB from '../api';
 import type { DatabaseContextType } from '../types';
 
 export const DatabaseContext = createContext<DatabaseContextType | undefined>(undefined);

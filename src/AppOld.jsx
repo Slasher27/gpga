@@ -31,7 +31,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
-import * as DB from './db.ts';
+import * as DB from './api.ts';
 import {
   DashboardSkeleton,
   useConfirm,
@@ -239,7 +239,7 @@ const LoginPage = ({ onLogin }) => {
     setIsLoading(true);
 
     try {
-      const user = DB.authenticateUser(email, password);
+      const user = await DB.authenticateUser(email, password);
 
       if (user) {
         DB.setAuthenticated(true);
@@ -398,6 +398,9 @@ export default function GPGAManager() {
   const [searchTerm, setSearchTerm] = useState('');
   const [golfCourses, setGolfCourses] = useState([]);
 
+  // Buy-in status cache for Players Directory view
+  const [directoryBuyInCache, setDirectoryBuyInCache] = useState({});
+
   // Date picker state
   const [selectedDate, setSelectedDate] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -437,7 +440,7 @@ export default function GPGAManager() {
         setIsAuthenticated(authenticated);
 
         if (authenticated) {
-          loadData();
+          await loadData();
           const userId = DB.getCurrentUserId();
           setCurrentUserId(userId);
         }
@@ -452,29 +455,29 @@ export default function GPGAManager() {
   }, []);
 
   // Load data from database
-  const loadData = () => {
+  const loadData = async () => {
     try {
       // Get active season
-      const season = DB.getActiveSeason();
+      const season = await DB.getActiveSeason();
       setActiveSeason(season);
 
       // Load players
-      const playersData = DB.getAllPlayers();
+      const playersData = await DB.getAllPlayers();
       setPlayers(playersData);
 
       // Load rounds for active season
-      const roundsData = season ? DB.getAllRounds(season.id) : DB.getAllRounds();
+      const roundsData = season ? await DB.getAllRounds(season.id) : await DB.getAllRounds();
       setRounds(roundsData);
 
       // Load golf courses
-      const coursesData = DB.getAllGolfCourses();
+      const coursesData = await DB.getAllGolfCourses();
       setGolfCourses(coursesData);
 
       // Load scores (strokes only)
-      const scoresData = DB.getAllScores();
+      const scoresData = await DB.getAllScores();
 
       // Load fines separately
-      const finesData = DB.getPlayerFinesByRound();
+      const finesData = await DB.getPlayerFinesByRound();
 
       // Merge scores and fines
       const mergedData = { ...scoresData };
@@ -502,10 +505,24 @@ export default function GPGAManager() {
   useEffect(() => {
     const previousView = localStorage.getItem('gpga_previous_view');
     if (previousView === 'fines' && view !== 'fines') {
-      loadData(); // Refresh all data when leaving fines management
+      loadData(); // Refresh all data when leaving fines management (fire-and-forget in useEffect)
     }
     localStorage.setItem('gpga_previous_view', view);
   }, [view]);
+
+  // Load buy-in status cache for Players Directory view
+  useEffect(() => {
+    const loadDirectoryBuyIn = async () => {
+      const cache = {};
+      for (const p of players) {
+        cache[p.id] = await DB.getPlayerBuyInStatus(p.id, activeSeason?.id);
+      }
+      setDirectoryBuyInCache(cache);
+    };
+    if (players.length > 0) {
+      loadDirectoryBuyIn();
+    }
+  }, [players, activeSeason?.id]);
 
   // Filter golf courses based on search term
   const filteredCourses = useMemo(() => {
@@ -597,7 +614,7 @@ export default function GPGAManager() {
 
   // -- Handlers --
 
-  const handleAddPlayer = (e) => {
+  const handleAddPlayer = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
     const newId = Date.now().toString();
@@ -611,13 +628,13 @@ export default function GPGAManager() {
       avatar: null
     };
 
-    DB.addPlayer(newPlayer);
-    loadData();
+    await DB.addPlayer(newPlayer);
+    await loadData();
     setIsAddPlayerModalOpen(false);
     showToast(`Player ${newPlayer.name} added successfully!`);
   };
 
-  const handleUpdateProfile = (e, setIsEditing) => {
+  const handleUpdateProfile = async (e, setIsEditing) => {
     e.preventDefault();
     const formData = new FormData(e.target);
     const updatedName = formData.get('name');
@@ -634,9 +651,9 @@ export default function GPGAManager() {
       updates.password = updatedPassword;
     }
 
-    DB.updatePlayer(currentUser.id, updates);
+    await DB.updatePlayer(currentUser.id, updates);
 
-    loadData();
+    await loadData();
     showToast("Profile updated successfully!");
 
     // Exit edit mode after saving
@@ -653,9 +670,9 @@ export default function GPGAManager() {
          return;
       }
       const reader = new FileReader();
-      reader.onloadend = () => {
-        DB.updatePlayer(currentUser.id, { avatar: reader.result });
-        loadData();
+      reader.onloadend = async () => {
+        await DB.updatePlayer(currentUser.id, { avatar: reader.result });
+        await loadData();
       };
       reader.readAsDataURL(file);
     }
@@ -677,10 +694,10 @@ export default function GPGAManager() {
     DB.setCurrentUserId(userId);
   };
 
-  const handleLogin = (user) => {
+  const handleLogin = async (user) => {
     setIsAuthenticated(true);
     setCurrentUserId(user.id);
-    loadData();
+    await loadData();
   };
 
   const handleLogout = () => {
@@ -1169,6 +1186,10 @@ export default function GPGAManager() {
     const [expandedPlayers, setExpandedPlayers] = useState({});
     const [roundViewPlayerFilter, setRoundViewPlayerFilter] = useState('all');
     const [expandedRoundViewPlayers, setExpandedRoundViewPlayers] = useState({});
+    const [isRoundConfirmed, setIsRoundConfirmed] = useState(false);
+    const [roundFinesData, setRoundFinesData] = useState([]);
+    const [paymentSummaryData, setPaymentSummaryData] = useState([]);
+    const [playerRoundFinesCache, setPlayerRoundFinesCache] = useState({});
 
     // Update selected round when a new round is created
     useEffect(() => {
@@ -1179,19 +1200,38 @@ export default function GPGAManager() {
 
     useEffect(() => {
       if (activeSeason) {
-        const types = DB.getFineTypes(activeSeason.id);
-        setFineTypes(types);
+        DB.getFineTypes(activeSeason.id).then(types => setFineTypes(types));
       }
     }, [activeSeason]);
 
     useEffect(() => {
       if (selectedPlayer && selectedRound) {
-        const fines = DB.getPlayerFinesForRound(selectedPlayer, selectedRound);
-        setPlayerFines(fines);
+        DB.getPlayerFinesForRound(selectedPlayer, selectedRound).then(fines => setPlayerFines(fines));
       } else {
         setPlayerFines([]);
       }
     }, [selectedPlayer, selectedRound, scores]);
+
+    // Load confirmed status for selected player+round
+    useEffect(() => {
+      if (selectedPlayer && selectedRound) {
+        DB.isPlayerRoundConfirmed(selectedPlayer, selectedRound).then(v => setIsRoundConfirmed(v));
+      } else {
+        setIsRoundConfirmed(false);
+      }
+    }, [selectedPlayer, selectedRound, playerFines]);
+
+    // Load round fines data for the round view tab
+    useEffect(() => {
+      if (selectedRound) {
+        DB.getRoundFines(selectedRound).then(data => setRoundFinesData(data));
+      }
+    }, [selectedRound, scores]);
+
+    // Load payment summary for the payment tab
+    useEffect(() => {
+      DB.getPaymentSummary().then(data => setPaymentSummaryData(data));
+    }, [scores]);
 
     const handleRoundChange = (roundId) => {
       setSelectedRound(roundId);
@@ -1203,21 +1243,21 @@ export default function GPGAManager() {
       localStorage.setItem('gpga_selected_player', playerId);
     };
 
-    const handleAddFine = (fineTypeId) => {
+    const handleAddFine = async (fineTypeId) => {
       if (!selectedPlayer || !selectedRound) return;
-      DB.addPlayerFine(selectedPlayer, selectedRound, fineTypeId);
+      await DB.addPlayerFine(selectedPlayer, selectedRound, fineTypeId);
 
       // Only update local player fines - smooth UX, no jumping
-      const updatedFines = DB.getPlayerFinesForRound(selectedPlayer, selectedRound);
+      const updatedFines = await DB.getPlayerFinesForRound(selectedPlayer, selectedRound);
       setPlayerFines(updatedFines);
     };
 
-    const handleRemoveFine = (fineTypeId) => {
+    const handleRemoveFine = async (fineTypeId) => {
       if (!selectedPlayer || !selectedRound) return;
-      DB.removePlayerFine(selectedPlayer, selectedRound, fineTypeId);
+      await DB.removePlayerFine(selectedPlayer, selectedRound, fineTypeId);
 
       // Only update local player fines - smooth UX, no jumping
-      const updatedFines = DB.getPlayerFinesForRound(selectedPlayer, selectedRound);
+      const updatedFines = await DB.getPlayerFinesForRound(selectedPlayer, selectedRound);
       setPlayerFines(updatedFines);
     };
 
@@ -1395,27 +1435,27 @@ export default function GPGAManager() {
 
                       {/* Finish Button - Below fines list */}
                       {(() => {
-                        const isConfirmed = DB.isPlayerRoundConfirmed(selectedPlayer, selectedRound);
                         return (
                           <div className="mt-4 pt-3 border-t border-slate-200">
                             <button
-                              onClick={() => {
-                                DB.confirmPlayerRoundFines(selectedPlayer, selectedRound, !isConfirmed);
-                                loadData();
+                              onClick={async () => {
+                                await DB.confirmPlayerRoundFines(selectedPlayer, selectedRound, !isRoundConfirmed);
+                                setIsRoundConfirmed(!isRoundConfirmed);
+                                await loadData();
                                 showToast(
-                                  isConfirmed
+                                  isRoundConfirmed
                                     ? 'Fines reopened for editing'
                                     : 'Fines confirmed!',
-                                  isConfirmed ? 'info' : 'success'
+                                  isRoundConfirmed ? 'info' : 'success'
                                 );
                               }}
                               className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                                isConfirmed
+                                isRoundConfirmed
                                   ? 'bg-amber-500 text-white hover:bg-amber-600'
                                   : 'bg-emerald-600 text-white hover:bg-emerald-700'
                               }`}
                             >
-                              {isConfirmed ? 'Reopen' : 'Finish'}
+                              {isRoundConfirmed ? 'Reopen' : 'Finish'}
                             </button>
                             {isConfirmed && (
                               <span className="ml-3 text-xs text-amber-600">
@@ -1560,7 +1600,7 @@ export default function GPGAManager() {
                   {selectedRound ? (
                     <div className="space-y-3">
                       {(() => {
-                        const roundFines = DB.getRoundFines(selectedRound);
+                        const roundFines = roundFinesData;
 
                         if (roundFines.length === 0) {
                           return (
@@ -1697,7 +1737,7 @@ export default function GPGAManager() {
                 </div>
                 <div className="divide-y divide-slate-100">
                   {(() => {
-                    const paymentSummary = DB.getPaymentSummary();
+                    const paymentSummary = paymentSummaryData;
                     if (paymentSummary.length === 0) {
                       return (
                         <div className="p-8 text-center text-slate-400">
@@ -1706,7 +1746,7 @@ export default function GPGAManager() {
                       );
                     }
                     return paymentSummary.map((summary, idx) => {
-                      const playerRounds = DB.getPlayerRoundFines(summary.player_id);
+                      const playerRounds = playerRoundFinesCache[summary.player_id] || [];
                       const isExpanded = expandedPlayers[summary.player_id] || false;
 
                       return (
@@ -1714,7 +1754,11 @@ export default function GPGAManager() {
                           {/* Player Header - Clickable to expand/collapse */}
                           <div
                             className="p-4 cursor-pointer select-none"
-                            onClick={() => {
+                            onClick={async () => {
+                              if (!isExpanded && !playerRoundFinesCache[summary.player_id]) {
+                                const rounds = await DB.getPlayerRoundFines(summary.player_id);
+                                setPlayerRoundFinesCache(prev => ({ ...prev, [summary.player_id]: rounds }));
+                              }
                               setExpandedPlayers(prev => ({
                                 ...prev,
                                 [summary.player_id]: !isExpanded
@@ -1797,10 +1841,12 @@ export default function GPGAManager() {
                                       <span className="text-sm font-bold text-slate-800">R{round.total_amount.toLocaleString()}</span>
                                       {(currentUser.role === 'master' || currentUser.role === 'admin') ? (
                                         <button
-                                          onClick={(e) => {
+                                          onClick={async (e) => {
                                             e.stopPropagation();
-                                            DB.markRoundFinesPaid(summary.player_id, round.round_id, !round.paid);
-                                            loadData();
+                                            await DB.markRoundFinesPaid(summary.player_id, round.round_id, !round.paid);
+                                            const updated = await DB.getPlayerRoundFines(summary.player_id);
+                                            setPlayerRoundFinesCache(prev => ({ ...prev, [summary.player_id]: updated }));
+                                            await loadData();
                                             showToast(
                                               `${round.round_name} marked as ${!round.paid ? 'paid' : 'unpaid'} for ${summary.player_name}`,
                                               !round.paid ? 'success' : 'info'
@@ -1866,7 +1912,7 @@ export default function GPGAManager() {
       });
     };
 
-    const savePlayerScore = (playerId, playerName) => {
+    const savePlayerScore = async (playerId, playerName) => {
       const scoreData = editScores[playerId];
       if (!scoreData) {
         showToast('No changes to save', 'error');
@@ -1880,9 +1926,9 @@ export default function GPGAManager() {
       const handicap = scoreData.handicap !== undefined ? Number(scoreData.handicap) || 0 : Number(currentScore.handicap) || 0;
       const stableford = scoreData.stableford !== undefined ? Number(scoreData.stableford) || 0 : Number(currentScore.stableford) || 0;
 
-      DB.updateScore(playerId, selectedRound, strokes, handicap, stableford);
+      await DB.updateScore(playerId, selectedRound, strokes, handicap, stableford);
 
-      loadData();
+      await loadData();
 
       // Remove from edit state
       setEditScores(prev => {
@@ -1915,11 +1961,11 @@ export default function GPGAManager() {
       setEditingPlayers(allPlayerIds);
     };
 
-    const saveAllPlayers = () => {
+    const saveAllPlayers = async () => {
       let savedCount = 0;
       const activePlayers = players.filter(p => p.status === 'active');
 
-      activePlayers.forEach(player => {
+      for (const player of activePlayers) {
         if (editingPlayers[player.id]) {
           const scoreData = editScores[player.id];
           const currentScore = scores[player.id]?.[selectedRound] || { strokes: 0, handicap: 0, stableford: 0 };
@@ -1928,12 +1974,12 @@ export default function GPGAManager() {
           const handicap = scoreData?.handicap !== undefined ? Number(scoreData.handicap) || 0 : Number(currentScore.handicap) || 0;
           const stableford = scoreData?.stableford !== undefined ? Number(scoreData.stableford) || 0 : Number(currentScore.stableford) || 0;
 
-          DB.updateScore(player.id, selectedRound, strokes, handicap, stableford);
+          await DB.updateScore(player.id, selectedRound, strokes, handicap, stableford);
           savedCount++;
         }
-      });
+      }
 
-      loadData();
+      await loadData();
       setEditScores({});
       setEditingPlayers({});
       showToast(`Saved scores for ${savedCount} player${savedCount !== 1 ? 's' : ''}!`);
@@ -1941,7 +1987,7 @@ export default function GPGAManager() {
 
     const isAnyPlayerEditing = Object.values(editingPlayers).some(v => v);
 
-    const handleCreateRound = (e) => {
+    const handleCreateRound = async (e) => {
       e.preventDefault();
 
       if (!selectedCourse) {
@@ -1962,8 +2008,8 @@ export default function GPGAManager() {
         courseName: selectedCourse.name
       };
 
-      DB.addRound(newRound, activeSeason.id);
-      loadData();
+      await DB.addRound(newRound, activeSeason.id);
+      await loadData();
       showToast(`Round created successfully at ${selectedCourse.name}!`);
       setShowCreateForm(false);
       setRoundName('');
@@ -2161,13 +2207,36 @@ export default function GPGAManager() {
     const [fineTypes, setFineTypes] = useState([]);
     const [expandedRounds, setExpandedRounds] = useState({});
     const [isEditing, setIsEditing] = useState(false);
+    const [profileBuyInStatus, setProfileBuyInStatus] = useState({ isPaid: false });
+    const [profileFinesSummary, setProfileFinesSummary] = useState({ total_fines: 0, paid_fines: 0, outstanding_fines: 0 });
+    const [profileRoundFines, setProfileRoundFines] = useState({});
+    const [profileRoundConfirmed, setProfileRoundConfirmed] = useState({});
 
     useEffect(() => {
-      if (activeSeason) {
-        const types = DB.getFineTypes(activeSeason.id);
-        setFineTypes(types);
-      }
-    }, [activeSeason]);
+      const loadProfileData = async () => {
+        if (activeSeason) {
+          const types = await DB.getFineTypes(activeSeason.id);
+          setFineTypes(types);
+        }
+        if (currentUser?.id) {
+          const buyIn = await DB.getPlayerBuyInStatus(currentUser.id, activeSeason?.id);
+          setProfileBuyInStatus(buyIn);
+          const summary = await DB.getPlayerFinesSummary(currentUser.id);
+          setProfileFinesSummary(summary);
+          // Load fines and confirmed status for each round
+          const finesMap = {};
+          const confirmedMap = {};
+          for (const round of rounds) {
+            const playerFines = await DB.getPlayerFinesForRound(currentUser.id, round.id);
+            finesMap[round.id] = playerFines;
+            confirmedMap[round.id] = playerFines.length > 0 && await DB.isPlayerRoundConfirmed(currentUser.id, round.id);
+          }
+          setProfileRoundFines(finesMap);
+          setProfileRoundConfirmed(confirmedMap);
+        }
+      };
+      loadProfileData();
+    }, [activeSeason, currentUser?.id, rounds]);
 
     const toggleRound = (roundId) => {
       setExpandedRounds(prev => ({
@@ -2227,26 +2296,20 @@ export default function GPGAManager() {
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Buy-In</label>
-                        {(() => {
-                          const buyInStatus = DB.getPlayerBuyInStatus(currentUser.id, activeSeason?.id);
-                          const isPaid = buyInStatus.isPaid;
-                          return (
-                            <div className="flex items-center gap-2">
-                              <p className={`text-lg font-semibold ${isPaid ? 'text-emerald-700' : 'text-amber-700'}`}>
-                                {isPaid ? 'Paid' : 'Outstanding'}
-                              </p>
-                              {isPaid ? (
-                                <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center">
-                                  <span className="text-white text-xs font-bold">✓</span>
-                                </div>
-                              ) : (
-                                <div className="w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center">
-                                  <span className="text-white text-xs font-bold">!</span>
-                                </div>
-                              )}
+                        <div className="flex items-center gap-2">
+                          <p className={`text-lg font-semibold ${profileBuyInStatus.isPaid ? 'text-emerald-700' : 'text-amber-700'}`}>
+                            {profileBuyInStatus.isPaid ? 'Paid' : 'Outstanding'}
+                          </p>
+                          {profileBuyInStatus.isPaid ? (
+                            <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center">
+                              <span className="text-white text-xs font-bold">✓</span>
                             </div>
-                          );
-                        })()}
+                          ) : (
+                            <div className="w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center">
+                              <span className="text-white text-xs font-bold">!</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </>
                   ) : (
@@ -2366,7 +2429,7 @@ export default function GPGAManager() {
           </div>
           <div className="p-6">
             {(() => {
-              const summary = DB.getPlayerFinesSummary(currentUser.id);
+              const summary = profileFinesSummary;
               const paymentPercentage = summary.total_fines > 0
                 ? Math.round((summary.paid_fines / summary.total_fines) * 100)
                 : 100;
@@ -2453,11 +2516,11 @@ export default function GPGAManager() {
             ) : (
               <div className="space-y-4">
                 {rounds.map(round => {
-                  const playerFines = DB.getPlayerFinesForRound(currentUser.id, round.id);
+                  const playerFines = profileRoundFines[round.id] || [];
                   const roundTotal = playerFines.reduce((sum, fine) => sum + (fine.amount * fine.quantity), 0);
                   const roundScore = scores[currentUser.id]?.[round.id]?.strokes || 0;
                   const isExpanded = expandedRounds[round.id];
-                  const isConfirmed = playerFines.length > 0 && DB.isPlayerRoundConfirmed(currentUser.id, round.id);
+                  const isConfirmed = profileRoundConfirmed[round.id] || false;
                   const isPaid = playerFines.length > 0 && playerFines.every(f => f.paid === 1);
 
                   // Only show rounds with fines that are confirmed
@@ -2611,8 +2674,11 @@ export default function GPGAManager() {
 
     useEffect(() => {
       // Load all golf courses
-      const courses = DB.getAllGolfCourses();
-      setGolfCourses(courses);
+      const loadCourses = async () => {
+        const courses = await DB.getAllGolfCourses();
+        setGolfCourses(courses);
+      };
+      loadCourses();
     }, []);
 
     const filteredCourses = searchTerm
@@ -2622,7 +2688,7 @@ export default function GPGAManager() {
         )
       : golfCourses;
 
-    const handleCreateRound = (e) => {
+    const handleCreateRound = async (e) => {
       e.preventDefault();
 
       if (!selectedCourse) {
@@ -2642,8 +2708,8 @@ export default function GPGAManager() {
         courseName: selectedCourse.name
       };
 
-      DB.addRound(newRound, activeSeason.id);
-      loadData();
+      await DB.addRound(newRound, activeSeason.id);
+      await loadData();
       showToast(`Round created successfully at ${selectedCourse.name}!`);
       setView('admin');
       localStorage.setItem('gpga_current_view', 'admin');
@@ -2799,7 +2865,7 @@ export default function GPGAManager() {
     );
   };
 
-  const handleAddRound = (e) => {
+  const handleAddRound = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
 
@@ -2823,8 +2889,8 @@ export default function GPGAManager() {
       courseName: selectedCourse.name
     };
 
-    DB.addRound(newRound, activeSeason.id);
-    loadData();
+    await DB.addRound(newRound, activeSeason.id);
+    await loadData();
     setIsAddRoundModalOpen(false);
     setSelectedCourse(null);
     setSearchTerm('');
@@ -2837,7 +2903,7 @@ export default function GPGAManager() {
     setIsEditPlayerModalOpen(true);
   };
 
-  const handleUpdatePlayerSubmit = (e) => {
+  const handleUpdatePlayerSubmit = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
 
@@ -2856,9 +2922,9 @@ export default function GPGAManager() {
       }
     }
 
-    DB.updatePlayer(editingPlayer.id, updates);
+    await DB.updatePlayer(editingPlayer.id, updates);
 
-    loadData();
+    await loadData();
     setIsEditPlayerModalOpen(false);
     showToast(`Player ${formData.get('name')} updated successfully!`);
     setEditingPlayer(null);
@@ -2868,9 +2934,9 @@ export default function GPGAManager() {
     showConfirm(
       `Remove ${name}?`,
       `This will permanently remove ${name} and all their scores, fines, and history. This action cannot be undone.`,
-      () => {
-        DB.deletePlayer(id);
-        loadData();
+      async () => {
+        await DB.deletePlayer(id);
+        await loadData();
         showToast(`Player ${name} deleted successfully!`, 'success');
       },
       'danger'
@@ -2887,18 +2953,18 @@ export default function GPGAManager() {
     setIsEditRoundModalOpen(true);
   };
 
-  const handleUpdateRoundSubmit = (e) => {
+  const handleUpdateRoundSubmit = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
 
-    DB.updateRound(editingRound.id, {
+    await DB.updateRound(editingRound.id, {
       name: formData.get('name'),
       date: formData.get('date'),
       courseId: selectedCourse?.id,
       courseName: selectedCourse?.name
     });
 
-    loadData();
+    await loadData();
     setIsEditRoundModalOpen(false);
     setSelectedCourse(null);
     setSearchTerm('');
@@ -2910,16 +2976,16 @@ export default function GPGAManager() {
     setDeleteRoundConfirm({ id, name });
   };
 
-  const confirmDeleteRound = () => {
+  const confirmDeleteRound = async () => {
     if (deleteRoundConfirm) {
-      DB.deleteRound(deleteRoundConfirm.id);
-      loadData();
+      await DB.deleteRound(deleteRoundConfirm.id);
+      await loadData();
       showToast(`Round "${deleteRoundConfirm.name}" deleted successfully!`, 'success');
       setDeleteRoundConfirm(null);
     }
   };
 
-  const handleAddFineType = (e) => {
+  const handleAddFineType = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
 
@@ -2928,14 +2994,14 @@ export default function GPGAManager() {
       return;
     }
 
-    DB.addFineType(
+    await DB.addFineType(
       activeSeason.id,
       formData.get('name'),
       parseInt(formData.get('amount')),
       formData.get('description')
     );
 
-    loadData();
+    await loadData();
     setIsAddFineTypeModalOpen(false);
   };
 
@@ -2943,9 +3009,9 @@ export default function GPGAManager() {
     showConfirm(
       `Delete Fine Type "${name}"?`,
       `This will permanently delete this fine type. Any existing fines of this type will remain. This action cannot be undone.`,
-      () => {
-        DB.deleteFineType(id);
-        loadData();
+      async () => {
+        await DB.deleteFineType(id);
+        await loadData();
         showToast(`Fine type "${name}" deleted`, 'success');
       },
       'danger'
@@ -2959,6 +3025,18 @@ export default function GPGAManager() {
     const [roleFilter, setRoleFilter] = useState('all');
     const [sortBy, setSortBy] = useState('name');
     const [viewingPlayer, setViewingPlayer] = useState(null);
+    const [buyInStatusCache, setBuyInStatusCache] = useState({});
+
+    useEffect(() => {
+      const loadBuyInStatuses = async () => {
+        const cache = {};
+        for (const p of players) {
+          cache[p.id] = await DB.getPlayerBuyInStatus(p.id, activeSeason?.id);
+        }
+        setBuyInStatusCache(cache);
+      };
+      loadBuyInStatuses();
+    }, [players, activeSeason?.id]);
 
     // Calculate player statistics
     const playersWithStats = useMemo(() => {
@@ -3098,7 +3176,7 @@ export default function GPGAManager() {
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
             {filteredPlayers.map(p => {
-              const buyInStatus = DB.getPlayerBuyInStatus(p.id, activeSeason?.id);
+              const buyInStatus = buyInStatusCache[p.id] || { isPaid: false };
               return (
             <Card key={p.id} className="hover:shadow-lg transition-shadow">
               <div className="p-4">
@@ -3131,9 +3209,9 @@ export default function GPGAManager() {
                       <p className="text-sm text-slate-500 truncate">{p.email}</p>
                       {/* Buy-In Status - Desktop */}
                       <button
-                        onClick={() => {
-                          DB.markBuyInPaid(p.id, activeSeason?.id, !buyInStatus.isPaid);
-                          loadData();
+                        onClick={async () => {
+                          await DB.markBuyInPaid(p.id, activeSeason?.id, !buyInStatus.isPaid);
+                          await loadData();
                           showToast(`Buy-in ${!buyInStatus.isPaid ? 'marked as paid' : 'marked as outstanding'}`, 'success');
                         }}
                         className={`mt-2 inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold transition-all ${
@@ -3181,10 +3259,10 @@ export default function GPGAManager() {
                       <Edit size={20} />
                     </button>
                     <button
-                      onClick={() => {
+                      onClick={async () => {
                         const newStatus = p.status === 'active' ? 'inactive' : 'active';
-                        DB.updatePlayer(p.id, { status: newStatus });
-                        loadData();
+                        await DB.updatePlayer(p.id, { status: newStatus });
+                        await loadData();
                         showToast(`Player ${newStatus === 'active' ? 'activated' : 'deactivated'}`, 'success');
                       }}
                       className={`p-2.5 rounded-lg transition-colors ${
@@ -3231,9 +3309,9 @@ export default function GPGAManager() {
 
                   {/* Buy-In Status - Mobile */}
                   <button
-                    onClick={() => {
-                      DB.markBuyInPaid(p.id, activeSeason?.id, !buyInStatus.isPaid);
-                      loadData();
+                    onClick={async () => {
+                      await DB.markBuyInPaid(p.id, activeSeason?.id, !buyInStatus.isPaid);
+                      await loadData();
                       showToast(`Buy-in ${!buyInStatus.isPaid ? 'marked as paid' : 'marked as outstanding'}`, 'success');
                     }}
                     className={`w-full inline-flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
@@ -3279,10 +3357,10 @@ export default function GPGAManager() {
                       <Edit size={20} />
                     </button>
                     <button
-                      onClick={() => {
+                      onClick={async () => {
                         const newStatus = p.status === 'active' ? 'inactive' : 'active';
-                        DB.updatePlayer(p.id, { status: newStatus });
-                        loadData();
+                        await DB.updatePlayer(p.id, { status: newStatus });
+                        await loadData();
                         showToast(`Player ${newStatus === 'active' ? 'activated' : 'deactivated'}`, 'success');
                       }}
                       className={`p-2.5 rounded-lg transition-colors ${
@@ -3455,7 +3533,7 @@ export default function GPGAManager() {
              </div>
              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                {players.map(p => {
-                 const buyInStatus = DB.getPlayerBuyInStatus(p.id, activeSeason?.id);
+                 const buyInStatus = directoryBuyInCache[p.id] || { isPaid: false };
                  return (
                  <Card key={p.id} className="p-4 group hover:border-emerald-500 transition-all">
                     <div className="flex items-center gap-4 mb-3">
@@ -3493,9 +3571,9 @@ export default function GPGAManager() {
                     {(currentUser.role === 'master' || currentUser.role === 'admin') && (
                       <div className="pt-3 border-t border-slate-200">
                         <button
-                          onClick={() => {
-                            DB.markBuyInPaid(p.id, activeSeason?.id, !buyInStatus.isPaid);
-                            window.location.reload(); // Refresh to show updated status
+                          onClick={async () => {
+                            await DB.markBuyInPaid(p.id, activeSeason?.id, !buyInStatus.isPaid);
+                            await loadData();
                           }}
                           className={`w-full flex items-center justify-between p-2 rounded-lg transition-all ${
                             buyInStatus.isPaid
