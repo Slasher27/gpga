@@ -1024,8 +1024,7 @@ export default function GPGAManager() {
 
     const PlayerCell = ({ player, isWinner }) => (
       <div className="flex items-center gap-2 min-w-0">
-        {isWinner && <Trophy size={14} className="text-yellow-500 flex-shrink-0" />}
-        <span className={`truncate ${player.isDisqualified ? 'text-slate-400 line-through' : 'font-medium text-slate-800'}`}>
+                <span className={`truncate ${player.isDisqualified ? 'text-slate-400 line-through' : 'font-medium text-slate-800'}`}>
           {player.name}
         </span>
         {isWinner && <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold flex-shrink-0">WINNER</span>}
@@ -1039,10 +1038,7 @@ export default function GPGAManager() {
         {isCompletedSeason && (
           <Card>
             <div className="p-4 md:p-5">
-              <div className="flex items-center gap-2 mb-3">
-                <Trophy size={18} className="text-yellow-500" />
-                <h3 className="font-bold text-slate-800 text-sm">{activeSeason.name} Champions</h3>
-              </div>
+              <h3 className="font-bold text-slate-800 text-sm mb-3">{activeSeason.name} Champions</h3>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="flex items-center gap-3 bg-slate-50 rounded-lg p-3">
                   <Trophy size={18} className="text-yellow-500 flex-shrink-0" />
@@ -1208,7 +1204,6 @@ export default function GPGAManager() {
                         <td className="px-3 py-3"><RankBadge idx={idx} /></td>
                         <td className="px-3 py-3">
                           <div className="flex items-center gap-2">
-                            {isCompletedSeason && idx === 0 && <Trophy size={14} className="text-yellow-500 flex-shrink-0" />}
                             <div className="min-w-0">
                               <p className="font-medium text-slate-800 flex items-center gap-1.5">
                                 {team.name}
