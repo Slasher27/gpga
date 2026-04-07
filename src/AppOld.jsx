@@ -3404,7 +3404,6 @@ export default function GPGAManager() {
                           if (!activeSeason?.id) return;
                           await DB.markBuyInPaid(p.id, activeSeason.id, !buyInStatus.isPaid);
                           setBuyInStatusCache(prev => ({ ...prev, [p.id]: { isPaid: !buyInStatus.isPaid, date: !buyInStatus.isPaid ? new Date().toISOString().split('T')[0] : null } }));
-                          await loadData();
                           showToast(`Buy-in ${!buyInStatus.isPaid ? 'marked as paid' : 'marked as outstanding'}`, 'success');
                         }}
                         className={`mt-2 inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold transition-all ${
@@ -3506,7 +3505,6 @@ export default function GPGAManager() {
                       if (!activeSeason?.id) return;
                       await DB.markBuyInPaid(p.id, activeSeason.id, !buyInStatus.isPaid);
                       setBuyInStatusCache(prev => ({ ...prev, [p.id]: { isPaid: !buyInStatus.isPaid, date: !buyInStatus.isPaid ? new Date().toISOString().split('T')[0] : null } }));
-                      await loadData();
                       showToast(`Buy-in ${!buyInStatus.isPaid ? 'marked as paid' : 'marked as outstanding'}`, 'success');
                     }}
                     className={`w-full inline-flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
@@ -3921,7 +3919,6 @@ export default function GPGAManager() {
                             if (!activeSeason?.id) return;
                             await DB.markBuyInPaid(p.id, activeSeason.id, !buyInStatus.isPaid);
                             setDirectoryBuyInCache(prev => ({ ...prev, [p.id]: { isPaid: !buyInStatus.isPaid, date: !buyInStatus.isPaid ? new Date().toISOString().split('T')[0] : null } }));
-                            await loadData();
                           }}
                           className={`w-full flex items-center justify-between p-2 rounded-lg transition-all ${
                             buyInStatus.isPaid
