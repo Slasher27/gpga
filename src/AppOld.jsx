@@ -291,10 +291,12 @@ const LoginPage = ({ onLogin }) => {
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label htmlFor="login-email" className="block text-sm font-medium text-slate-700 mb-2">
                   Email Address
                 </label>
                 <input
+                  id="login-email"
+                  name="login-email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -306,11 +308,13 @@ const LoginPage = ({ onLogin }) => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label htmlFor="login-password" className="block text-sm font-medium text-slate-700 mb-2">
                   Password
                 </label>
                 <div className="relative">
                   <input
+                    id="login-password"
+                    name="login-password"
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -775,6 +779,9 @@ export default function GPGAManager() {
         </h1>
         {allSeasons.length > 1 ? (
           <select
+            id="season-switcher"
+            name="season-switcher"
+            aria-label="Select season"
             value={activeSeason?.id || ''}
             onChange={async (e) => {
               const seasonId = Number(e.target.value);
@@ -842,9 +849,11 @@ export default function GPGAManager() {
 
       {/* Dev Tool: User Switcher */}
       <div className="p-4 border-t border-slate-800 bg-slate-900">
-        <label className="text-xs text-slate-500 block mb-2">Simulate Login As:</label>
+        <label htmlFor="user-switcher" className="text-xs text-slate-500 block mb-2">Simulate Login As:</label>
         <div className="relative">
           <select
+            id="user-switcher"
+            name="user-switcher"
             className="w-full bg-slate-800 text-slate-300 text-xs rounded p-2 appearance-none cursor-pointer focus:ring-1 focus:ring-emerald-500 outline-none"
             value={currentUserId}
             onChange={(e) => handleUserSwitch(e.target.value)}
@@ -1542,8 +1551,10 @@ export default function GPGAManager() {
 
                     {/* Player Selector */}
                     <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Select Player</label>
+                      <label htmlFor="fines-select-player" className="block text-xs font-bold text-slate-500 uppercase mb-2">Select Player</label>
                       <select
+                        id="fines-select-player"
+                        name="fines-select-player"
                         value={selectedPlayer || ''}
                         onChange={(e) => handlePlayerChange(e.target.value)}
                         className="w-full bg-white text-slate-800 border border-slate-200 rounded-lg px-3 py-2 pr-10 focus:ring-2 focus:ring-emerald-500 outline-none appearance-none bg-no-repeat bg-right"
@@ -1743,8 +1754,10 @@ export default function GPGAManager() {
                   {/* Filters - Round and Player */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Select Round</label>
+                      <label htmlFor="fines-select-round" className="block text-xs font-bold text-slate-500 uppercase mb-2">Select Round</label>
                       <select
+                        id="fines-select-round"
+                        name="fines-select-round"
                         value={selectedRound || ''}
                         onChange={(e) => handleRoundChange(parseInt(e.target.value))}
                         className="w-full bg-white text-slate-800 border border-slate-200 rounded-lg pl-3 pr-10 py-2 focus:ring-2 focus:ring-emerald-500 outline-none appearance-none"
@@ -1758,8 +1771,10 @@ export default function GPGAManager() {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Filter by Player</label>
+                      <label htmlFor="fines-filter-player" className="block text-xs font-bold text-slate-500 uppercase mb-2">Filter by Player</label>
                       <select
+                        id="fines-filter-player"
+                        name="fines-filter-player"
                         value={roundViewPlayerFilter}
                         onChange={(e) => setRoundViewPlayerFilter(e.target.value)}
                         className="w-full bg-white text-slate-800 border border-slate-200 rounded-lg pl-3 pr-10 py-2 focus:ring-2 focus:ring-emerald-500 outline-none appearance-none"
@@ -3326,8 +3341,10 @@ export default function GPGAManager() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {/* Search */}
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Search</label>
+              <label htmlFor="pm-search" className="block text-xs font-bold text-slate-500 uppercase mb-2">Search</label>
               <input
+                id="pm-search"
+                name="pm-search"
                 type="text"
                 placeholder="Search by name or email..."
                 value={searchTerm}
@@ -3338,8 +3355,10 @@ export default function GPGAManager() {
 
             {/* Status Filter */}
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Status</label>
+              <label htmlFor="pm-status" className="block text-xs font-bold text-slate-500 uppercase mb-2">Status</label>
               <select
+                id="pm-status"
+                name="pm-status"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
                 className="select select-bordered w-full pr-10"
@@ -3352,8 +3371,10 @@ export default function GPGAManager() {
 
             {/* Role Filter */}
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Role</label>
+              <label htmlFor="pm-role" className="block text-xs font-bold text-slate-500 uppercase mb-2">Role</label>
               <select
+                id="pm-role"
+                name="pm-role"
                 value={roleFilter}
                 onChange={(e) => setRoleFilter(e.target.value)}
                 className="select select-bordered w-full pr-10"
@@ -3366,8 +3387,10 @@ export default function GPGAManager() {
 
             {/* Sort By */}
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Sort By</label>
+              <label htmlFor="pm-sort" className="block text-xs font-bold text-slate-500 uppercase mb-2">Sort By</label>
               <select
+                id="pm-sort"
+                name="pm-sort"
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
                 className="select select-bordered w-full pr-10"
@@ -3842,19 +3865,22 @@ export default function GPGAManager() {
             {isAddingTeam && (
               <div className="p-4 bg-slate-50 flex items-center gap-2 flex-wrap">
                 <input
+                  id="team-name"
+                  name="team-name"
                   value={newTeamName}
                   onChange={e => setNewTeamName(e.target.value)}
                   placeholder="Team name"
+                  aria-label="Team name"
                   className="input input-bordered input-sm w-32"
                 />
-                <select value={newPlayer1} onChange={e => setNewPlayer1(e.target.value)} className="select select-bordered select-sm">
+                <select id="team-p1" name="team-p1" aria-label="Player 1" value={newPlayer1} onChange={e => setNewPlayer1(e.target.value)} className="select select-bordered select-sm">
                   <option value="">Player 1</option>
                   {availablePlayers.filter(p => p.id !== newPlayer2).map(p => (
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
                 </select>
                 <span className="text-slate-400">&</span>
-                <select value={newPlayer2} onChange={e => setNewPlayer2(e.target.value)} className="select select-bordered select-sm">
+                <select id="team-p2" name="team-p2" aria-label="Player 2" value={newPlayer2} onChange={e => setNewPlayer2(e.target.value)} className="select select-bordered select-sm">
                   <option value="">Player 2</option>
                   {availablePlayers.filter(p => p.id !== newPlayer1).map(p => (
                     <option key={p.id} value={p.id}>{p.name}</option>
@@ -4126,8 +4152,9 @@ export default function GPGAManager() {
 
                 <div className="space-y-3">
                   <div>
-                    <label className="text-sm font-medium text-slate-700 mb-1 block">Full Name</label>
+                    <label htmlFor="pp-name" className="text-sm font-medium text-slate-700 mb-1 block">Full Name</label>
                     <input
+                      id="pp-name"
                       name="playerName"
                       required
                       value={formData.name || ''}
@@ -4136,8 +4163,9 @@ export default function GPGAManager() {
                     />
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-slate-700 mb-1 block">Email Address</label>
+                    <label htmlFor="pp-email" className="text-sm font-medium text-slate-700 mb-1 block">Email Address</label>
                     <input
+                      id="pp-email"
                       name="playerEmail"
                       required
                       type="email"
@@ -4147,8 +4175,9 @@ export default function GPGAManager() {
                     />
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-slate-700 mb-1 block">New Password</label>
+                    <label htmlFor="pp-password" className="text-sm font-medium text-slate-700 mb-1 block">New Password</label>
                     <input
+                      id="pp-password"
                       name="playerPassword"
                       type="password"
                       placeholder="Leave blank to keep current"
@@ -4160,8 +4189,9 @@ export default function GPGAManager() {
                   <div className="grid grid-cols-2 gap-3">
                     {currentUser.role === 'master' && player.role !== 'master' && (
                       <div>
-                        <label className="text-sm font-medium text-slate-700 mb-1 block">Role</label>
+                        <label htmlFor="pp-role" className="text-sm font-medium text-slate-700 mb-1 block">Role</label>
                         <select
+                          id="pp-role"
                           name="playerRole"
                           value={formData.role || 'player'}
                           onChange={e => setFormData(prev => ({ ...prev, role: e.target.value }))}
@@ -4173,8 +4203,9 @@ export default function GPGAManager() {
                       </div>
                     )}
                     <div>
-                      <label className="text-sm font-medium text-slate-700 mb-1 block">Status</label>
+                      <label htmlFor="pp-status" className="text-sm font-medium text-slate-700 mb-1 block">Status</label>
                       <select
+                        id="pp-status"
                         name="playerStatus"
                         value={formData.status || 'active'}
                         onChange={e => setFormData(prev => ({ ...prev, status: e.target.value }))}
