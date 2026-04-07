@@ -761,198 +761,202 @@ export default function GPGAManager() {
 
   // -- Views --
 
-  const Sidebar = () => (
-    <>
-      {/* Mobile Overlay */}
-      {isMobileMenuOpen && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-30 md:hidden"
-          onClick={() => setIsMobileMenuOpen(false)}
-        />
-      )}
+  // Season switcher handler
+  const handleSeasonSwitch = async (seasonId) => {
+    const season = allSeasons.find(s => s.id === seasonId);
+    if (!season) return;
+    setActiveSeason(season);
+    const roundsData = await DB.getAllRounds(season.id);
+    setRounds(roundsData);
+    const scoresData = await DB.getAllScores();
+    const finesData = await DB.getPlayerFinesByRound();
+    const mergedData = { ...scoresData };
+    Object.keys(finesData).forEach(pid => {
+      if (!mergedData[pid]) mergedData[pid] = {};
+      Object.keys(finesData[pid]).forEach(rid => {
+        if (!mergedData[pid][rid]) mergedData[pid][rid] = { strokes: 0, fines: 0 };
+        mergedData[pid][rid].fines = finesData[pid][rid];
+      });
+    });
+    setScores(mergedData);
+  };
 
-      {/* Sidebar */}
-      <div className={`w-64 bg-slate-900 text-slate-300 flex flex-col h-full fixed left-0 top-0 overflow-y-auto z-40 transition-transform duration-300 ${
-        isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
-      }`}>
-      <div className="p-6 pb-3">
-        <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-          <Trophy className="text-emerald-500" />
+  const handleEndSeason = () => {
+    const roundCount = rounds.length;
+    const warning = roundCount < 9
+      ? `The season has only completed ${roundCount} of 9 rounds. Are you sure you want to end it early?\n\nScores, fines, and standings will be locked. This cannot be undone.`
+      : 'Scores, fines, and standings will be locked. You can still view the data but cannot make changes. This cannot be undone.';
+    showConfirm(
+      `End ${activeSeason.name}?`,
+      warning,
+      async () => {
+        await fetch('/api/seasons/' + activeSeason.id, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ is_active: false })
+        });
+        setActiveSeason(prev => ({ ...prev, is_active: 0 }));
+        setAllSeasons(prev => prev.map(s => s.id === activeSeason.id ? { ...s, is_active: 0 } : s));
+        showToast(`${activeSeason.name} has ended`, 'success');
+      },
+      'danger'
+    );
+  };
+
+  // Nav items config
+  const isAdmin = currentUser.role === 'master' || currentUser.role === 'admin';
+  const isMaster = currentUser.role === 'master';
+
+  const navItems = [
+    { id: 'dashboard', icon: <TrendingUp size={20} />, label: 'Leaderboard' },
+    { id: 'profile', icon: <User size={20} />, label: 'Profile' },
+    { id: 'fines', icon: <Banknote size={20} />, label: 'Fines' },
+    ...(isAdmin ? [{ id: 'rounds', icon: <Calendar size={20} />, label: 'Rounds' }] : []),
+    ...(isMaster ? [{ id: 'admin', icon: <Users size={20} />, label: 'Players' }] : []),
+  ];
+
+  const setNavView = (id) => {
+    setView(id);
+    localStorage.setItem('gpga_current_view', id);
+    setIsMobileMenuOpen(false);
+  };
+
+  // Desktop sidebar
+  const DesktopSidebar = () => (
+    <div className="hidden md:flex w-56 bg-white border-r border-slate-200 flex-col h-full fixed left-0 top-0 z-40">
+      {/* Logo */}
+      <div className="p-5 pb-4">
+        <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+          <Trophy className="text-emerald-500" size={22} />
           GPGA
         </h1>
-        {allSeasons.length > 1 ? (
+        <p className="text-xs text-slate-400 mt-1">{activeSeason?.name || 'No Season'}</p>
+      </div>
+
+      {/* Nav */}
+      <nav className="flex-1 px-3 space-y-1">
+        {navItems.map(item => (
+          <button
+            key={item.id}
+            onClick={() => setNavView(item.id)}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm ${
+              view === item.id
+                ? 'bg-emerald-50 text-emerald-700 font-semibold'
+                : 'text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            {item.icon}
+            <span>{item.label}</span>
+          </button>
+        ))}
+
+        {/* Admin actions */}
+        {isMaster && (
+          <div className="pt-4 mt-4 border-t border-slate-100 space-y-1">
+            <button onClick={() => setIsNewSeasonModalOpen(true)} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-slate-600 hover:bg-slate-50 transition-colors">
+              <Plus size={20} /> New Season
+            </button>
+            {activeSeason?.is_active === 1 && (
+              <button onClick={handleEndSeason} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-red-500 hover:bg-red-50 transition-colors">
+                <XCircle size={20} /> End Season
+              </button>
+            )}
+          </div>
+        )}
+      </nav>
+
+      {/* Season Switcher + User */}
+      <div className="p-3 border-t border-slate-100 space-y-3">
+        {allSeasons.length > 1 && (
           <select
             id="season-switcher"
             name="season-switcher"
             aria-label="Select season"
             value={activeSeason?.id || ''}
-            onChange={async (e) => {
-              const seasonId = Number(e.target.value);
-              const season = allSeasons.find(s => s.id === seasonId);
-              if (season) {
-                setActiveSeason(season);
-                const roundsData = await DB.getAllRounds(season.id);
-                setRounds(roundsData);
-                const scoresData = await DB.getAllScores();
-                const finesData = await DB.getPlayerFinesByRound();
-                const mergedData = { ...scoresData };
-                Object.keys(finesData).forEach(pid => {
-                  if (!mergedData[pid]) mergedData[pid] = {};
-                  Object.keys(finesData[pid]).forEach(rid => {
-                    if (!mergedData[pid][rid]) mergedData[pid][rid] = { strokes: 0, fines: 0 };
-                    mergedData[pid][rid].fines = finesData[pid][rid];
-                  });
-                });
-                setScores(mergedData);
-              }
-            }}
-            className="mt-2 w-full bg-slate-800 text-slate-300 text-xs rounded px-2 py-1.5 border border-slate-700 focus:border-emerald-500 focus:outline-none"
+            onChange={(e) => handleSeasonSwitch(Number(e.target.value))}
+            className="w-full text-xs rounded-lg px-3 py-2 border border-slate-200 bg-slate-50 text-slate-600 focus:border-emerald-500 focus:outline-none min-h-[36px]"
           >
             {allSeasons.map(s => (
-              <option key={s.id} value={s.id}>{s.name}</option>
+              <option key={s.id} value={s.id}>{s.name}{s.is_active ? '' : ' (ended)'}</option>
             ))}
           </select>
-        ) : (
-          <p className="text-xs text-slate-500 mt-2">{activeSeason?.name || 'No Season'}</p>
         )}
-      </div>
-
-      <nav className="flex-1 px-4 space-y-2">
-        <NavItem icon={<TrendingUp />} label="Leaderboard" id="dashboard" />
-        <NavItem icon={<User />} label="My Profile" id="profile" />
-
-        {currentUser.role === 'player' && (
-          <NavItem icon={<Banknote />} label="View Fines" id="fines" />
-        )}
-
-        {(currentUser.role === 'master' || currentUser.role === 'admin') && (
-          <>
-            <div className="pt-4 pb-2">
-              <p className="px-4 text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                {currentUser.role === 'master' ? 'Master Admin' : 'Admin'}
-              </p>
-            </div>
-            <NavItem icon={<Banknote />} label="Manage Fines" id="fines" />
-            <NavItem icon={<Calendar />} label="Manage Rounds" id="rounds" />
-            {currentUser.role === 'master' && (
-              <>
-                <NavItem icon={<Users />} label="Manage Players" id="admin" />
-                <button
-                  onClick={() => setIsNewSeasonModalOpen(true)}
-                  className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors hover:bg-slate-800"
-                >
-                  <Plus size={18} />
-                  <span className="font-medium text-sm">New Season</span>
-                </button>
-                {activeSeason?.is_active === 1 && (
-                  <button
-                    onClick={() => {
-                      const roundCount = rounds.length;
-                      const warning = roundCount < 9
-                        ? `The season has only completed ${roundCount} of 9 rounds. Are you sure you want to end it early?\n\nThis will close the season. Scores, fines, and standings will be locked. This cannot be undone.`
-                        : 'This will close the season. Scores, fines, and standings will be locked. You can still view the data but cannot make changes. This cannot be undone.';
-                      showConfirm(
-                        `End ${activeSeason.name}?`,
-                        warning,
-                        async () => {
-                          await fetch('/api/seasons/' + activeSeason.id, {
-                            method: 'PUT',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ is_active: false })
-                          });
-                          setActiveSeason(prev => ({ ...prev, is_active: 0 }));
-                          setAllSeasons(prev => prev.map(s => s.id === activeSeason.id ? { ...s, is_active: 0 } : s));
-                          showToast(`${activeSeason.name} has ended`, 'success');
-                        },
-                        'danger'
-                      );
-                    }}
-                    className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors hover:bg-red-900/30 text-red-400"
-                  >
-                    <XCircle size={18} />
-                    <span className="font-medium text-sm">End Season</span>
-                  </button>
-                )}
-              </>
-            )}
-          </>
-        )}
-      </nav>
-
-      {/* Dev Tool: User Switcher */}
-      <div className="p-4 border-t border-slate-800 bg-slate-900">
-        <label htmlFor="user-switcher" className="text-xs text-slate-500 block mb-2">Simulate Login As:</label>
-        <div className="relative">
-          <select
-            id="user-switcher"
-            name="user-switcher"
-            className="w-full bg-slate-800 text-slate-300 text-xs rounded p-2 appearance-none cursor-pointer focus:ring-1 focus:ring-emerald-500 outline-none"
-            value={currentUserId}
-            onChange={(e) => handleUserSwitch(e.target.value)}
-          >
-            {players.map(p => (
-              <option key={p.id} value={p.id}>
-                {p.name} ({p.role})
-              </option>
-            ))}
-          </select>
-          <div className="absolute right-2 top-2 pointer-events-none">
-            <RefreshCw size={12} className="text-slate-500" />
-          </div>
-        </div>
-      </div>
-
-      <div className="p-4 border-t border-slate-800">
-        <div className="flex items-center gap-3 mb-3">
+        <div className="flex items-center gap-3 px-2">
           {currentUser.avatar ? (
-             <img src={currentUser.avatar} alt="Avatar" className="w-10 h-10 rounded-full object-cover border-2 border-emerald-600" />
+            <img src={currentUser.avatar} alt="" className="w-8 h-8 rounded-full object-cover" />
           ) : (
-            <div className="w-10 h-10 rounded-full bg-emerald-600 flex items-center justify-center text-white font-bold">
+            <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-bold text-xs">
               {currentUser.name.charAt(0)}
             </div>
           )}
-          <div className="flex-1 overflow-hidden">
-            <p className="text-sm font-medium text-white truncate">{currentUser.name}</p>
-            <p className="text-xs text-slate-500 capitalize">
-              {currentUser.role === 'master' ? 'Master' : currentUser.role}
-            </p>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-slate-800 truncate">{currentUser.name}</p>
+            <p className="text-[10px] text-slate-400 capitalize">{currentUser.role}</p>
           </div>
-        </div>
-        <div className="space-y-2">
-          <button
-            onClick={toggleTheme}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
-          >
-            {theme === 'emerald' ? <Moon size={16} /> : <Sun size={16} />}
-            <span>{theme === 'emerald' ? 'Dark Mode' : 'Light Mode'}</span>
-          </button>
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
-          >
-            <LogOut size={16} />
-            <span>Sign Out</span>
-          </button>
+          <div className="flex gap-1">
+            <button onClick={toggleTheme} className="p-1.5 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors" aria-label="Toggle theme">
+              {theme === 'emerald' ? <Moon size={14} /> : <Sun size={14} />}
+            </button>
+            <button onClick={handleLogout} className="p-1.5 rounded text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors" aria-label="Sign out">
+              <LogOut size={14} />
+            </button>
+          </div>
         </div>
       </div>
     </div>
-    </>
   );
 
-  const NavItem = ({ icon, label, id }) => (
-    <button
-      onClick={() => {
-        setView(id);
-        localStorage.setItem('gpga_current_view', id);
-        setIsMobileMenuOpen(false);
-      }}
-      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-        view === id ? 'bg-emerald-600 text-white shadow-lg' : 'hover:bg-slate-800'
-      }`}
-    >
-      {React.cloneElement(icon, { size: 18 })}
-      <span className="font-medium text-sm">{label}</span>
-    </button>
+  // Mobile bottom nav + top header
+  const MobileNav = () => (
+    <>
+      {/* Top Header */}
+      <div className="md:hidden fixed top-0 left-0 right-0 bg-white border-b border-slate-200 px-4 py-2.5 flex items-center justify-between z-30">
+        <h1 className="text-base font-bold text-slate-800 flex items-center gap-1.5">
+          <Trophy className="text-emerald-500" size={18} />
+          GPGA
+        </h1>
+        <div className="flex items-center gap-2">
+          {allSeasons.length > 1 && (
+            <select
+              id="mobile-season-switcher"
+              name="mobile-season-switcher"
+              aria-label="Select season"
+              value={activeSeason?.id || ''}
+              onChange={(e) => handleSeasonSwitch(Number(e.target.value))}
+              className="text-xs rounded-lg px-2 py-1.5 border border-slate-200 bg-slate-50 text-slate-600 focus:outline-none"
+            >
+              {allSeasons.map(s => (
+                <option key={s.id} value={s.id}>{s.year}{s.is_active ? '' : ' (ended)'}</option>
+              ))}
+            </select>
+          )}
+          <button onClick={toggleTheme} className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 min-h-[36px] min-w-[36px] flex items-center justify-center" aria-label="Toggle theme">
+            {theme === 'emerald' ? <Moon size={16} /> : <Sun size={16} />}
+          </button>
+          <button onClick={handleLogout} className="p-2 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-500 min-h-[36px] min-w-[36px] flex items-center justify-center" aria-label="Sign out">
+            <LogOut size={16} />
+          </button>
+        </div>
+      </div>
+
+      {/* Bottom Tab Bar */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-30 safe-area-bottom">
+        <div className="flex">
+          {navItems.slice(0, 5).map(item => (
+            <button
+              key={item.id}
+              onClick={() => setNavView(item.id)}
+              className={`flex-1 flex flex-col items-center gap-0.5 py-2 pt-2.5 min-h-[56px] transition-colors ${
+                view === item.id ? 'text-emerald-600' : 'text-slate-400'
+              }`}
+            >
+              {item.icon}
+              <span className="text-[10px] font-medium">{item.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </>
   );
 
   const DashboardView = () => {
@@ -3904,24 +3908,10 @@ export default function GPGAManager() {
 
   return (
     <div className="min-h-screen bg-slate-100 font-sans">
-      <Sidebar />
+      <DesktopSidebar />
+      <MobileNav />
 
-      {/* Mobile Header */}
-      <div className="md:hidden fixed top-0 left-0 right-0 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between z-20">
-        <button
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-        >
-          <Menu size={24} className="text-slate-700" />
-        </button>
-        <h1 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-          <Trophy className="text-emerald-500" size={20} />
-          GPGA {activeSeason?.year || ''}
-        </h1>
-        <div className="w-10" /> {/* Spacer for centering */}
-      </div>
-
-      <main className="p-4 md:p-8 md:ml-64 pt-20 md:pt-8">
+      <main className="p-4 md:p-8 md:ml-56 pt-14 pb-20 md:pt-8 md:pb-8">
         {view === 'dashboard' && <DashboardView />}
         {view === 'fines' && <FinesView />}
         {view === 'rounds' && <RoundsManagementView />}
