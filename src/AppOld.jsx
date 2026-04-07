@@ -1389,261 +1389,152 @@ export default function GPGAManager() {
 
     const totalFines = playerFines.reduce((sum, fine) => sum + (fine.amount * fine.quantity), 0);
 
+    // Build fines tab list
+    const finesTabs = [];
+    if (!isReadOnlySeason && isAdmin) {
+      finesTabs.push({ id: 'assign', label: 'Assign' }, { id: 'types', label: 'Fine Sheet' });
+    }
+    finesTabs.push({ id: 'leaderboard', label: 'Ranking' }, { id: 'roundview', label: 'Rounds' }, { id: 'payments', label: 'Payments' });
+
     return (
-      <div className="space-y-6 animate-in fade-in duration-500">
+      <div className="space-y-4 animate-in fade-in duration-300">
         <div className="flex items-center justify-between h-10">
           <h2 className="text-xl font-bold text-slate-800">Fines</h2>
         </div>
 
         {/* Tab Navigation */}
         <div className="flex border-b border-slate-200 overflow-x-auto scrollbar-hide">
-          {/* Admin/Master Only Tabs — hidden for completed seasons */}
-          {!isReadOnlySeason && (currentUser.role === 'master' || currentUser.role === 'admin') && (
-            <>
-              <button
-                onClick={() => setFinesTab('assign')}
-                className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap min-h-[44px] ${
-                  finesTab === 'assign'
-                    ? 'border-emerald-600 text-emerald-600'
-                    : 'border-transparent text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                Assign Fines
-              </button>
-              <button
-                onClick={() => setFinesTab('types')}
-                className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap min-h-[44px] ${
-                  finesTab === 'types'
-                    ? 'border-emerald-600 text-emerald-600'
-                    : 'border-transparent text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                Fine Sheet
-              </button>
-            </>
-          )}
-
-          {/* Tabs visible to all roles */}
-          <button
-            onClick={() => setFinesTab('leaderboard')}
-            className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap min-h-[44px] ${
-              finesTab === 'leaderboard'
-                ? 'border-emerald-600 text-emerald-600'
-                : 'border-transparent text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            Leaderboard
-          </button>
-          <button
-            onClick={() => setFinesTab('roundview')}
-            className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap min-h-[44px] ${
-              finesTab === 'roundview'
-                ? 'border-emerald-600 text-emerald-600'
-                : 'border-transparent text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            Round View
-          </button>
-          <button
-            onClick={() => setFinesTab('payments')}
-            className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap min-h-[44px] ${
-              finesTab === 'payments'
-                ? 'border-emerald-600 text-emerald-600'
-                : 'border-transparent text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            Payments
-          </button>
+          {finesTabs.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setFinesTab(tab.id)}
+              className={`flex-1 min-w-[60px] px-3 py-3 text-sm font-medium text-center transition-colors whitespace-nowrap min-h-[44px] ${
+                finesTab === tab.id
+                  ? 'text-emerald-600 border-b-2 border-emerald-600'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
 
-        {/* Tab Content */}
+        {/* Assign Fines Tab */}
+        {isAdmin && finesTab === 'assign' && (
+          <Card>
+            <div className="p-4 space-y-4">
+              {/* Round + Player selectors */}
+              <div className="space-y-3">
+                {mostRecentRound ? (
+                  <div className="bg-slate-50 rounded-lg px-3 py-2.5 text-sm text-slate-700 font-medium">
+                    {mostRecentRound.name} — {mostRecentRound.course_name}
+                  </div>
+                ) : (
+                  <div className="bg-slate-50 rounded-lg px-3 py-2.5 text-sm text-slate-400">No rounds yet</div>
+                )}
+                <select
+                  id="fines-select-player"
+                  name="fines-select-player"
+                  value={selectedPlayer || ''}
+                  onChange={(e) => handlePlayerChange(e.target.value)}
+                  className="select select-bordered w-full min-h-[44px]"
+                  aria-label="Select player"
+                >
+                  <option value="">Select Player</option>
+                  {players.filter(p => p.status === 'active').map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
 
-        {/* Admin/Master Only Tabs */}
-        {(currentUser.role === 'master' || currentUser.role === 'admin') && (
-          <>
-            {/* Assign Fines Tab */}
-            {finesTab === 'assign' && (
-              <Card>
-                <div className="p-4 border-b border-slate-100 bg-blue-50">
-                  <h3 className="font-semibold text-blue-800">Assign Fines</h3>
-                  <p className="text-xs text-blue-600 mt-1">Add or remove fines for players</p>
-                </div>
-                <div className="p-4 space-y-4">
-                  {/* Round Display and Player Selector - Single Row */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Round Display - Auto-selected to most recent */}
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Current Round</label>
-                      {mostRecentRound ? (
-                        <div className="w-full bg-emerald-50 text-emerald-800 border-2 border-emerald-200 rounded-lg px-4 py-3 font-semibold">
-                          {mostRecentRound.name} - {mostRecentRound.course}
-                        </div>
-                      ) : (
-                        <div className="w-full bg-slate-100 text-slate-500 border border-slate-200 rounded-lg px-4 py-3">
-                          No rounds created yet
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Player Selector */}
-                    <div>
-                      <label htmlFor="fines-select-player" className="block text-xs font-bold text-slate-500 uppercase mb-2">Select Player</label>
-                      <select
-                        id="fines-select-player"
-                        name="fines-select-player"
-                        value={selectedPlayer || ''}
-                        onChange={(e) => handlePlayerChange(e.target.value)}
-                        className="w-full bg-white text-slate-800 border border-slate-200 rounded-lg px-3 py-2 pr-10 focus:ring-2 focus:ring-emerald-500 outline-none appearance-none bg-no-repeat bg-right"
-                        style={{backgroundImage: "url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e\")", backgroundPosition: "right 0.75rem center", backgroundSize: "1.5em 1.5em"}}
-                      >
-                        <option value="">-- Select Player --</option>
-                        {players.filter(p => p.status === 'active').map(p => (
-                          <option key={p.id} value={p.id}>{p.name}</option>
-                        ))}
-                      </select>
-                    </div>
+              {/* Fine list */}
+              {selectedPlayer && selectedRound ? (
+                <>
+                  <div className="flex justify-between items-center pt-2 border-t border-slate-100">
+                    <p className="text-sm font-semibold text-slate-700">{players.find(p => p.id === selectedPlayer)?.name}</p>
+                    <p className="font-bold text-red-600">R{totalFines}</p>
                   </div>
 
-                  {/* Fine Assignment */}
-                  {selectedPlayer && selectedRound ? (
-                    <div className="border-t border-slate-200 pt-4">
-                      <div className="flex justify-between items-center mb-3">
-                        <h4 className="font-semibold text-slate-700">
-                          Fines for {players.find(p => p.id === selectedPlayer)?.name}
-                        </h4>
-                        <div className="text-right">
-                          <p className="text-xs text-slate-500">Total</p>
-                          <p className="font-bold text-red-600 text-lg">R{totalFines}</p>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2 max-h-96 overflow-y-auto" style={{scrollBehavior: 'auto'}}>
-                        {fineTypes.length === 0 ? (
-                          <p className="text-sm text-slate-400 text-center py-4">No fines on the fine sheet. Create the fine sheet first.</p>
-                        ) : (
-                          fineTypes.map(ft => {
-                            const playerFine = playerFines.find(pf => pf.fine_type_id === ft.id);
-                            const quantity = playerFine?.quantity || 0;
-
-                            return (
-                              <div key={ft.id} className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
-                                <div className="flex-1">
-                                  <p className="text-sm font-medium text-slate-700">{ft.name}</p>
-                                  <p className="text-xs text-slate-500">R{ft.amount} each</p>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleRemoveFine(ft.id)}
-                                    disabled={quantity === 0}
-                                    className="w-8 h-8 flex items-center justify-center rounded-md bg-red-100 text-red-600 hover:bg-red-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                                  >
-                                    -
-                                  </button>
-                                  <span className="w-8 text-center font-bold text-slate-800">{quantity}</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleAddFine(ft.id)}
-                                    className="w-8 h-8 flex items-center justify-center rounded-md bg-emerald-100 text-emerald-600 hover:bg-emerald-200 transition-colors"
-                                  >
-                                    +
-                                  </button>
-                                  <span className="w-16 text-right font-semibold text-slate-600">
-                                    R{quantity * ft.amount}
-                                  </span>
-                                </div>
-                              </div>
-                            );
-                          })
-                        )}
-                      </div>
-
-                      {/* Finish Button - Below fines list */}
-                      {(() => {
+                  <div className="space-y-1.5 max-h-[60vh] overflow-y-auto">
+                    {fineTypes.length === 0 ? (
+                      <p className="text-sm text-slate-400 text-center py-4">No fines on the sheet yet</p>
+                    ) : (
+                      fineTypes.map(ft => {
+                        const quantity = playerFines.find(pf => pf.fine_type_id === ft.id)?.quantity || 0;
                         return (
-                          <div className="mt-4 pt-3 border-t border-slate-200">
-                            <button
-                              onClick={async () => {
-                                await DB.confirmPlayerRoundFines(selectedPlayer, selectedRound, !isRoundConfirmed);
-                                setIsRoundConfirmed(!isRoundConfirmed);
-                                showToast(
-                                  isRoundConfirmed
-                                    ? 'Fines reopened for editing'
-                                    : 'Fines confirmed!',
-                                  isRoundConfirmed ? 'info' : 'success'
-                                );
-                              }}
-                              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                                isRoundConfirmed
-                                  ? 'bg-amber-500 text-white hover:bg-amber-600'
-                                  : 'bg-emerald-600 text-white hover:bg-emerald-700'
-                              }`}
-                            >
-                              {isRoundConfirmed ? 'Reopen' : 'Finish'}
-                            </button>
-                            {isRoundConfirmed && (
-                              <span className="ml-3 text-xs text-amber-600">
-                                ✓ Confirmed
-                              </span>
-                            )}
+                          <div key={ft.id} className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-slate-700 truncate">{ft.name}</p>
+                              <p className="text-[10px] text-slate-400">R{ft.amount}</p>
+                            </div>
+                            <button type="button" onClick={() => handleRemoveFine(ft.id)} disabled={quantity === 0} className="w-9 h-9 flex items-center justify-center rounded-lg bg-red-100 text-red-600 hover:bg-red-200 disabled:opacity-30 transition-colors font-bold min-h-[36px]" aria-label="Remove fine">-</button>
+                            <span className="w-6 text-center font-bold text-sm text-slate-800">{quantity}</span>
+                            <button type="button" onClick={() => handleAddFine(ft.id)} className="w-9 h-9 flex items-center justify-center rounded-lg bg-emerald-100 text-emerald-600 hover:bg-emerald-200 transition-colors font-bold min-h-[36px]" aria-label="Add fine">+</button>
+                            <span className="w-14 text-right text-sm font-semibold text-slate-600">R{quantity * ft.amount}</span>
                           </div>
                         );
-                      })()}
-                    </div>
-                  ) : (
-                    <div className="border-t border-slate-200 pt-4">
-                      <p className="text-sm text-slate-400 text-center py-8">Select a round and player to assign fines</p>
-                    </div>
-                  )}
-                </div>
-              </Card>
-            )}
-
-            {/* Fine Sheet Tab */}
-            {finesTab === 'types' && (
-              <Card>
-                <div className="p-4 border-b border-slate-100 bg-emerald-50 flex justify-between items-center">
-                  <div>
-                    <h3 className="font-semibold text-emerald-800">Fine Sheet</h3>
-                    <p className="text-xs text-emerald-600 mt-1">Manage season fine sheet for {activeSeason?.year} - All players are subject to these fines</p>
+                      })
+                    )}
                   </div>
-                  <button
-                    onClick={() => setIsAddFineTypeModalOpen(true)}
-                    className="bg-emerald-600 text-white px-3 py-1 rounded-md flex items-center gap-2 hover:bg-emerald-700 text-sm"
-                  >
-                    <Plus size={14} /> Add Fine
-                  </button>
-                </div>
-                <div className="divide-y divide-slate-100 max-h-96 overflow-y-auto">
-                  {fineTypes.length === 0 ? (
-                    <div className="p-8 text-center text-slate-400">
-                      <p>No fines on the sheet yet.</p>
-                      <p className="text-xs mt-2">Click "Add Fine" to add fines to the season sheet.</p>
-                    </div>
-                  ) : (
-                    fineTypes.map(ft => (
-                      <div key={ft.id} className="p-3 hover:bg-slate-50 flex items-center justify-between">
-                        <div className="flex-1">
-                          <p className="font-medium text-slate-800">{ft.name}</p>
-                          {ft.description && <p className="text-xs text-slate-500">{ft.description}</p>}
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="font-bold text-red-600">R{ft.amount}</span>
-                          <button
-                            onClick={() => handleDeleteFineType(ft.id, ft.name)}
-                            className="p-1 hover:bg-red-50 rounded transition-colors text-slate-400 hover:text-red-600"
-                            title="Delete Fine"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
+
+                  {/* Confirm button */}
+                  <div className="pt-3 border-t border-slate-100 flex items-center gap-3">
+                    <button
+                      onClick={async () => {
+                        await DB.confirmPlayerRoundFines(selectedPlayer, selectedRound, !isRoundConfirmed);
+                        setIsRoundConfirmed(!isRoundConfirmed);
+                        showToast(isRoundConfirmed ? 'Fines reopened' : 'Fines confirmed!', isRoundConfirmed ? 'info' : 'success');
+                      }}
+                      className={`px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors min-h-[44px] ${
+                        isRoundConfirmed ? 'bg-amber-500 text-white hover:bg-amber-600' : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                      }`}
+                    >
+                      {isRoundConfirmed ? 'Reopen' : 'Confirm'}
+                    </button>
+                    {isRoundConfirmed && <span className="text-xs text-amber-600 font-medium">Confirmed</span>}
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm text-slate-400 text-center py-8">Select a player to assign fines</p>
+              )}
+            </div>
+          </Card>
+        )}
+
+        {/* Fine Sheet Tab */}
+        {isAdmin && finesTab === 'types' && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-slate-500">{fineTypes.length} fines</p>
+              <button onClick={() => setIsAddFineTypeModalOpen(true)} className="bg-emerald-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-emerald-700 transition-colors flex items-center gap-2 text-sm min-h-[44px]">
+                <Plus size={16} /> Add Fine
+              </button>
+            </div>
+            <Card>
+              <div className="divide-y divide-slate-50">
+                {fineTypes.length === 0 ? (
+                  <div className="p-8 text-center text-slate-400 text-sm">No fines on the sheet yet</div>
+                ) : (
+                  fineTypes.map(ft => (
+                    <div key={ft.id} className="flex items-center gap-3 p-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-slate-800 truncate">{ft.name}</p>
+                        {ft.description && <p className="text-[10px] text-slate-400 truncate">{ft.description}</p>}
                       </div>
-                    ))
-                  )}
-                </div>
-              </Card>
-            )}
-          </>
+                      <span className="text-sm font-bold text-red-600 flex-shrink-0">R{ft.amount}</span>
+                      <button
+                        onClick={() => handleDeleteFineType(ft.id, ft.name)}
+                        className="p-2.5 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center flex-shrink-0"
+                        aria-label={`Delete ${ft.name}`}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </Card>
+          </div>
         )}
 
         {/* Shared Tabs - Visible to All Roles */}
