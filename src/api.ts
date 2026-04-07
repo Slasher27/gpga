@@ -191,8 +191,9 @@ export async function getPlayerRoundFines(playerId: string) {
   return request<any[]>(`/fines/player/${playerId}/rounds`);
 }
 
-export async function getPlayerFinesSummary(playerId: string) {
-  return request<any>(`/fines/player/${playerId}/summary`);
+export async function getPlayerFinesSummary(playerId: string, seasonId?: number) {
+  const qs = seasonId ? `?season_id=${seasonId}` : '';
+  return request<any>(`/fines/player/${playerId}/summary${qs}`);
 }
 
 // ---- Buy-In ----

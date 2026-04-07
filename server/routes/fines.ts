@@ -234,6 +234,7 @@ router.get('/player/:playerId/rounds', async (req, res) => {
 });
 
 router.get('/player/:playerId/summary', async (req, res) => {
+  const seasonId = req.query.season_id;
   const result = await getClient().execute({
     sql: `SELECT
             COALESCE(SUM(pf.quantity * ft.amount), 0) as total_fines,
@@ -243,8 +244,9 @@ router.get('/player/:playerId/summary', async (req, res) => {
             COUNT(DISTINCT pf.round_id) as total_rounds_with_fines
           FROM player_fines pf
           INNER JOIN fine_types ft ON pf.fine_type_id = ft.id
+          ${seasonId ? 'INNER JOIN rounds r ON pf.round_id = r.id AND r.season_id = ?' : ''}
           WHERE pf.player_id = ?`,
-    args: [req.params.playerId]
+    args: seasonId ? [Number(seasonId), req.params.playerId] : [req.params.playerId]
   });
 
   const row = result.rows[0];
