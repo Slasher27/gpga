@@ -2405,7 +2405,6 @@ export default function GPGAManager() {
     const [expandedRounds, setExpandedRounds] = useState({});
     const [isEditing, setIsEditing] = useState(false);
     const [profileBuyInStatus, setProfileBuyInStatus] = useState({ isPaid: false });
-    const [profileFinesSummary, setProfileFinesSummary] = useState({ total_fines: 0, paid_fines: 0, outstanding_fines: 0 });
     const [profileRoundFines, setProfileRoundFines] = useState({});
     const [profileRoundConfirmed, setProfileRoundConfirmed] = useState({});
 
@@ -2418,8 +2417,6 @@ export default function GPGAManager() {
         if (currentUser?.id) {
           const buyIn = await DB.getPlayerBuyInStatus(currentUser.id, activeSeason?.id);
           setProfileBuyInStatus(buyIn);
-          const summary = await DB.getPlayerFinesSummary(currentUser.id);
-          setProfileFinesSummary(summary);
           // Load fines and confirmed status for each round
           const finesMap = {};
           const confirmedMap = {};
@@ -2434,6 +2431,18 @@ export default function GPGAManager() {
       };
       loadProfileData();
     }, [activeSeason, currentUser?.id, rounds]);
+
+    // Calculate fines summary from current season data only
+    const profileFinesSummary = useMemo(() => {
+      const pScores = scores[currentUser?.id] || {};
+      const seasonRIds = new Set(rounds.map(r => r.id));
+      let total = 0;
+      for (const [rid, s] of Object.entries(pScores)) {
+        if (!seasonRIds.has(Number(rid))) continue;
+        total += (s.fines || 0);
+      }
+      return { total_fines: total, paid_fines: 0, outstanding_fines: total };
+    }, [scores, rounds, currentUser?.id]);
 
     const toggleRound = (roundId) => {
       setExpandedRounds(prev => ({
@@ -3875,27 +3884,26 @@ export default function GPGAManager() {
     const [formData, setFormData] = useState({});
     const [avatarPreview, setAvatarPreview] = useState(null);
     const [playerBuyIn, setPlayerBuyIn] = useState({ isPaid: false, date: null });
-    const [playerFinesSummary, setPlayerFinesSummary] = useState({ total_fines: 0, paid_fines: 0, outstanding_fines: 0 });
-
     useEffect(() => {
       if (player) {
         setFormData({ name: player.name, email: player.email, role: player.role, status: player.status, password: '' });
         setAvatarPreview(player.avatar);
         if (activeSeason?.id) {
           DB.getPlayerBuyInStatus(player.id, activeSeason.id).then(setPlayerBuyIn);
-          DB.getPlayerFinesSummary(player.id).then(setPlayerFinesSummary);
         }
       }
     }, [managingPlayerId, player?.id, activeSeason?.id]);
 
     if (!player) return null;
 
+    // Calculate stats only from current season's rounds
     const playerScores = scores[player.id] || {};
     const seasonRoundIds = new Set(rounds.map(r => r.id));
-    let roundsPlayed = 0, totalStrokes = 0, totalStableford = 0;
+    let roundsPlayed = 0, totalStrokes = 0, totalStableford = 0, totalFines = 0;
     for (const [rid, s] of Object.entries(playerScores)) {
       if (!seasonRoundIds.has(Number(rid))) continue;
       if (s.strokes > 0) { roundsPlayed++; totalStrokes += s.strokes; totalStableford += (s.stableford || 0); }
+      totalFines += (s.fines || 0);
     }
     const avgScore = roundsPlayed > 0 ? Math.round(totalStrokes / roundsPlayed) : 0;
 
@@ -3988,15 +3996,7 @@ export default function GPGAManager() {
                 </div>
                 <div className="border-t border-slate-100 pt-3 flex justify-between items-center">
                   <span className="text-sm text-slate-500">Total Fines</span>
-                  <span className="font-bold text-red-600">R{playerFinesSummary.total_fines.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-500">Fines Paid</span>
-                  <span className="font-bold text-emerald-600">R{playerFinesSummary.paid_fines.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-500">Fines Outstanding</span>
-                  <span className="font-bold text-amber-600">R{playerFinesSummary.outstanding_fines.toLocaleString()}</span>
+                  <span className="font-bold text-red-600">R{totalFines.toLocaleString()}</span>
                 </div>
               </div>
             </Card>
