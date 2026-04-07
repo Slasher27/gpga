@@ -11,6 +11,7 @@ import finesRouter from './routes/fines.js';
 import coursesRouter from './routes/courses.js';
 import authRouter from './routes/auth.js';
 import buyInRouter from './routes/buy-in.js';
+import teamsRouter from './routes/teams.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -27,6 +28,7 @@ app.use('/api/fines', finesRouter);
 app.use('/api/courses', coursesRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/buy-in', buyInRouter);
+app.use('/api/teams', teamsRouter);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

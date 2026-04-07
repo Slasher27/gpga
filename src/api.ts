@@ -208,6 +208,36 @@ export async function markBuyInPaid(playerId: string, seasonId: number, paid: bo
   });
 }
 
+// ---- Teams ----
+
+export async function getTeams(seasonId: number) {
+  return request<any[]>(`/teams?season_id=${seasonId}`);
+}
+
+export async function createTeam(seasonId: number, name: string, player1Id: string, player2Id: string) {
+  return request<{ id: number }>('/teams', {
+    method: 'POST',
+    body: JSON.stringify({ season_id: seasonId, name, player1_id: player1Id, player2_id: player2Id })
+  });
+}
+
+export async function updateTeam(id: number, updates: { name?: string; player1_id?: string; player2_id?: string }) {
+  return request(`/teams/${id}`, { method: 'PUT', body: JSON.stringify(updates) });
+}
+
+export async function deleteTeam(id: number) {
+  return request(`/teams/${id}`, { method: 'DELETE' });
+}
+
+// ---- Seasons (create) ----
+
+export async function createSeason(year: number, name: string, buyInAmount: number) {
+  return request<{ id: number }>('/seasons', {
+    method: 'POST',
+    body: JSON.stringify({ year, name, buy_in_amount: buyInAmount, is_active: true })
+  });
+}
+
 // ---- Auth ----
 
 export async function authenticateUser(email: string, password: string) {

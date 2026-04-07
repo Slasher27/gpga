@@ -10,6 +10,7 @@ import finesRouter from '../server/routes/fines.js';
 import coursesRouter from '../server/routes/courses.js';
 import authRouter from '../server/routes/auth.js';
 import buyInRouter from '../server/routes/buy-in.js';
+import teamsRouter from '../server/routes/teams.js';
 
 const app = express();
 
@@ -35,6 +36,7 @@ app.use('/api/fines', finesRouter);
 app.use('/api/courses', coursesRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/buy-in', buyInRouter);
+app.use('/api/teams', teamsRouter);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

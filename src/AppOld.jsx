@@ -405,6 +405,10 @@ export default function GPGAManager() {
   const [selectedDate, setSelectedDate] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
 
+  // Season management
+  const [allSeasons, setAllSeasons] = useState([]);
+  const [isNewSeasonModalOpen, setIsNewSeasonModalOpen] = useState(false);
+
   // Toast notification state
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
@@ -460,6 +464,10 @@ export default function GPGAManager() {
       // Get active season
       const season = await DB.getActiveSeason();
       setActiveSeason(season);
+
+      // Load all seasons
+      const seasonsData = await DB.getAllSeasons();
+      setAllSeasons(seasonsData);
 
       // Load players
       const playersData = await DB.getAllPlayers();
@@ -737,12 +745,43 @@ export default function GPGAManager() {
       <div className={`w-64 bg-slate-900 text-slate-300 flex flex-col h-full fixed left-0 top-0 overflow-y-auto z-40 transition-transform duration-300 ${
         isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
       }`}>
-      <div className="p-6">
+      <div className="p-6 pb-3">
         <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
           <Trophy className="text-emerald-500" />
-          GPGA 2025
+          GPGA
         </h1>
-        <p className="text-xs text-slate-500 mt-2">Season Manager (SQLite)</p>
+        {allSeasons.length > 1 ? (
+          <select
+            value={activeSeason?.id || ''}
+            onChange={async (e) => {
+              const seasonId = Number(e.target.value);
+              const season = allSeasons.find(s => s.id === seasonId);
+              if (season) {
+                setActiveSeason(season);
+                const roundsData = await DB.getAllRounds(season.id);
+                setRounds(roundsData);
+                const scoresData = await DB.getAllScores();
+                const finesData = await DB.getPlayerFinesByRound();
+                const mergedData = { ...scoresData };
+                Object.keys(finesData).forEach(pid => {
+                  if (!mergedData[pid]) mergedData[pid] = {};
+                  Object.keys(finesData[pid]).forEach(rid => {
+                    if (!mergedData[pid][rid]) mergedData[pid][rid] = { strokes: 0, fines: 0 };
+                    mergedData[pid][rid].fines = finesData[pid][rid];
+                  });
+                });
+                setScores(mergedData);
+              }
+            }}
+            className="mt-2 w-full bg-slate-800 text-slate-300 text-xs rounded px-2 py-1.5 border border-slate-700 focus:border-emerald-500 focus:outline-none"
+          >
+            {allSeasons.map(s => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+        ) : (
+          <p className="text-xs text-slate-500 mt-2">{activeSeason?.name || 'No Season'}</p>
+        )}
       </div>
 
       <nav className="flex-1 px-4 space-y-2">
@@ -763,7 +802,16 @@ export default function GPGAManager() {
             <NavItem icon={<Banknote />} label="Manage Fines" id="fines" />
             <NavItem icon={<Calendar />} label="Manage Rounds" id="rounds" />
             {currentUser.role === 'master' && (
-              <NavItem icon={<Users />} label="Manage Players" id="admin" />
+              <>
+                <NavItem icon={<Users />} label="Manage Players" id="admin" />
+                <button
+                  onClick={() => setIsNewSeasonModalOpen(true)}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors hover:bg-slate-800"
+                >
+                  <Plus size={18} />
+                  <span className="font-medium text-sm">New Season</span>
+                </button>
+              </>
             )}
           </>
         )}
@@ -845,6 +893,36 @@ export default function GPGAManager() {
 
   const DashboardView = () => {
     const [leaderboardTab, setLeaderboardTab] = useState('medal');
+    const [teamsData, setTeamsData] = useState([]);
+
+    // Load teams for active season
+    useEffect(() => {
+      if (activeSeason) {
+        DB.getTeams(activeSeason.id).then(data => setTeamsData(data));
+      }
+    }, [activeSeason]);
+
+    // Calculate team leaderboard (combined stableford, ALL rounds count)
+    const teamLeaderboard = useMemo(() => {
+      if (!teamsData.length || !rounds.length) return [];
+
+      return teamsData.map(team => {
+        const p1Scores = scores[team.player1_id] || {};
+        const p2Scores = scores[team.player2_id] || {};
+        let total = 0;
+        const roundTotals = {};
+
+        rounds.forEach(r => {
+          const p1sf = p1Scores[r.id]?.stableford || 0;
+          const p2sf = p2Scores[r.id]?.stableford || 0;
+          const combined = p1sf + p2sf;
+          roundTotals[r.id] = combined;
+          total += combined;
+        });
+
+        return { ...team, roundTotals, total };
+      }).sort((a, b) => b.total - a.total);
+    }, [teamsData, scores, rounds]);
 
     // Sort leaderboard based on selected tab
     const sortedLeaderboard = useMemo(() => {
@@ -870,7 +948,7 @@ export default function GPGAManager() {
             <div className="flex justify-between items-end">
               <div>
                 <h2 className="text-2xl font-bold text-slate-800">Season Leaderboard</h2>
-                <p className="text-slate-500">{leaderboardTab === 'medal' ? 'Medal Rankings' : 'Stableford Rankings'} • 2025 Season</p>
+                <p className="text-slate-500">{leaderboardTab === 'medal' ? 'Medal Rankings' : leaderboardTab === 'stableford' ? 'Stableford Rankings' : 'Team Rankings'} • {activeSeason?.name || 'Season'}</p>
               </div>
               <div className="text-right">
                 <p className="text-sm text-slate-500">Leader</p>
@@ -879,7 +957,7 @@ export default function GPGAManager() {
             </div>
 
             {/* Leader Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
               {/* Medal Leader */}
               <Card className="p-4 border-l-4 border-emerald-500">
                 <p className="text-xs text-slate-500 uppercase font-bold mb-3">Medal Leader</p>
@@ -893,7 +971,7 @@ export default function GPGAManager() {
                   )}
                   <div>
                     <p className="font-bold text-slate-800">{leaderboardData[0]?.name || 'N/A'}</p>
-                    <p className="text-2xl font-bold text-emerald-600">{leaderboardData[0]?.netAverage || '-'}</p>
+                    <p className="text-2xl font-bold text-emerald-600">{leaderboardData[0]?.netTotal || '-'}</p>
                   </div>
                 </div>
               </Card>
@@ -912,6 +990,21 @@ export default function GPGAManager() {
                   <div>
                     <p className="font-bold text-slate-800">{sortedLeaderboard[0]?.name || 'N/A'}</p>
                     <p className="text-2xl font-bold text-blue-600">{sortedLeaderboard[0]?.netStableford || '-'}</p>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Team Leader */}
+              <Card className="p-4 border-l-4 border-purple-500">
+                <p className="text-xs text-slate-500 uppercase font-bold mb-3">Team Leader</p>
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 font-bold text-lg">
+                    {teamLeaderboard[0]?.name?.charAt(0) || '?'}
+                  </div>
+                  <div>
+                    <p className="font-bold text-slate-800">{teamLeaderboard[0]?.name || 'N/A'}</p>
+                    <p className="text-xs text-slate-500">{teamLeaderboard[0]?.player1_name} & {teamLeaderboard[0]?.player2_name}</p>
+                    <p className="text-2xl font-bold text-purple-600">{teamLeaderboard[0]?.total || '-'}</p>
                   </div>
                 </div>
               </Card>
@@ -975,6 +1068,16 @@ export default function GPGAManager() {
                     }`}
                   >
                     Stableford
+                  </button>
+                  <button
+                    onClick={() => setLeaderboardTab('teams')}
+                    className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                      leaderboardTab === 'teams'
+                        ? 'bg-emerald-600 text-white shadow-md'
+                        : 'bg-white text-slate-600 border border-slate-200 hover:border-emerald-300'
+                    }`}
+                  >
+                    Teams
                   </button>
                 </div>
               </div>
@@ -1086,6 +1189,53 @@ export default function GPGAManager() {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              )}
+
+              {/* Teams Table */}
+              {leaderboardTab === 'teams' && (
+                <div className="overflow-x-auto -mx-4 md:mx-0">
+                  {teamLeaderboard.length === 0 ? (
+                    <div className="p-8 text-center text-slate-400">No teams set up for this season</div>
+                  ) : (
+                    <table className="w-full text-sm text-left min-w-max">
+                      <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
+                        <tr>
+                          <th className="px-3 md:px-6 py-4 font-semibold">Rank</th>
+                          <th className="px-3 md:px-6 py-4 font-semibold">Team</th>
+                          {rounds.map(r => (
+                            <th key={r.id} className="px-2 py-4 font-semibold text-center">{r.name.replace('Round ', 'R')}</th>
+                          ))}
+                          <th className="px-3 md:px-6 py-4 font-semibold text-center">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {teamLeaderboard.map((team, idx) => (
+                          <tr key={team.id} className={`border-b border-slate-100 ${idx === 0 ? 'bg-emerald-50' : 'hover:bg-slate-50'}`}>
+                            <td className="px-3 md:px-6 py-4">
+                              <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold ${
+                                idx === 0 ? 'bg-yellow-400 text-yellow-900' :
+                                idx === 1 ? 'bg-slate-300 text-slate-700' :
+                                idx === 2 ? 'bg-amber-600 text-white' : 'bg-slate-100 text-slate-600'
+                              }`}>{idx + 1}</span>
+                            </td>
+                            <td className="px-3 md:px-6 py-4">
+                              <p className="font-bold text-slate-800">{team.name}</p>
+                              <p className="text-xs text-slate-500">{team.player1_name} & {team.player2_name}</p>
+                            </td>
+                            {rounds.map(r => (
+                              <td key={r.id} className="px-2 py-4 text-center font-medium text-slate-700">
+                                {team.roundTotals[r.id] || '-'}
+                              </td>
+                            ))}
+                            <td className="px-3 md:px-6 py-4 text-center">
+                              <span className="font-bold text-emerald-700 text-lg">{team.total}</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
                 </div>
               )}
             </div>
@@ -1457,7 +1607,7 @@ export default function GPGAManager() {
                             >
                               {isRoundConfirmed ? 'Reopen' : 'Finish'}
                             </button>
-                            {isConfirmed && (
+                            {isRoundConfirmed && (
                               <span className="ml-3 text-xs text-amber-600">
                                 ✓ Confirmed
                               </span>
@@ -2145,6 +2295,8 @@ export default function GPGAManager() {
                         <div>
                           <input
                             type="number"
+                            min="40"
+                            max="150"
                             value={displayStrokes}
                             onChange={(e) => handleScoreChange(p.id, 'strokes', e.target.value)}
                             disabled={!isEditing}
@@ -2155,6 +2307,8 @@ export default function GPGAManager() {
                         <div>
                           <input
                             type="number"
+                            min="0"
+                            max="36"
                             value={displayHandicap}
                             onChange={(e) => handleScoreChange(p.id, 'handicap', e.target.value)}
                             disabled={!isEditing}
@@ -2165,6 +2319,8 @@ export default function GPGAManager() {
                         <div>
                           <input
                             type="number"
+                            min="0"
+                            max="50"
                             value={displayStableford}
                             onChange={(e) => handleScoreChange(p.id, 'stableford', e.target.value)}
                             disabled={!isEditing}
@@ -2393,7 +2549,7 @@ export default function GPGAManager() {
                   </div>
                   <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
                     <p className="text-xs text-slate-500 uppercase tracking-wide leading-none">Total Stableford</p>
-                    <p className="text-xl font-bold text-slate-800 mt-1">{myStats?.netTotal || 0}</p>
+                    <p className="text-xl font-bold text-slate-800 mt-1">{myStats?.totalStableford || 0}</p>
                   </div>
                   <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
                     <p className="text-xs text-slate-500 uppercase tracking-wide leading-none">Last Round</p>
@@ -3489,6 +3645,157 @@ export default function GPGAManager() {
             </div>
           </div>
         )}
+
+        {/* Team Management Section */}
+        <TeamManagementSection />
+      </div>
+    );
+  };
+
+  const TeamManagementSection = () => {
+    const [teams, setTeams] = useState([]);
+    const [isAddingTeam, setIsAddingTeam] = useState(false);
+    const [newTeamName, setNewTeamName] = useState('');
+    const [newPlayer1, setNewPlayer1] = useState('');
+    const [newPlayer2, setNewPlayer2] = useState('');
+    const [editingTeam, setEditingTeam] = useState(null);
+
+    useEffect(() => {
+      if (activeSeason) {
+        DB.getTeams(activeSeason.id).then(data => setTeams(data));
+      }
+    }, [activeSeason]);
+
+    const assignedPlayerIds = teams.flatMap(t => [t.player1_id, t.player2_id]);
+    const availablePlayers = players.filter(p => p.status === 'active' && !assignedPlayerIds.includes(p.id));
+
+    const handleAddTeam = async () => {
+      if (!newTeamName || !newPlayer1 || !newPlayer2 || !activeSeason) return;
+      await DB.createTeam(activeSeason.id, newTeamName, newPlayer1, newPlayer2);
+      const updated = await DB.getTeams(activeSeason.id);
+      setTeams(updated);
+      setNewTeamName('');
+      setNewPlayer1('');
+      setNewPlayer2('');
+      setIsAddingTeam(false);
+      showToast('Team created!', 'success');
+    };
+
+    const handleDeleteTeam = async (id) => {
+      await DB.deleteTeam(id);
+      const updated = await DB.getTeams(activeSeason.id);
+      setTeams(updated);
+      showToast('Team deleted', 'info');
+    };
+
+    const handleUpdateTeam = async () => {
+      if (!editingTeam) return;
+      await DB.updateTeam(editingTeam.id, {
+        name: editingTeam.name,
+        player1_id: editingTeam.player1_id,
+        player2_id: editingTeam.player2_id
+      });
+      const updated = await DB.getTeams(activeSeason.id);
+      setTeams(updated);
+      setEditingTeam(null);
+      showToast('Team updated!', 'success');
+    };
+
+    return (
+      <div className="mt-8">
+        <Card>
+          <div className="p-4 border-b border-slate-100 bg-purple-50 flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold text-purple-800">Team Pairs</h3>
+              <p className="text-xs text-purple-600 mt-1">Fixed pairs for {activeSeason?.name || 'the season'}. Combined stableford points, all 9 rounds count.</p>
+            </div>
+            {!isAddingTeam && teams.length < 4 && (
+              <button onClick={() => setIsAddingTeam(true)} className="btn btn-sm bg-purple-600 text-white hover:bg-purple-700 border-0">
+                <Plus size={14} /> Add Team
+              </button>
+            )}
+          </div>
+          <div className="divide-y divide-slate-100">
+            {teams.map(team => (
+              <div key={team.id} className="p-4 flex items-center justify-between hover:bg-slate-50">
+                {editingTeam?.id === team.id ? (
+                  <div className="flex-1 flex items-center gap-2 flex-wrap">
+                    <input
+                      value={editingTeam.name}
+                      onChange={e => setEditingTeam({ ...editingTeam, name: e.target.value })}
+                      className="input input-bordered input-sm w-32"
+                    />
+                    <select
+                      value={editingTeam.player1_id}
+                      onChange={e => setEditingTeam({ ...editingTeam, player1_id: e.target.value })}
+                      className="select select-bordered select-sm"
+                    >
+                      {players.filter(p => p.status === 'active').map(p => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                    <span className="text-slate-400">&</span>
+                    <select
+                      value={editingTeam.player2_id}
+                      onChange={e => setEditingTeam({ ...editingTeam, player2_id: e.target.value })}
+                      className="select select-bordered select-sm"
+                    >
+                      {players.filter(p => p.status === 'active').map(p => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                    <button onClick={handleUpdateTeam} className="btn btn-sm btn-success"><Save size={14} /></button>
+                    <button onClick={() => setEditingTeam(null)} className="btn btn-sm"><X size={14} /></button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 font-bold text-sm">
+                        {team.name.charAt(0)}
+                      </div>
+                      <div>
+                        <p className="font-bold text-slate-800">{team.name}</p>
+                        <p className="text-sm text-slate-500">{team.player1_name} & {team.player2_name}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => setEditingTeam(team)} className="btn btn-sm btn-ghost"><Edit size={14} /></button>
+                      <button onClick={() => handleDeleteTeam(team.id)} className="btn btn-sm btn-ghost text-red-500"><Trash2 size={14} /></button>
+                    </div>
+                  </>
+                )}
+              </div>
+            ))}
+            {teams.length === 0 && !isAddingTeam && (
+              <div className="p-8 text-center text-slate-400">No teams set up yet. Add teams to enable the team competition.</div>
+            )}
+            {isAddingTeam && (
+              <div className="p-4 bg-slate-50 flex items-center gap-2 flex-wrap">
+                <input
+                  value={newTeamName}
+                  onChange={e => setNewTeamName(e.target.value)}
+                  placeholder="Team name"
+                  className="input input-bordered input-sm w-32"
+                />
+                <select value={newPlayer1} onChange={e => setNewPlayer1(e.target.value)} className="select select-bordered select-sm">
+                  <option value="">Player 1</option>
+                  {availablePlayers.filter(p => p.id !== newPlayer2).map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+                <span className="text-slate-400">&</span>
+                <select value={newPlayer2} onChange={e => setNewPlayer2(e.target.value)} className="select select-bordered select-sm">
+                  <option value="">Player 2</option>
+                  {availablePlayers.filter(p => p.id !== newPlayer1).map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+                <button onClick={handleAddTeam} disabled={!newTeamName || !newPlayer1 || !newPlayer2} className="btn btn-sm bg-purple-600 text-white hover:bg-purple-700 border-0 disabled:opacity-50">Add</button>
+                <button onClick={() => setIsAddingTeam(false)} className="btn btn-sm">Cancel</button>
+              </div>
+            )}
+          </div>
+        </Card>
       </div>
     );
   };
@@ -4059,6 +4366,45 @@ export default function GPGAManager() {
           </div>
         </div>
       )}
+
+      {/* New Season Modal */}
+      <Modal
+        isOpen={isNewSeasonModalOpen}
+        onClose={() => setIsNewSeasonModalOpen(false)}
+        title="Create New Season"
+      >
+        <form onSubmit={async (e) => {
+          e.preventDefault();
+          const formData = new FormData(e.target);
+          const year = Number(formData.get('year'));
+          const name = formData.get('name');
+          const buyIn = Number(formData.get('buyIn'));
+          await DB.createSeason(year, name, buyIn);
+          await loadData();
+          setIsNewSeasonModalOpen(false);
+          showToast(`${name} created!`, 'success');
+        }} className="space-y-4">
+          <div className="form-control">
+            <label className="label"><span className="label-text font-semibold">Year</span></label>
+            <input name="year" type="number" defaultValue={new Date().getFullYear() + 1} className="input input-bordered" required />
+          </div>
+          <div className="form-control">
+            <label className="label"><span className="label-text font-semibold">Season Name</span></label>
+            <input name="name" type="text" defaultValue={`GPGA ${new Date().getFullYear() + 1} Season`} className="input input-bordered" required />
+          </div>
+          <div className="form-control">
+            <label className="label"><span className="label-text font-semibold">Buy-in Amount (R)</span></label>
+            <input name="buyIn" type="number" defaultValue={2500} className="input input-bordered" required />
+          </div>
+          <div className="alert alert-warning text-sm">
+            Creating a new season will deactivate the current one. You can switch between seasons using the sidebar dropdown.
+          </div>
+          <div className="flex gap-2 justify-end">
+            <button type="button" onClick={() => setIsNewSeasonModalOpen(false)} className="btn">Cancel</button>
+            <button type="submit" className="btn bg-emerald-600 text-white hover:bg-emerald-700 border-0">Create Season</button>
+          </div>
+        </form>
+      </Modal>
 
       {/* Confirmation Dialog */}
       <ConfirmDialogComponent />

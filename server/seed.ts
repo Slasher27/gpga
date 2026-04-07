@@ -101,6 +101,14 @@ export async function seedDatabase(): Promise<void> {
         (1, '7', 1, '2025-01-09'),
         (1, '8', 0, NULL)`,
       args: []
+    },
+    {
+      sql: `INSERT OR IGNORE INTO teams (id, season_id, name, player1_id, player2_id) VALUES
+        (1, 1, 'Team 1', '1', '2'),
+        (2, 1, 'Team 2', '3', '4'),
+        (3, 1, 'Team 3', '5', '6'),
+        (4, 1, 'Team 4', '7', '8')`,
+      args: []
     }
   ], 'write');
 

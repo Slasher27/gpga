@@ -107,6 +107,19 @@ export async function initSchema(): Promise<void> {
       FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE,
       UNIQUE(season_id, player_id)
     )`,
+    `CREATE TABLE IF NOT EXISTS teams (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      season_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      player1_id TEXT NOT NULL,
+      player2_id TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (season_id) REFERENCES seasons(id) ON DELETE CASCADE,
+      FOREIGN KEY (player1_id) REFERENCES players(id),
+      FOREIGN KEY (player2_id) REFERENCES players(id),
+      UNIQUE(season_id, player1_id),
+      UNIQUE(season_id, player2_id)
+    )`,
     'CREATE INDEX IF NOT EXISTS idx_scores_player ON scores(player_id)',
     'CREATE INDEX IF NOT EXISTS idx_scores_round ON scores(round_id)',
     'CREATE INDEX IF NOT EXISTS idx_players_email ON players(email)',
