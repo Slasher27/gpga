@@ -3,7 +3,6 @@ import {
   Trophy,
   Users,
   Banknote,
-  Settings,
   Plus,
   Save,
   X,
@@ -12,7 +11,6 @@ import {
   Camera,
   Trash2,
   Edit,
-  MoreVertical,
   ChevronDown,
   Search,
   Calendar,
@@ -20,9 +18,7 @@ import {
   LogOut,
   Eye,
   EyeOff,
-  CheckCircle,
   XCircle,
-  DollarSign,
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 import * as DB from './api.ts';
