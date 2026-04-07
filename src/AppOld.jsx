@@ -3241,6 +3241,12 @@ export default function GPGAManager() {
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
     const [sortBy, setSortBy] = useState('name');
+    const [teamsList, setTeamsList] = useState([]);
+    const [isAddingTeam, setIsAddingTeam] = useState(false);
+
+    useEffect(() => {
+      if (activeSeason) DB.getTeams(activeSeason.id).then(setTeamsList);
+    }, [activeSeason]);
     const [buyInStatusCache, setBuyInStatusCache] = useState({});
     const [buyInLoaded, setBuyInLoaded] = useState(false);
 
@@ -3320,8 +3326,8 @@ export default function GPGAManager() {
 
     return (
       <div className="space-y-4 animate-in fade-in duration-300">
-        {/* Header + Tabs */}
-        <div className="flex items-center justify-between">
+        {/* Header: Title + Action Button (consistent across tabs) */}
+        <div className="flex items-center justify-between min-h-[44px]">
           <h2 className="text-xl font-bold text-slate-800">Manage</h2>
           {adminTab === 'players' && (
             <button
@@ -3329,6 +3335,14 @@ export default function GPGAManager() {
               className="bg-emerald-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-emerald-700 transition-colors flex items-center gap-2 text-sm min-h-[44px]"
             >
               <Plus size={16} /> Add Player
+            </button>
+          )}
+          {adminTab === 'teams' && !isAddingTeam && teamsList.length < 4 && (
+            <button
+              onClick={() => setIsAddingTeam(true)}
+              className="bg-purple-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-purple-700 transition-colors flex items-center gap-2 text-sm min-h-[44px]"
+            >
+              <Plus size={16} /> Add Team
             </button>
           )}
         </div>
@@ -3359,46 +3373,6 @@ export default function GPGAManager() {
 
         {/* Players Tab */}
         {adminTab === 'players' && <>
-        <div className="flex flex-col sm:flex-row gap-2">
-          <div className="flex-1 relative">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              id="pm-search"
-              name="pm-search"
-              type="text"
-              placeholder="Search players..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="input input-bordered w-full pl-9 min-h-[44px]"
-              aria-label="Search players"
-            />
-          </div>
-          <select
-            id="pm-status"
-            name="pm-status"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="select select-bordered min-h-[44px]"
-            aria-label="Filter by status"
-          >
-            <option value="all">All</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-          </select>
-          <select
-            id="pm-sort"
-            name="pm-sort"
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            className="select select-bordered min-h-[44px]"
-            aria-label="Sort by"
-          >
-            <option value="name">Name</option>
-            <option value="rounds">Rounds</option>
-            <option value="fines">Fines</option>
-            <option value="avg">Average</option>
-          </select>
-        </div>
 
         {/* Player List */}
         {filteredPlayers.length === 0 && players.length === 0 ? (
@@ -3474,24 +3448,16 @@ export default function GPGAManager() {
         </>}
 
         {/* Teams Tab */}
-        {adminTab === 'teams' && <TeamManagementSection />}
+        {adminTab === 'teams' && <TeamManagementSection teams={teamsList} setTeams={setTeamsList} isAddingTeam={isAddingTeam} setIsAddingTeam={setIsAddingTeam} />}
       </div>
     );
   };
 
-  const TeamManagementSection = () => {
-    const [teams, setTeams] = useState([]);
-    const [isAddingTeam, setIsAddingTeam] = useState(false);
+  const TeamManagementSection = ({ teams, setTeams, isAddingTeam, setIsAddingTeam }) => {
     const [newTeamName, setNewTeamName] = useState('');
     const [newPlayer1, setNewPlayer1] = useState('');
     const [newPlayer2, setNewPlayer2] = useState('');
     const [editingTeam, setEditingTeam] = useState(null);
-
-    useEffect(() => {
-      if (activeSeason) {
-        DB.getTeams(activeSeason.id).then(data => setTeams(data));
-      }
-    }, [activeSeason]);
 
     const assignedPlayerIds = teams.flatMap(t => [t.player1_id, t.player2_id]);
     const availablePlayers = players.filter(p => p.status === 'active' && !assignedPlayerIds.includes(p.id));
@@ -3530,22 +3496,7 @@ export default function GPGAManager() {
 
     return (
       <div>
-        {/* Header */}
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <h3 className="text-lg font-bold text-slate-800">Team Pairs</h3>
-            <p className="text-xs text-slate-500">Combined stableford, all 9 rounds count</p>
-          </div>
-          {!isAddingTeam && teams.length < 4 && (
-            <button
-              onClick={() => setIsAddingTeam(true)}
-              className="bg-purple-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-purple-700 transition-colors flex items-center gap-2 text-sm min-h-[44px]"
-            >
-              <Plus size={16} /> Add Team
-            </button>
-          )}
-        </div>
-
+        <p className="text-sm text-slate-500 mb-3">Fixed pairs for {activeSeason?.name || 'the season'}. Combined stableford, all 9 rounds count.</p>
         <Card>
           <div className="divide-y divide-slate-100">
             {teams.map(team => (
