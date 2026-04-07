@@ -535,12 +535,13 @@ export default function GPGAManager() {
     let cancelled = false;
     const loadDirectoryBuyIn = async () => {
       if (!activeSeason?.id || players.length === 0) return;
+      const results = await Promise.all(
+        players.map(p => DB.getPlayerBuyInStatus(p.id, activeSeason.id).then(status => [p.id, status]))
+      );
+      if (cancelled) return;
       const cache = {};
-      for (const p of players) {
-        if (cancelled) return;
-        cache[p.id] = await DB.getPlayerBuyInStatus(p.id, activeSeason.id);
-      }
-      if (!cancelled) setDirectoryBuyInCache(cache);
+      for (const [id, status] of results) cache[id] = status;
+      setDirectoryBuyInCache(cache);
     };
     loadDirectoryBuyIn();
     return () => { cancelled = true; };
@@ -3226,21 +3227,25 @@ export default function GPGAManager() {
     const [sortBy, setSortBy] = useState('name');
     const [viewingPlayer, setViewingPlayer] = useState(null);
     const [buyInStatusCache, setBuyInStatusCache] = useState({});
+    const [buyInLoaded, setBuyInLoaded] = useState(false);
 
     useEffect(() => {
       let cancelled = false;
+      setBuyInLoaded(false);
       const loadBuyInStatuses = async () => {
         if (!activeSeason?.id || players.length === 0) return;
+        const results = await Promise.all(
+          players.map(p => DB.getPlayerBuyInStatus(p.id, activeSeason.id).then(status => [p.id, status]))
+        );
+        if (cancelled) return;
         const cache = {};
-        for (const p of players) {
-          if (cancelled) return;
-          cache[p.id] = await DB.getPlayerBuyInStatus(p.id, activeSeason.id);
-        }
-        if (!cancelled) setBuyInStatusCache(cache);
+        for (const [id, status] of results) cache[id] = status;
+        setBuyInStatusCache(cache);
+        setBuyInLoaded(true);
       };
       loadBuyInStatuses();
       return () => { cancelled = true; };
-    }, [activeSeason?.id]); // Only reload on season change, not player edits
+    }, [activeSeason?.id]); // Only reload on season change
 
     // Calculate player statistics (only for current season's rounds)
     const playersWithStats = useMemo(() => {
@@ -3435,7 +3440,7 @@ export default function GPGAManager() {
                             : 'bg-amber-100 hover:bg-amber-200 text-amber-700'
                         }`}
                       >
-                        Buy-In: {buyInStatus.isPaid ? 'Paid' : 'Outstanding'}
+                        Buy-In: {!buyInLoaded ? '...' : buyInStatus.isPaid ? 'Paid' : 'Outstanding'}
                         {buyInStatus.isPaid && <span className="text-[10px]">✓</span>}
                       </button>
                     </div>
@@ -3536,7 +3541,7 @@ export default function GPGAManager() {
                         : 'bg-amber-100 hover:bg-amber-200 text-amber-700'
                     }`}
                   >
-                    Buy-In: {buyInStatus.isPaid ? 'Paid' : 'Outstanding'}
+                    Buy-In: {!buyInLoaded ? '...' : buyInStatus.isPaid ? 'Paid' : 'Outstanding'}
                     {buyInStatus.isPaid && <span className="text-xs">✓</span>}
                   </button>
 
