@@ -533,7 +533,7 @@ export default function GPGAManager() {
   useEffect(() => {
     let cancelled = false;
     const loadDirectoryBuyIn = async () => {
-      if (!activeSeason?.id) return;
+      if (!activeSeason?.id || players.length === 0) return;
       const cache = {};
       for (const p of players) {
         if (cancelled) return;
@@ -541,11 +541,9 @@ export default function GPGAManager() {
       }
       if (!cancelled) setDirectoryBuyInCache(cache);
     };
-    if (players.length > 0) {
-      loadDirectoryBuyIn();
-    }
+    loadDirectoryBuyIn();
     return () => { cancelled = true; };
-  }, [players, activeSeason?.id]);
+  }, [activeSeason?.id]); // Only reload on season change
 
   // Filter golf courses based on search term
   const filteredCourses = useMemo(() => {
@@ -3232,7 +3230,7 @@ export default function GPGAManager() {
     useEffect(() => {
       let cancelled = false;
       const loadBuyInStatuses = async () => {
-        if (!activeSeason?.id) return;
+        if (!activeSeason?.id || players.length === 0) return;
         const cache = {};
         for (const p of players) {
           if (cancelled) return;
@@ -3242,7 +3240,7 @@ export default function GPGAManager() {
       };
       loadBuyInStatuses();
       return () => { cancelled = true; };
-    }, [players, activeSeason?.id]);
+    }, [activeSeason?.id]); // Only reload on season change, not player edits
 
     // Calculate player statistics (only for current season's rounds)
     const playersWithStats = useMemo(() => {
@@ -3638,7 +3636,7 @@ export default function GPGAManager() {
               </div>
 
               {/* Stats Overview */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
                 <div className="stat bg-slate-50 rounded-lg p-4">
                   <div className="stat-title text-xs">Rounds Played</div>
                   <div className="stat-value text-2xl text-emerald-600">{viewingPlayer.roundsPlayed}</div>
@@ -3652,8 +3650,32 @@ export default function GPGAManager() {
                   <div className="stat-value text-2xl text-red-600">R{viewingPlayer.totalFines}</div>
                 </div>
                 <div className="stat bg-slate-50 rounded-lg p-4">
-                  <div className="stat-title text-xs">Member Since</div>
-                  <div className="stat-value text-2xl text-slate-600">{activeSeason?.year || '-'}</div>
+                  <div className="stat-title text-xs">Buy-In ({activeSeason?.year || '-'})</div>
+                  <div className="stat-value text-2xl">
+                    {buyInStatusCache[viewingPlayer.id]?.isPaid ? (
+                      <span className="text-emerald-600">Paid</span>
+                    ) : (
+                      <span className="text-amber-600">Due</span>
+                    )}
+                  </div>
+                  {(currentUser.role === 'master' || currentUser.role === 'admin') && (
+                    <button
+                      onClick={async () => {
+                        if (!activeSeason?.id) return;
+                        const current = buyInStatusCache[viewingPlayer.id]?.isPaid || false;
+                        await DB.markBuyInPaid(viewingPlayer.id, activeSeason.id, !current);
+                        setBuyInStatusCache(prev => ({ ...prev, [viewingPlayer.id]: { isPaid: !current, date: !current ? new Date().toISOString().split('T')[0] : null } }));
+                        showToast(`Buy-in ${!current ? 'marked as paid' : 'marked as outstanding'}`, 'success');
+                      }}
+                      className={`mt-2 text-xs font-semibold px-2 py-1 rounded transition-all ${
+                        buyInStatusCache[viewingPlayer.id]?.isPaid
+                          ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                          : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                      }`}
+                    >
+                      {buyInStatusCache[viewingPlayer.id]?.isPaid ? 'Mark Unpaid' : 'Mark Paid'}
+                    </button>
+                  )}
                 </div>
               </div>
 
