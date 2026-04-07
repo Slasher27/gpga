@@ -23,8 +23,6 @@ import {
   CheckCircle,
   XCircle,
   DollarSign,
-  CreditCard,
-  AlertCircle
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 import * as DB from './api.ts';
@@ -2332,461 +2330,221 @@ export default function GPGAManager() {
 
   const ProfileView = () => {
     const myStats = leaderboardData.find(p => p.id === currentUser.id);
-    const [fineTypes, setFineTypes] = useState([]);
-    const [expandedRounds, setExpandedRounds] = useState({});
-    const [isEditing, setIsEditing] = useState(false);
+    const [profileTab, setProfileTab] = useState('stats');
     const [profileBuyInStatus, setProfileBuyInStatus] = useState({ isPaid: false });
-    const [profileRoundFines, setProfileRoundFines] = useState({});
-    const [profileRoundConfirmed, setProfileRoundConfirmed] = useState({});
+    const [profileFinesSummary, setProfileFinesSummary] = useState({ total_fines: 0, paid_fines: 0, outstanding_fines: 0 });
+    const [formData, setFormData] = useState({ name: currentUser.name, email: currentUser.email, password: '' });
 
     useEffect(() => {
-      const loadProfileData = async () => {
-        if (activeSeason) {
-          const types = await DB.getFineTypes(activeSeason.id);
-          setFineTypes(types);
-        }
-        if (currentUser?.id) {
-          const buyIn = await DB.getPlayerBuyInStatus(currentUser.id, activeSeason?.id);
-          setProfileBuyInStatus(buyIn);
-          const summary = await DB.getPlayerFinesSummary(currentUser.id, activeSeason?.id);
-          setProfileFinesSummary(summary);
-          // Load fines and confirmed status for each round
-          const finesMap = {};
-          const confirmedMap = {};
-          for (const round of rounds) {
-            const playerFines = await DB.getPlayerFinesForRound(currentUser.id, round.id);
-            finesMap[round.id] = playerFines;
-            confirmedMap[round.id] = playerFines.length > 0 && await DB.isPlayerRoundConfirmed(currentUser.id, round.id);
-          }
-          setProfileRoundFines(finesMap);
-          setProfileRoundConfirmed(confirmedMap);
-        }
-      };
-      loadProfileData();
-    }, [activeSeason, currentUser?.id, rounds]);
+      if (currentUser?.id && activeSeason?.id) {
+        DB.getPlayerBuyInStatus(currentUser.id, activeSeason.id).then(setProfileBuyInStatus);
+        DB.getPlayerFinesSummary(currentUser.id, activeSeason.id).then(setProfileFinesSummary);
+      }
+    }, [activeSeason?.id, currentUser?.id]);
 
-    const [profileFinesSummary, setProfileFinesSummary] = useState({ total_fines: 0, paid_fines: 0, outstanding_fines: 0 });
-
-    const toggleRound = (roundId) => {
-      setExpandedRounds(prev => ({
-        ...prev,
-        [roundId]: !prev[roundId]
-      }));
+    const handleSaveProfile = async (e) => {
+      e.preventDefault();
+      const updates = { name: formData.name, email: formData.email };
+      if (formData.password?.trim()) updates.password = formData.password;
+      await DB.updatePlayer(currentUser.id, updates);
+      setPlayers(prev => prev.map(p => p.id === currentUser.id ? { ...p, ...updates } : p));
+      showToast('Profile updated!', 'success');
     };
 
-    return (
-      <div className="max-w-5xl mx-auto space-y-6 animate-in fade-in duration-500">
-        {/* Page Header with Season Info */}
-        <div className="flex items-center justify-between mb-2">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-800">My Profile</h1>
-            <p className="text-sm text-slate-500 mt-1">Manage your account and view your performance</p>
-          </div>
-          <div className="text-right">
-            <p className="text-xs text-slate-500 uppercase font-semibold">Active Season</p>
-            <p className="text-lg font-bold text-emerald-700">{activeSeason?.name || activeSeason?.year}</p>
-          </div>
-        </div>
+    // Season-scoped stats
+    const playerScores = scores[currentUser.id] || {};
+    const seasonRoundIds = new Set(rounds.map(r => r.id));
+    let roundsPlayed = 0, totalStrokes = 0, totalStableford = 0;
+    for (const [rid, s] of Object.entries(playerScores)) {
+      if (!seasonRoundIds.has(Number(rid))) continue;
+      if (s.strokes > 0) { roundsPlayed++; totalStrokes += s.strokes; totalStableford += (s.stableford || 0); }
+    }
+    const avgScore = roundsPlayed > 0 ? Math.round(totalStrokes / roundsPlayed) : 0;
 
-        <form onSubmit={(e) => handleUpdateProfile(e, setIsEditing)}>
-          <Card>
-            <div className="p-8">
-              {/* Personal Details Section */}
-              <div className="flex flex-col md:flex-row gap-8 pb-8 border-b border-slate-200">
-                {/* Avatar */}
-                <div className="relative group flex-shrink-0">
-                  <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-slate-100 shadow-lg bg-slate-200 flex items-center justify-center">
+    const profileTabs = [
+      { id: 'stats', label: 'Stats' },
+      { id: 'rounds', label: 'Rounds' },
+      { id: 'fines', label: 'Fines' },
+      { id: 'edit', label: 'Edit' },
+    ];
+
+    return (
+      <div className="space-y-4 animate-in fade-in duration-300">
+        <h2 className="text-xl font-bold text-slate-800">My Profile</h2>
+
+        <Card>
+          {/* Profile Header */}
+          <div className="p-5 pb-4">
+            <div className="flex items-center gap-4">
+              <div className="flex-shrink-0">
+                {currentUser.avatar ? (
+                  <img src={currentUser.avatar} alt="" className="w-16 h-16 rounded-full object-cover ring-2 ring-emerald-200" />
+                ) : (
+                  <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-bold text-xl ring-2 ring-emerald-200">
+                    {currentUser.name.split(' ').map(n => n.charAt(0)).slice(0, 2).join('')}
+                  </div>
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-lg font-bold text-slate-800 truncate">{currentUser.name}</h3>
+                <p className="text-sm text-slate-500 truncate">{currentUser.email}</p>
+                <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-semibold capitalize">{currentUser.role}</span>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${profileBuyInStatus.isPaid ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                    Buy-In: {profileBuyInStatus.isPaid ? 'Paid' : 'Due'}
+                  </span>
+                </div>
+              </div>
+            </div>
+            {/* Stat Pills */}
+            <div className="flex flex-wrap gap-2 mt-4 text-xs">
+              <span className="bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full font-medium">{roundsPlayed}/{rounds.length} Rounds</span>
+              <span className="bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full font-medium">Avg {avgScore || '-'}</span>
+              <span className="bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full font-medium">SF {totalStableford || '-'}</span>
+              <span className="bg-red-50 text-red-600 px-2.5 py-1 rounded-full font-medium">Fines R{profileFinesSummary.total_fines.toLocaleString()}</span>
+            </div>
+          </div>
+
+          {/* Tabs */}
+          <div className="flex border-t border-b border-slate-200 overflow-x-auto scrollbar-hide">
+            {profileTabs.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setProfileTab(tab.id)}
+                className={`flex-1 min-w-[70px] px-3 py-3 text-sm font-medium text-center transition-colors whitespace-nowrap min-h-[44px] ${
+                  profileTab === tab.id
+                    ? 'text-emerald-600 border-b-2 border-emerald-600'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="p-4">
+            {/* Stats Tab */}
+            {profileTab === 'stats' && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="bg-slate-50 rounded-lg p-3 text-center">
+                  <p className="text-xs text-slate-500">Rounds</p>
+                  <p className="text-xl font-bold text-slate-800 mt-0.5">{roundsPlayed} <span className="text-sm font-normal text-slate-400">/ {rounds.length}</span></p>
+                </div>
+                <div className="bg-slate-50 rounded-lg p-3 text-center">
+                  <p className="text-xs text-slate-500">Average</p>
+                  <p className="text-xl font-bold text-slate-800 mt-0.5">{avgScore || '-'}</p>
+                </div>
+                <div className="bg-slate-50 rounded-lg p-3 text-center">
+                  <p className="text-xs text-slate-500">Total Strokes</p>
+                  <p className="text-xl font-bold text-slate-800 mt-0.5">{totalStrokes || '-'}</p>
+                </div>
+                <div className="bg-slate-50 rounded-lg p-3 text-center">
+                  <p className="text-xs text-slate-500">Stableford</p>
+                  <p className="text-xl font-bold text-slate-800 mt-0.5">{totalStableford || '-'}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Rounds Tab */}
+            {profileTab === 'rounds' && (
+              <div className="overflow-x-auto -mx-4">
+                {rounds.length > 0 ? (
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-xs text-slate-500 uppercase border-b border-slate-100">
+                        <th className="px-4 py-2 font-medium">Round</th>
+                        <th className="px-4 py-2 font-medium">Course</th>
+                        <th className="px-4 py-2 font-medium text-center">Net</th>
+                        <th className="px-4 py-2 font-medium text-center">HC</th>
+                        <th className="px-4 py-2 font-medium text-center">SF</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rounds.map(r => {
+                        const s = playerScores[r.id];
+                        return (
+                          <tr key={r.id} className={`border-b border-slate-50 ${!s?.strokes ? 'opacity-30' : ''}`}>
+                            <td className="px-4 py-2.5 font-medium text-slate-800">{r.name}</td>
+                            <td className="px-4 py-2.5 text-slate-500 text-xs">{r.course_name}</td>
+                            <td className="px-4 py-2.5 text-center font-bold text-slate-800">{s?.strokes || '-'}</td>
+                            <td className="px-4 py-2.5 text-center text-slate-600">{s?.handicap || '-'}</td>
+                            <td className="px-4 py-2.5 text-center text-slate-600">{s?.stableford || '-'}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="py-12 text-center text-slate-400">No rounds this season</div>
+                )}
+              </div>
+            )}
+
+            {/* Fines Tab */}
+            {profileTab === 'fines' && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="bg-red-50 rounded-lg p-3 text-center">
+                    <p className="text-xs text-red-500">Total</p>
+                    <p className="text-lg font-bold text-red-700 mt-0.5">R{profileFinesSummary.total_fines.toLocaleString()}</p>
+                  </div>
+                  <div className="bg-emerald-50 rounded-lg p-3 text-center">
+                    <p className="text-xs text-emerald-500">Paid</p>
+                    <p className="text-lg font-bold text-emerald-700 mt-0.5">R{profileFinesSummary.paid_fines.toLocaleString()}</p>
+                  </div>
+                  <div className="bg-amber-50 rounded-lg p-3 text-center">
+                    <p className="text-xs text-amber-500">Outstanding</p>
+                    <p className="text-lg font-bold text-amber-700 mt-0.5">R{profileFinesSummary.outstanding_fines.toLocaleString()}</p>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">Season Buy-In</p>
+                    <p className="text-xs text-slate-500">R{activeSeason?.buy_in_amount?.toLocaleString() || '2,500'}</p>
+                  </div>
+                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${profileBuyInStatus.isPaid ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                    {profileBuyInStatus.isPaid ? 'Paid' : 'Outstanding'}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Edit Tab */}
+            {profileTab === 'edit' && (
+              <form onSubmit={handleSaveProfile} className="space-y-4">
+                <div className="flex items-center gap-4 mb-2">
+                  <div className="flex-shrink-0">
                     {currentUser.avatar ? (
-                      <img src={currentUser.avatar} alt="Profile" className="w-full h-full object-cover" />
+                      <img src={currentUser.avatar} alt="" className="w-14 h-14 rounded-full object-cover" />
                     ) : (
-                      <User size={48} className="text-slate-400" />
+                      <div className="w-14 h-14 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-bold">
+                        {currentUser.name.charAt(0)}
+                      </div>
                     )}
                   </div>
-                  {isEditing && (
-                    <label className="absolute bottom-0 right-0 bg-emerald-600 text-white p-2 rounded-full shadow-lg cursor-pointer hover:bg-emerald-700 transition-colors">
-                      <Camera size={16} />
-                      <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
-                    </label>
-                  )}
+                  <label className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg cursor-pointer transition-colors text-sm text-slate-600 min-h-[44px]">
+                    <Camera size={16} /> Change Photo
+                    <input type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />
+                  </label>
                 </div>
-
-                {/* Personal Info */}
-                <div className="flex-1 space-y-4">
-                  {!isEditing ? (
-                    <>
-                      {/* View Mode - Show as text */}
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Full Name</label>
-                        <p className="text-lg font-semibold text-slate-800">{currentUser.name}</p>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Email Address</label>
-                        <p className="text-lg text-slate-700">{currentUser.email}</p>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Buy-In</label>
-                        <div className="flex items-center gap-2">
-                          <p className={`text-lg font-semibold ${profileBuyInStatus.isPaid ? 'text-emerald-700' : 'text-amber-700'}`}>
-                            {profileBuyInStatus.isPaid ? 'Paid' : 'Outstanding'}
-                          </p>
-                          {profileBuyInStatus.isPaid ? (
-                            <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center">
-                              <span className="text-white text-xs font-bold">✓</span>
-                            </div>
-                          ) : (
-                            <div className="w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center">
-                              <span className="text-white text-xs font-bold">!</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      {/* Edit Mode - Show as input fields */}
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Full Name</label>
-                        <input
-                          name="name"
-                          defaultValue={currentUser.name}
-                          required
-                          className="w-full bg-white text-slate-800 border border-slate-200 rounded-lg px-4 py-2 focus:ring-2 focus:ring-emerald-500 outline-none"
-                          placeholder="e.g., John Smith"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Email Address</label>
-                        <input
-                          name="email"
-                          type="email"
-                          defaultValue={currentUser.email}
-                          required
-                          className="w-full bg-white text-slate-800 border border-slate-200 rounded-lg px-4 py-2 focus:ring-2 focus:ring-emerald-500 outline-none"
-                          placeholder="your.email@example.com"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
-                          New Password <span className="text-slate-400 font-normal">(optional)</span>
-                        </label>
-                        <input
-                          name="password"
-                          type="password"
-                          className="w-full bg-white text-slate-800 border border-slate-200 rounded-lg px-4 py-2 focus:ring-2 focus:ring-emerald-500 outline-none"
-                          placeholder="Leave blank to keep current password"
-                        />
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                {/* Edit Button */}
-                <div className="flex-shrink-0">
-                  {!isEditing ? (
-                    <button
-                      type="button"
-                      onClick={() => setIsEditing(true)}
-                      className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
-                    >
-                      <Edit size={16} />
-                      Edit Profile
-                    </button>
-                  ) : (
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setIsEditing(false)}
-                        className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition-colors"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
-                      >
-                        <Save size={16} />
-                        Save
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Season Summary */}
-              <div className="pt-6 border-t border-slate-200">
-                <h3 className="text-sm font-bold text-slate-600 uppercase tracking-wide mb-3">Season Summary</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                    <p className="text-xs text-slate-500 uppercase tracking-wide leading-none">Total Medal</p>
-                    <p className="text-xl font-bold text-slate-800 mt-1">{myStats?.totalStrokes || 0}</p>
+                <div className="space-y-3">
+                  <div>
+                    <label htmlFor="profile-name" className="text-sm font-medium text-slate-700 mb-1 block">Full Name</label>
+                    <input id="profile-name" name="name" required value={formData.name} onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))} className="input input-bordered w-full min-h-[44px]" />
                   </div>
-                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                    <p className="text-xs text-slate-500 uppercase tracking-wide leading-none">Total Stableford</p>
-                    <p className="text-xl font-bold text-slate-800 mt-1">{myStats?.totalStableford || 0}</p>
+                  <div>
+                    <label htmlFor="profile-email" className="text-sm font-medium text-slate-700 mb-1 block">Email</label>
+                    <input id="profile-email" name="email" type="email" required value={formData.email} onChange={e => setFormData(prev => ({ ...prev, email: e.target.value }))} className="input input-bordered w-full min-h-[44px]" />
                   </div>
-                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                    <p className="text-xs text-slate-500 uppercase tracking-wide leading-none">Last Round</p>
-                    <p className="text-xl font-bold text-slate-800 mt-1">
-                      {(() => {
-                        const lastRound = rounds[rounds.length - 1];
-                        return lastRound && scores[currentUser.id]?.[lastRound.id]?.strokes || '-';
-                      })()}
-                    </p>
-                  </div>
-                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                    <p className="text-xs text-slate-500 uppercase tracking-wide leading-none">Total Fines</p>
-                    <p className="text-xl font-bold text-red-700 mt-1">R{myStats?.totalFines.toLocaleString() || 0}</p>
+                  <div>
+                    <label htmlFor="profile-password" className="text-sm font-medium text-slate-700 mb-1 block">New Password</label>
+                    <input id="profile-password" name="password" type="password" placeholder="Leave blank to keep current" value={formData.password} onChange={e => setFormData(prev => ({ ...prev, password: e.target.value }))} className="input input-bordered w-full min-h-[44px]" />
                   </div>
                 </div>
-              </div>
-            </div>
-          </Card>
-        </form>
-
-        {/* Payment Summary */}
-        <Card className="overflow-hidden">
-          <div className="p-6 bg-gradient-to-r from-slate-50 to-slate-100/50 border-b border-slate-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-bold text-slate-800 text-lg">Payment Summary</h3>
-                <p className="text-sm text-slate-600 mt-1">{activeSeason?.year} Season</p>
-              </div>
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-lg">
-                <CreditCard size={24} className="text-white" />
-              </div>
-            </div>
-          </div>
-          <div className="p-6">
-            {(() => {
-              const summary = profileFinesSummary;
-              const paymentPercentage = summary.total_fines > 0
-                ? Math.round((summary.paid_fines / summary.total_fines) * 100)
-                : 100;
-
-              return (
-                <div className="space-y-6">
-                  {/* Summary Stats */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 p-5 rounded-xl border border-emerald-200 hover:shadow-md transition-shadow">
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center">
-                          <CheckCircle size={20} className="text-emerald-700" />
-                        </div>
-                        <div>
-                          <p className="text-xs text-emerald-700 font-bold uppercase tracking-wide">Paid</p>
-                          <p className="text-2xl font-bold text-emerald-800">R{summary.paid_fines.toLocaleString()}</p>
-                        </div>
-                      </div>
-                      <div className="h-2 bg-emerald-200 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-emerald-600 rounded-full transition-all duration-500"
-                          style={{ width: `${paymentPercentage}%` }}
-                        ></div>
-                      </div>
-                    </div>
-
-                    <div className="bg-gradient-to-br from-red-50 to-red-100/50 p-5 rounded-xl border border-red-200 hover:shadow-md transition-shadow">
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center">
-                          <AlertCircle size={20} className="text-red-700" />
-                        </div>
-                        <div>
-                          <p className="text-xs text-red-700 font-bold uppercase tracking-wide">Outstanding</p>
-                          <p className="text-2xl font-bold text-red-800">R{summary.outstanding_fines.toLocaleString()}</p>
-                        </div>
-                      </div>
-                      <div className="h-2 bg-red-200 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-red-600 rounded-full transition-all duration-500"
-                          style={{ width: `${100 - paymentPercentage}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Payment Progress Indicator */}
-                  <div className="bg-gradient-to-r from-slate-50 to-slate-100/50 p-4 rounded-xl border border-slate-200">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-semibold text-slate-700">Payment Progress</span>
-                      <span className="text-2xl font-bold text-slate-800">{paymentPercentage}%</span>
-                    </div>
-                    <div className="h-3 bg-slate-200 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-full transition-all duration-500 shadow-sm"
-                        style={{ width: `${paymentPercentage}%` }}
-                      ></div>
-                    </div>
-                    <p className="text-xs text-slate-500 mt-2">
-                      {paymentPercentage === 100 ? '🎉 All fines paid!' : `R${summary.outstanding_fines.toLocaleString()} remaining`}
-                    </p>
-                  </div>
-                </div>
-              );
-            })()}
-          </div>
-        </Card>
-
-        {/* Fines Breakdown Per Round */}
-        <Card className="overflow-hidden">
-          <div className="p-6 bg-gradient-to-r from-slate-50 to-slate-100/50 border-b border-slate-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-bold text-slate-800 text-lg">Fines Breakdown</h3>
-                <p className="text-sm text-slate-600 mt-1">Detailed view per round</p>
-              </div>
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center shadow-lg">
-                <Banknote size={24} className="text-white" />
-              </div>
-            </div>
-          </div>
-          <div className="p-6">
-            {rounds.length === 0 ? (
-              <p className="text-sm text-slate-400 text-center py-8">No rounds available yet</p>
-            ) : (
-              <div className="space-y-4">
-                {rounds.map(round => {
-                  const playerFines = profileRoundFines[round.id] || [];
-                  const roundTotal = playerFines.reduce((sum, fine) => sum + (fine.amount * fine.quantity), 0);
-                  const roundScore = scores[currentUser.id]?.[round.id]?.strokes || 0;
-                  const isExpanded = expandedRounds[round.id];
-                  const isConfirmed = profileRoundConfirmed[round.id] || false;
-                  const isPaid = playerFines.length > 0 && playerFines.every(f => f.paid === 1);
-
-                  // Only show rounds with fines that are confirmed
-                  if (playerFines.length === 0 || !isConfirmed) {
-                    return null;
-                  }
-
-                  return (
-                    <div key={round.id} className="group border border-slate-200 rounded-xl overflow-hidden hover:shadow-lg hover:border-emerald-200 transition-all">
-                      <button
-                        onClick={() => toggleRound(round.id)}
-                        className="w-full bg-gradient-to-r from-slate-50 to-white p-4 hover:from-emerald-50/30 hover:to-white transition-all cursor-pointer"
-                      >
-                        <div className="flex flex-col gap-3">
-                          {/* Row 1: Round Info */}
-                          <div className="flex items-center gap-3">
-                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center transition-all ${
-                              isExpanded
-                                ? 'bg-emerald-500 shadow-md'
-                                : 'bg-slate-200 group-hover:bg-emerald-100'
-                            }`}>
-                              <ChevronDown
-                                size={20}
-                                className={`transition-all duration-300 flex-shrink-0 ${
-                                  isExpanded ? 'rotate-180 text-white' : 'text-slate-600 group-hover:text-emerald-700'
-                                }`}
-                              />
-                            </div>
-                            <div className="text-left flex-1 min-w-0">
-                              <h4 className="font-bold text-slate-800 group-hover:text-emerald-700 transition-colors">{round.name}</h4>
-                              <div className="flex items-center gap-2 mt-1">
-                                <MapPin size={12} className="text-slate-400 flex-shrink-0" />
-                                <p className="text-xs text-slate-500 truncate">{round.course}</p>
-                                <span className="text-slate-300">•</span>
-                                <Calendar size={12} className="text-slate-400 flex-shrink-0" />
-                                <p className="text-xs text-slate-500">{round.date}</p>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Row 2: Scores and Fines */}
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                            {/* Score Data */}
-                            {scores[currentUser.id]?.[round.id] && (
-                              <>
-                                <div className="bg-blue-50 px-3 py-2.5 rounded-lg border border-blue-100 h-[60px] flex flex-col justify-center items-center">
-                                  <p className="text-xs text-blue-600 font-semibold uppercase tracking-wide leading-none">Medal</p>
-                                  <p className="text-lg font-bold text-blue-700 leading-none mt-1">{scores[currentUser.id][round.id].strokes}</p>
-                                </div>
-                                <div className="bg-emerald-50 px-3 py-2.5 rounded-lg border border-emerald-100 h-[60px] flex flex-col justify-center items-center">
-                                  <p className="text-xs text-emerald-600 font-semibold uppercase tracking-wide leading-none">Stableford</p>
-                                  <p className="text-lg font-bold text-emerald-700 leading-none mt-1">{scores[currentUser.id][round.id].stableford}</p>
-                                </div>
-                              </>
-                            )}
-                            {/* Fines Amount with Payment Status */}
-                            <div className={`px-3 py-2.5 rounded-lg border transition-all h-[60px] flex flex-col justify-center items-center ${
-                              isPaid
-                                ? 'bg-emerald-50 border-emerald-200'
-                                : 'bg-red-50 border-red-200'
-                            }`}>
-                              <p className={`text-xs font-semibold uppercase tracking-wide leading-none ${
-                                isPaid ? 'text-emerald-600' : 'text-red-600'
-                              }`}>
-                                Total Fines
-                              </p>
-                              <div className="flex items-center gap-1 mt-1">
-                                <p className={`text-lg font-bold leading-none ${
-                                  isPaid ? 'text-emerald-700' : 'text-red-700'
-                                }`}>
-                                  R{roundTotal.toLocaleString()}
-                                </p>
-                                <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${
-                                  isPaid
-                                    ? 'bg-emerald-500 border border-emerald-600'
-                                    : 'bg-red-500 border border-red-600'
-                                }`}>
-                                  {isPaid ? (
-                                    <span className="text-white text-[10px] font-bold">✓</span>
-                                  ) : (
-                                    <span className="text-white text-[10px] font-bold">!</span>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </button>
-
-                      {isExpanded && (
-                        <div className="bg-gradient-to-b from-white to-slate-50/50 border-t border-slate-200 animate-in slide-in-from-top duration-200">
-                          {playerFines.length > 0 ? (
-                            <div className="p-5">
-                              <div className="space-y-3 mb-4">
-                                {playerFines.map((fine, idx) => {
-                                  const fineType = fineTypes.find(ft => ft.id === fine.fine_type_id);
-                                  return (
-                                    <div key={idx} className="flex justify-between items-center p-3 bg-white rounded-lg border border-slate-100 hover:border-red-200 hover:shadow-sm transition-all">
-                                      <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center">
-                                          <span className="text-red-700 font-bold text-xs">{fine.quantity}</span>
-                                        </div>
-                                        <span className="text-sm font-medium text-slate-700">
-                                          {fineType?.name || 'Unknown Fine'}
-                                        </span>
-                                      </div>
-                                      <div className="text-right">
-                                        <p className="text-sm font-bold text-red-700">
-                                          R{(fine.amount * fine.quantity).toLocaleString()}
-                                        </p>
-                                        {fine.quantity > 1 && (
-                                          <p className="text-xs text-slate-500">R{fine.amount} each</p>
-                                        )}
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                              <div className="pt-4 border-t-2 border-slate-200 flex justify-between items-center bg-slate-50 -mx-5 -mb-5 px-5 py-4 rounded-b-xl">
-                                <span className="font-bold text-slate-800 text-base">Round Total</span>
-                                <span className="font-bold text-red-700 text-xl">R{roundTotal.toLocaleString()}</span>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="p-8 text-center">
-                              <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-3">
-                                <CheckCircle size={32} className="text-slate-400" />
-                              </div>
-                              <p className="text-sm text-slate-500 font-medium">No fines for this round</p>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+                <button type="submit" className="w-full bg-emerald-600 text-white py-3 rounded-lg font-semibold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 min-h-[48px]">
+                  <Save size={16} /> Save Changes
+                </button>
+              </form>
             )}
           </div>
         </Card>
@@ -2848,7 +2606,7 @@ export default function GPGAManager() {
       <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in duration-500">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-slate-800">Create New Round</h2>
+            <h2 className="text-xl font-bold text-slate-800">Create New Round</h2>
             <p className="text-slate-500">Set up a new round for {activeSeason?.year}</p>
           </div>
           <button
@@ -3891,7 +3649,7 @@ export default function GPGAManager() {
         {view === 'players' && (
           <div className="space-y-6 animate-in fade-in duration-500">
              <div className="flex justify-between items-center">
-               <h2 className="text-2xl font-bold text-slate-800">Players Directory</h2>
+               <h2 className="text-xl font-bold text-slate-800">Players Directory</h2>
                {currentUser.role === 'master' && (
                  <button
                   onClick={() => setIsAddPlayerModalOpen(true)}
