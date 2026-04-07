@@ -3502,75 +3502,108 @@ export default function GPGAManager() {
     };
 
     return (
-      <div className="mt-8">
-        <Card>
-          <div className="p-4 border-b border-slate-100 bg-purple-50 flex items-center justify-between">
-            <div>
-              <h3 className="font-semibold text-purple-800">Team Pairs</h3>
-              <p className="text-xs text-purple-600 mt-1">Fixed pairs for {activeSeason?.name || 'the season'}. Combined stableford points, all 9 rounds count.</p>
-            </div>
-            {!isAddingTeam && teams.length < 4 && (
-              <button onClick={() => setIsAddingTeam(true)} className="btn btn-sm bg-purple-600 text-white hover:bg-purple-700 border-0">
-                <Plus size={14} /> Add Team
-              </button>
-            )}
+      <div className="mt-6">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h3 className="text-lg font-bold text-slate-800">Team Pairs</h3>
+            <p className="text-xs text-slate-500">Combined stableford, all 9 rounds count</p>
           </div>
+          {!isAddingTeam && teams.length < 4 && (
+            <button
+              onClick={() => setIsAddingTeam(true)}
+              className="bg-purple-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-purple-700 transition-colors flex items-center gap-2 text-sm min-h-[44px]"
+            >
+              <Plus size={16} /> Add Team
+            </button>
+          )}
+        </div>
+
+        <Card>
           <div className="divide-y divide-slate-100">
             {teams.map(team => (
-              <div key={team.id} className="p-4 flex items-center justify-between hover:bg-slate-50">
+              <div key={team.id} className="p-4">
                 {editingTeam?.id === team.id ? (
-                  <div className="flex-1 flex items-center gap-2 flex-wrap">
+                  <div className="space-y-3">
                     <input
+                      id={`edit-team-${team.id}`}
+                      name="edit-team-name"
                       value={editingTeam.name}
                       onChange={e => setEditingTeam({ ...editingTeam, name: e.target.value })}
-                      className="input input-bordered input-sm w-32"
+                      aria-label="Team name"
+                      className="input input-bordered w-full min-h-[44px]"
                     />
-                    <select
-                      value={editingTeam.player1_id}
-                      onChange={e => setEditingTeam({ ...editingTeam, player1_id: e.target.value })}
-                      className="select select-bordered select-sm"
-                    >
-                      {players.filter(p => p.status === 'active').map(p => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                      ))}
-                    </select>
-                    <span className="text-slate-400">&</span>
-                    <select
-                      value={editingTeam.player2_id}
-                      onChange={e => setEditingTeam({ ...editingTeam, player2_id: e.target.value })}
-                      className="select select-bordered select-sm"
-                    >
-                      {players.filter(p => p.status === 'active').map(p => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                      ))}
-                    </select>
-                    <button onClick={handleUpdateTeam} className="btn btn-sm btn-success"><Save size={14} /></button>
-                    <button onClick={() => setEditingTeam(null)} className="btn btn-sm"><X size={14} /></button>
+                    <div className="grid grid-cols-2 gap-2">
+                      <select
+                        id={`edit-team-p1-${team.id}`}
+                        name="edit-team-p1"
+                        value={editingTeam.player1_id}
+                        onChange={e => setEditingTeam({ ...editingTeam, player1_id: e.target.value })}
+                        aria-label="Player 1"
+                        className="select select-bordered w-full min-h-[44px]"
+                      >
+                        {players.filter(p => p.status === 'active').map(p => (
+                          <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                      </select>
+                      <select
+                        id={`edit-team-p2-${team.id}`}
+                        name="edit-team-p2"
+                        value={editingTeam.player2_id}
+                        onChange={e => setEditingTeam({ ...editingTeam, player2_id: e.target.value })}
+                        aria-label="Player 2"
+                        className="select select-bordered w-full min-h-[44px]"
+                      >
+                        {players.filter(p => p.status === 'active').map(p => (
+                          <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={handleUpdateTeam} className="flex-1 bg-emerald-600 text-white py-2.5 rounded-lg font-semibold hover:bg-emerald-700 transition-colors text-sm min-h-[44px] flex items-center justify-center gap-2">
+                        <Save size={14} /> Save
+                      </button>
+                      <button onClick={() => setEditingTeam(null)} className="px-4 py-2.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors text-sm min-h-[44px]">
+                        Cancel
+                      </button>
+                    </div>
                   </div>
                 ) : (
-                  <>
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 font-bold text-sm">
-                        {team.name.charAt(0)}
-                      </div>
-                      <div>
-                        <p className="font-bold text-slate-800">{team.name}</p>
-                        <p className="text-sm text-slate-500">{team.player1_name} & {team.player2_name}</p>
-                      </div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 font-bold text-sm flex-shrink-0">
+                      {team.name.charAt(0)}
                     </div>
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => setEditingTeam(team)} className="btn btn-sm btn-ghost"><Edit size={14} /></button>
-                      <button onClick={() => handleDeleteTeam(team.id)} className="btn btn-sm btn-ghost text-red-500"><Trash2 size={14} /></button>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-slate-800 text-sm">{team.name}</p>
+                      <p className="text-xs text-slate-500">{team.player1_name} & {team.player2_name}</p>
                     </div>
-                  </>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <button
+                        onClick={() => setEditingTeam(team)}
+                        className="p-2.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+                        aria-label={`Edit ${team.name}`}
+                      >
+                        <Edit size={16} />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteTeam(team.id)}
+                        className="p-2.5 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+                        aria-label={`Delete ${team.name}`}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
             ))}
+
             {teams.length === 0 && !isAddingTeam && (
-              <div className="p-8 text-center text-slate-400">No teams set up yet. Add teams to enable the team competition.</div>
+              <div className="p-8 text-center text-slate-400 text-sm">No teams set up yet</div>
             )}
+
             {isAddingTeam && (
-              <div className="p-4 bg-slate-50 flex items-center gap-2 flex-wrap">
+              <div className="p-4 bg-slate-50 space-y-3">
                 <input
                   id="team-name"
                   name="team-name"
@@ -3578,23 +3611,37 @@ export default function GPGAManager() {
                   onChange={e => setNewTeamName(e.target.value)}
                   placeholder="Team name"
                   aria-label="Team name"
-                  className="input input-bordered input-sm w-32"
+                  className="input input-bordered w-full min-h-[44px]"
                 />
-                <select id="team-p1" name="team-p1" aria-label="Player 1" value={newPlayer1} onChange={e => setNewPlayer1(e.target.value)} className="select select-bordered select-sm">
-                  <option value="">Player 1</option>
-                  {availablePlayers.filter(p => p.id !== newPlayer2).map(p => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
-                <span className="text-slate-400">&</span>
-                <select id="team-p2" name="team-p2" aria-label="Player 2" value={newPlayer2} onChange={e => setNewPlayer2(e.target.value)} className="select select-bordered select-sm">
-                  <option value="">Player 2</option>
-                  {availablePlayers.filter(p => p.id !== newPlayer1).map(p => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
-                <button onClick={handleAddTeam} disabled={!newTeamName || !newPlayer1 || !newPlayer2} className="btn btn-sm bg-purple-600 text-white hover:bg-purple-700 border-0 disabled:opacity-50">Add</button>
-                <button onClick={() => setIsAddingTeam(false)} className="btn btn-sm">Cancel</button>
+                <div className="grid grid-cols-2 gap-2">
+                  <select id="team-p1" name="team-p1" aria-label="Player 1" value={newPlayer1} onChange={e => setNewPlayer1(e.target.value)} className="select select-bordered w-full min-h-[44px]">
+                    <option value="">Player 1</option>
+                    {availablePlayers.filter(p => p.id !== newPlayer2).map(p => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                  <select id="team-p2" name="team-p2" aria-label="Player 2" value={newPlayer2} onChange={e => setNewPlayer2(e.target.value)} className="select select-bordered w-full min-h-[44px]">
+                    <option value="">Player 2</option>
+                    {availablePlayers.filter(p => p.id !== newPlayer1).map(p => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleAddTeam}
+                    disabled={!newTeamName || !newPlayer1 || !newPlayer2}
+                    className="flex-1 bg-purple-600 text-white py-2.5 rounded-lg font-semibold hover:bg-purple-700 transition-colors text-sm min-h-[44px] disabled:opacity-50"
+                  >
+                    Add Team
+                  </button>
+                  <button
+                    onClick={() => setIsAddingTeam(false)}
+                    className="px-4 py-2.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors text-sm min-h-[44px]"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             )}
           </div>
