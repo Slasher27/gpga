@@ -243,6 +243,42 @@ export async function updateSeason(id: number, updates: Record<string, any>) {
   return request(`/seasons/${id}`, { method: 'PUT', body: JSON.stringify(updates) });
 }
 
+// ---- Notifications ----
+
+export async function getNotifications(playerId: string) {
+  return request<any[]>(`/notifications?player_id=${playerId}`);
+}
+
+export async function getUnreadCount(playerId: string) {
+  return request<{ count: number }>(`/notifications/unread-count?player_id=${playerId}`);
+}
+
+export async function markNotificationRead(id: number) {
+  return request(`/notifications/${id}/read`, { method: 'PUT' });
+}
+
+export async function markAllNotificationsRead(playerId: string) {
+  return request(`/notifications/read-all?player_id=${playerId}`, { method: 'PUT' });
+}
+
+export async function clearReadNotifications(playerId: string) {
+  return request(`/notifications/clear-read?player_id=${playerId}`, { method: 'DELETE' });
+}
+
+export async function checkNotifications(playerId: string, seasonId: number) {
+  return request<{ count: number }>(`/notifications/check?player_id=${playerId}&season_id=${seasonId}`);
+}
+
+// ---- Push ----
+
+export async function subscribePush(playerId: string, subscription: PushSubscription) {
+  return request('/push/subscribe', { method: 'POST', body: JSON.stringify({ player_id: playerId, subscription: subscription.toJSON() }) });
+}
+
+export async function unsubscribePush(endpoint: string) {
+  return request('/push/unsubscribe', { method: 'DELETE', body: JSON.stringify({ endpoint }) });
+}
+
 // ---- Auth ----
 
 export async function authenticateUser(email: string, password: string) {

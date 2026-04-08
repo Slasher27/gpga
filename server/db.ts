@@ -137,6 +137,28 @@ export async function initSchema(): Promise<void> {
     'CREATE INDEX IF NOT EXISTS idx_fines_player ON player_fines(player_id)',
     'CREATE INDEX IF NOT EXISTS idx_fines_round ON player_fines(round_id)',
     'CREATE INDEX IF NOT EXISTS idx_season_players ON season_players(season_id, player_id)',
+    `CREATE TABLE IF NOT EXISTS notifications (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      player_id TEXT NOT NULL,
+      type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      body TEXT NOT NULL,
+      round_id INTEGER,
+      read INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE,
+      FOREIGN KEY (round_id) REFERENCES rounds(id) ON DELETE SET NULL
+    )`,
+    'CREATE INDEX IF NOT EXISTS idx_notifications_player ON notifications(player_id, read)',
+    `CREATE TABLE IF NOT EXISTS push_subscriptions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      player_id TEXT NOT NULL,
+      endpoint TEXT NOT NULL UNIQUE,
+      p256dh TEXT NOT NULL,
+      auth TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE
+    )`,
   ], 'write');
 
   // Migrations for existing tables

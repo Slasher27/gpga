@@ -11,6 +11,8 @@ import coursesRouter from '../server/routes/courses.js';
 import authRouter from '../server/routes/auth.js';
 import buyInRouter from '../server/routes/buy-in.js';
 import teamsRouter from '../server/routes/teams.js';
+import notificationsRouter from '../server/routes/notifications.js';
+import pushRouter from '../server/routes/push.js';
 
 const app = express();
 
@@ -37,6 +39,8 @@ app.use('/api/courses', coursesRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/buy-in', buyInRouter);
 app.use('/api/teams', teamsRouter);
+app.use('/api/notifications', notificationsRouter);
+app.use('/api/push', pushRouter);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { getClient } from '../db.js';
+import { notify } from '../notify.js';
 
 const router = Router();
 
@@ -141,10 +142,18 @@ router.put('/pay-round', async (req, res) => {
   const { player_id, round_id, paid } = req.body;
   const paidDate = paid ? new Date().toISOString().split('T')[0] : null;
 
-  await getClient().execute({
+  const db = getClient();
+  await db.execute({
     sql: 'UPDATE player_fines SET paid = ?, paid_date = ? WHERE player_id = ? AND round_id = ?',
     args: [paid ? 1 : 0, paidDate, player_id, round_id]
   });
+  if (paid) {
+    const total = await db.execute({ sql: 'SELECT SUM(pf.quantity * ft.amount) as amt FROM player_fines pf INNER JOIN fine_types ft ON pf.fine_type_id = ft.id WHERE pf.player_id = ? AND pf.round_id = ?', args: [player_id, round_id] });
+    const round = await db.execute({ sql: 'SELECT name FROM rounds WHERE id = ?', args: [round_id] });
+    const amt = Number(total.rows[0]?.amt) || 0;
+    const roundName = (round.rows[0]?.name as string) || 'Round';
+    notify({ playerIds: [player_id], type: 'fine_paid', roundId: round_id, title: 'Fine payment confirmed', body: `R${amt.toLocaleString()} for ${roundName} marked as paid`, push: true }).catch(() => {});
+  }
   res.json({ ok: true });
 });
 
@@ -152,10 +161,19 @@ router.put('/confirm', async (req, res) => {
   const { player_id, round_id, confirmed } = req.body;
   const confirmedDate = confirmed ? new Date().toISOString().split('T')[0] : null;
 
-  await getClient().execute({
+  const db = getClient();
+  await db.execute({
     sql: 'UPDATE player_fines SET confirmed = ?, confirmed_date = ? WHERE player_id = ? AND round_id = ?',
     args: [confirmed ? 1 : 0, confirmedDate, player_id, round_id]
   });
+  if (confirmed) {
+    const fines = await db.execute({ sql: 'SELECT COUNT(*) as cnt, SUM(pf.quantity * ft.amount) as amt FROM player_fines pf INNER JOIN fine_types ft ON pf.fine_type_id = ft.id WHERE pf.player_id = ? AND pf.round_id = ? AND pf.quantity > 0', args: [player_id, round_id] });
+    const round = await db.execute({ sql: 'SELECT name FROM rounds WHERE id = ?', args: [round_id] });
+    const cnt = Number(fines.rows[0]?.cnt) || 0;
+    const amt = Number(fines.rows[0]?.amt) || 0;
+    const roundName = (round.rows[0]?.name as string) || 'Round';
+    notify({ playerIds: [player_id], type: 'fines_closed', roundId: round_id, title: `Fines confirmed: ${roundName}`, body: `${cnt} fines totalling R${amt.toLocaleString()}`, push: true }).catch(() => {});
+  }
   res.json({ ok: true });
 });
 

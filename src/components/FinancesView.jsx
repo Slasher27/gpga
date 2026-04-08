@@ -239,10 +239,10 @@ export default function FinancesView({
                 {!isRoundConfirmed && (
                   showOpenFine ? (
                     <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-lg border border-slate-200">
-                      <input value={openFineName} onChange={e => setOpenFineName(e.target.value)} placeholder="Fine name"
-                        className="input input-bordered input-sm flex-1 min-h-[36px]" />
-                      <input type="number" value={openFineAmount} onChange={e => setOpenFineAmount(e.target.value)} placeholder="R" min="1"
-                        className="input input-bordered input-sm w-20 min-h-[36px]" />
+                      <input id="open-fine-name" name="open-fine-name" aria-label="Fine name" value={openFineName} onChange={e => setOpenFineName(e.target.value)} placeholder="Fine name"
+                        className="input input-bordered input-sm flex-1 min-h-[36px]" autoComplete="off" />
+                      <input id="open-fine-amount" name="open-fine-amount" aria-label="Fine amount" type="number" value={openFineAmount} onChange={e => setOpenFineAmount(e.target.value)} placeholder="R" min="1"
+                        className="input input-bordered input-sm w-20 min-h-[36px]" autoComplete="off" />
                       <button onClick={handleAddOpenFine} disabled={!openFineName.trim() || !openFineAmount}
                         className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-30 min-h-[36px]">Add</button>
                       <button onClick={() => { setShowOpenFine(false); setOpenFineName(''); setOpenFineAmount(''); }}
@@ -294,12 +294,12 @@ export default function FinancesView({
                   {editingFineType?.id === ft.id ? (
                     <>
                       <div className="flex-1 flex gap-2">
-                        <input type="number" value={editingFineType.sort_order} onChange={e => setEditingFineType(prev => ({ ...prev, sort_order: Number(e.target.value) }))}
-                          className="input input-bordered input-sm w-14 min-h-[36px] text-center" min="0" placeholder="#" title="Sort order" />
-                        <input value={editingFineType.name} onChange={e => setEditingFineType(prev => ({ ...prev, name: e.target.value }))}
-                          className="input input-bordered input-sm flex-1 min-h-[36px]" />
-                        <input type="number" value={editingFineType.amount} onChange={e => setEditingFineType(prev => ({ ...prev, amount: Number(e.target.value) }))}
-                          className="input input-bordered input-sm w-20 min-h-[36px]" min="0" />
+                        <input id="edit-ft-order" name="sort_order" aria-label="Sort order" type="number" value={editingFineType.sort_order} onChange={e => setEditingFineType(prev => ({ ...prev, sort_order: Number(e.target.value) }))}
+                          className="input input-bordered input-sm w-14 min-h-[36px] text-center" min="0" placeholder="#" autoComplete="off" />
+                        <input id="edit-ft-name" name="fine_name" aria-label="Fine name" value={editingFineType.name} onChange={e => setEditingFineType(prev => ({ ...prev, name: e.target.value }))}
+                          className="input input-bordered input-sm flex-1 min-h-[36px]" autoComplete="off" />
+                        <input id="edit-ft-amount" name="fine_amount" aria-label="Fine amount" type="number" value={editingFineType.amount} onChange={e => setEditingFineType(prev => ({ ...prev, amount: Number(e.target.value) }))}
+                          className="input input-bordered input-sm w-20 min-h-[36px]" min="0" autoComplete="off" />
                       </div>
                       <button onClick={handleSaveFineType} className="p-2 rounded-lg text-emerald-600 hover:bg-emerald-50 min-h-[36px] min-w-[36px] flex items-center justify-center"><Save size={16} /></button>
                       <button onClick={() => setEditingFineType(null)} className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 min-h-[36px] min-w-[36px] flex items-center justify-center"><X size={16} /></button>

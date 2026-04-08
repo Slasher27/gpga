@@ -62,14 +62,14 @@ export default function LoginPage({ onLogin }) {
             <div className="space-y-4">
               <div>
                 <label htmlFor="login-email" className="block text-sm font-medium text-slate-700 mb-2">Email Address</label>
-                <input id="login-email" name="login-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                <input id="login-email" name="login-email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)}
                   className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
                   placeholder="your.email@example.com" required autoFocus />
               </div>
               <div>
                 <label htmlFor="login-password" className="block text-sm font-medium text-slate-700 mb-2">Password</label>
                 <div className="relative">
-                  <input id="login-password" name="login-password" type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)}
+                  <input id="login-password" name="login-password" type={showPassword ? "text" : "password"} autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)}
                     className="w-full px-4 py-3 pr-12 rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
                     placeholder="Enter your password" required />
                   <button type="button" onClick={() => setShowPassword(!showPassword)}

@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
-import { TrendingUp, User, Banknote, Calendar, Users, Plus, Save } from 'lucide-react';
+import { TrendingUp, Banknote, Calendar, Users, Plus, Save } from 'lucide-react';
 import * as DB from './api.ts';
 import { DashboardSkeleton, useConfirm, Modal, DatePicker, CourseSelector } from './components/common';
 import LoginPage from './components/LoginPage';
-import { DesktopSidebar, MobileNav } from './components/Nav';
+import { setupPush } from './pushSetup.ts';
+import { TopBar, DesktopSidebar, MobileBottomNav } from './components/Nav';
 import DashboardView from './components/DashboardView';
 import FinancesView from './components/FinancesView';
 import RoundsView from './components/RoundsView';
@@ -11,6 +12,7 @@ import ProfileView from './components/ProfileView';
 import PlayersView from './components/PlayersView';
 import PlayerProfilePage from './components/PlayerProfilePage';
 import SeasonSettings from './components/SeasonSettings';
+import NotificationsView from './components/NotificationsView';
 
 const mergeScoresAndFines = (scoresData, finesData) => {
   const merged = { ...scoresData };
@@ -23,6 +25,10 @@ const mergeScoresAndFines = (scoresData, finesData) => {
   });
   return merged;
 };
+
+// Capture PWA install prompt
+let deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; });
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -46,6 +52,24 @@ export default function App() {
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDate, setSelectedDate] = useState('');
+  const [canInstall, setCanInstall] = useState(false);
+
+  // Check if PWA install is available
+  useEffect(() => {
+    const check = () => setCanInstall(!!deferredPrompt);
+    check();
+    window.addEventListener('beforeinstallprompt', check);
+    window.addEventListener('appinstalled', () => setCanInstall(false));
+    return () => { window.removeEventListener('beforeinstallprompt', check); };
+  }, []);
+
+  const handleInstall = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') setCanInstall(false);
+    deferredPrompt = null;
+  };
 
   // Toast + confirm
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
@@ -66,7 +90,9 @@ export default function App() {
         setIsAuthenticated(authenticated);
         if (authenticated) {
           await loadData();
-          setCurrentUserId(DB.getCurrentUserId());
+          const uid = DB.getCurrentUserId();
+          setCurrentUserId(uid);
+          setupPush(uid);
         }
         setDbReady(true);
       } catch (error) {
@@ -165,7 +191,7 @@ export default function App() {
 
   // --- Handlers ---
 
-  const handleLogin = async (user) => { setIsAuthenticated(true); setCurrentUserId(user.id); await loadData(); };
+  const handleLogin = async (user) => { setIsAuthenticated(true); setCurrentUserId(user.id); await loadData(); setupPush(user.id); };
   const handleLogout = () => { DB.logout(); setIsAuthenticated(false); setCurrentUserId('1'); setView('dashboard'); };
 
   const setNavView = (id) => { setView(id); localStorage.setItem('gpga_current_view', id); };
@@ -251,7 +277,6 @@ export default function App() {
 
   const navItems = [
     { id: 'dashboard', icon: <TrendingUp size={20} />, label: 'Dashboard' },
-    { id: 'profile', icon: <User size={20} />, label: 'Profile' },
     { id: 'fines', icon: <Banknote size={20} />, label: 'Finances' },
     ...(isAdmin ? [{ id: 'rounds', icon: <Calendar size={20} />, label: 'Rounds' }] : []),
     ...(isMaster ? [{ id: 'admin', icon: <Users size={20} />, label: 'Players' }] : []),
@@ -263,16 +288,18 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-100 font-sans overflow-x-hidden">
-      <DesktopSidebar {...navProps} />
-      <MobileNav {...navProps} />
+      <TopBar currentUser={currentUser} activeSeason={activeSeason} allSeasons={allSeasons} handleSeasonSwitch={handleSeasonSwitch} handleLogout={handleLogout} setNavView={setNavView} canInstall={canInstall} onInstall={handleInstall} />
+      <DesktopSidebar view={view} setNavView={setNavView} navItems={navItems} activeSeason={activeSeason} allSeasons={allSeasons} isAdmin={isAdmin} />
+      <MobileBottomNav view={view} setNavView={setNavView} navItems={navItems} />
 
-      <main className="p-4 md:p-8 md:ml-56 pt-16 pb-28 landscape:pb-20 md:pt-8 md:pb-8">
+      <main className="p-4 md:p-8 md:ml-56 pt-16 pb-28 landscape:pb-20 md:pt-16 md:pb-8">
         {view === 'dashboard' && <DashboardView activeSeason={activeSeason} leaderboardData={leaderboardData} rounds={rounds} scores={scores} players={players} golfCourses={golfCourses} />}
         {view === 'fines' && <FinancesView leaderboardData={leaderboardData} rounds={rounds} scores={scores} players={players} activeSeason={activeSeason} isReadOnlySeason={isReadOnlySeason} currentUser={currentUser} showToast={showToast} onAddFineType={() => setIsAddFineTypeModalOpen(true)} onDeleteFineType={handleDeleteFineType} onFinesChanged={refreshFines} />}
         {view === 'rounds' && <RoundsView rounds={rounds} scores={scores} setScores={setScores} players={players} activeSeason={activeSeason} isReadOnlySeason={isReadOnlySeason} showToast={showToast} onAddRound={() => setIsAddRoundModalOpen(true)} onEditRound={handleEditRound} onDeleteRound={handleDeleteRound} />}
         {view === 'admin' && !managingPlayerId && <PlayersView players={players} scores={scores} rounds={rounds} activeSeason={activeSeason} isReadOnlySeason={isReadOnlySeason} currentUser={currentUser} showToast={showToast} showConfirm={showConfirm} setPlayers={setPlayers} onAddPlayer={() => setIsAddPlayerModalOpen(true)} managingPlayerId={managingPlayerId} setManagingPlayerId={setManagingPlayerId} />}
         {view === 'admin' && managingPlayerId && <PlayerProfilePage players={players} setPlayers={setPlayers} scores={scores} rounds={rounds} activeSeason={activeSeason} currentUser={currentUser} managingPlayerId={managingPlayerId} setManagingPlayerId={setManagingPlayerId} showToast={showToast} />}
         {view === 'profile' && <ProfileView currentUser={currentUser} players={players} setPlayers={setPlayers} scores={scores} rounds={rounds} activeSeason={activeSeason} showToast={showToast} />}
+        {view === 'notifications' && <NotificationsView currentUser={currentUser} />}
         {view === 'settings' && isAdmin && <SeasonSettings activeSeason={activeSeason} allSeasons={allSeasons} players={players} rounds={rounds} showToast={showToast} showConfirm={showConfirm} onDataChanged={loadData} />}
       </main>
 
