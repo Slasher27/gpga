@@ -89,10 +89,6 @@ export async function getAllGolfCourses() {
   return request<any[]>('/courses');
 }
 
-export async function searchGolfCourses(searchTerm: string) {
-  return request<any[]>(`/courses/search?q=${encodeURIComponent(searchTerm)}`);
-}
-
 // ---- Fine Types ----
 
 export async function getFineTypes(seasonId: number) {
@@ -104,10 +100,6 @@ export async function addFineType(seasonId: number, name: string, amount: number
     method: 'POST',
     body: JSON.stringify({ season_id: seasonId, name, amount, description })
   });
-}
-
-export async function updateFineType(id: number, updates: { name?: string; amount?: number; description?: string }) {
-  return request(`/fines/types/${id}`, { method: 'PUT', body: JSON.stringify(updates) });
 }
 
 export async function deleteFineType(id: number) {
@@ -148,20 +140,6 @@ export async function removePlayerFine(playerId: string, roundId: number, fineTy
   const existing = fines.find((f: any) => f.fine_type_id === fineTypeId);
   if (!existing) return;
   return setPlayerFine(playerId, roundId, fineTypeId, existing.quantity - 1);
-}
-
-export async function markFinePaid(playerId: string, roundId: number, fineTypeId: number, paid: boolean) {
-  return request('/fines/pay', {
-    method: 'PUT',
-    body: JSON.stringify({ player_id: playerId, round_id: roundId, fine_type_id: fineTypeId, paid })
-  });
-}
-
-export async function markAllPlayerFinesPaid(playerId: string, paid: boolean) {
-  return request('/fines/pay-all', {
-    method: 'PUT',
-    body: JSON.stringify({ player_id: playerId, paid })
-  });
 }
 
 export async function markRoundFinesPaid(playerId: string, roundId: number, paid: boolean) {
@@ -276,7 +254,6 @@ export function logout(): void {
 
 // No-op replacements for functions that no longer apply
 export async function initDatabase() { /* server handles DB init */ }
-export function saveDatabase() { /* server auto-persists */ }
 export function resetDatabase() {
   localStorage.removeItem('gpga_authenticated');
   localStorage.removeItem('gpga_current_user');

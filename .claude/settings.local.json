@@ -21,7 +21,14 @@
       "Bash(curl -s -X POST http://localhost:3001/api/seasons -H 'Content-Type: application/json' -d '{\"year\":2026,\"name\":\"GPGA 2026 Season\",\"buy_in_amount\":2500,\"is_active\":true}')",
       "Bash(curl -s http://localhost:3001/api/seasons)",
       "Bash(npm list:*)",
-      "Bash(node -e ':*)"
+      "Bash(node -e ':*)",
+      "Bash(wc -l /c/GPGA/app/server/routes/*.ts)",
+      "Bash(wc -l /c/GPGA/app/src/*.tsx /c/GPGA/app/src/*.ts /c/GPGA/app/src/*.jsx)",
+      "Bash(wc -l /c/GPGA/app/src/components/common/*.tsx)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5173)",
+      "Bash(ls -la /c/GPGA/app/src/components/*.jsx)",
+      "Read(//c/GPGA/app/**)",
+      "Bash(wc -l /c/GPGA/app/src/App.jsx /c/GPGA/app/src/api.ts /c/GPGA/app/src/components/*.jsx /c/GPGA/app/src/components/common/*.tsx /c/GPGA/app/src/components/common/*.jsx /c/GPGA/app/src/components/common/index.ts)"
     ],
     "deny": [],
     "ask": []
