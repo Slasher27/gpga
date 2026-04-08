@@ -39,7 +39,7 @@ export default function LoginPage({ onLogin }) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-emerald-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
+        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
           <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 p-8 text-center">
             <div className="flex justify-center mb-4">
               <div className="bg-white/10 backdrop-blur-sm p-4 rounded-full">
@@ -87,7 +87,7 @@ export default function LoginPage({ onLogin }) {
             </div>
 
             <button type="submit" disabled={isLoading}
-              className="w-full mt-6 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white py-3 rounded-lg font-semibold hover:from-emerald-700 hover:to-emerald-800 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed">
+              className="w-full mt-6 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white py-3 rounded-lg font-semibold hover:from-emerald-700 hover:to-emerald-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
               {isLoading ? 'Signing In...' : 'Sign In'}
             </button>
 

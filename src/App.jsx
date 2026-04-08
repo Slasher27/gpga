@@ -5,11 +5,24 @@ import { DashboardSkeleton, useConfirm, Modal, DatePicker, CourseSelector } from
 import LoginPage from './components/LoginPage';
 import { DesktopSidebar, MobileNav } from './components/Nav';
 import DashboardView from './components/DashboardView';
-import FinesView from './components/FinesView';
+import FinancesView from './components/FinancesView';
 import RoundsView from './components/RoundsView';
 import ProfileView from './components/ProfileView';
 import PlayersView from './components/PlayersView';
 import PlayerProfilePage from './components/PlayerProfilePage';
+import SeasonSettings from './components/SeasonSettings';
+
+const mergeScoresAndFines = (scoresData, finesData) => {
+  const merged = { ...scoresData };
+  Object.keys(finesData).forEach(pid => {
+    if (!merged[pid]) merged[pid] = {};
+    Object.keys(finesData[pid]).forEach(rid => {
+      if (!merged[pid][rid]) merged[pid][rid] = { strokes: 0, fines: 0 };
+      merged[pid][rid].fines = finesData[pid][rid];
+    });
+  });
+  return merged;
+};
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -30,7 +43,6 @@ export default function App() {
   const [isEditRoundModalOpen, setIsEditRoundModalOpen] = useState(false);
   const [editingRound, setEditingRound] = useState(null);
   const [isAddFineTypeModalOpen, setIsAddFineTypeModalOpen] = useState(false);
-  const [isNewSeasonModalOpen, setIsNewSeasonModalOpen] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDate, setSelectedDate] = useState('');
@@ -80,15 +92,7 @@ export default function App() {
       setRounds(roundsData);
       setGolfCourses(coursesData);
 
-      const merged = { ...scoresData };
-      Object.keys(finesData).forEach(pid => {
-        if (!merged[pid]) merged[pid] = {};
-        Object.keys(finesData[pid]).forEach(rid => {
-          if (!merged[pid][rid]) merged[pid][rid] = { strokes: 0, fines: 0 };
-          merged[pid][rid].fines = finesData[pid][rid];
-        });
-      });
-      setScores(merged);
+      setScores(mergeScoresAndFines(scoresData, finesData));
     } catch (error) {
       console.error('Failed to load data:', error);
     }
@@ -99,24 +103,26 @@ export default function App() {
   const isAdmin = currentUser?.role === 'master' || currentUser?.role === 'admin';
   const isMaster = currentUser?.role === 'master';
 
+  const refreshFines = () => {
+    DB.getPlayerFinesByRound().then(finesData => {
+      setScores(prev => {
+        // Reset all fines to 0, then apply fresh data
+        const reset = {};
+        Object.keys(prev).forEach(pid => {
+          reset[pid] = {};
+          Object.keys(prev[pid]).forEach(rid => {
+            reset[pid][rid] = { ...prev[pid][rid], fines: 0 };
+          });
+        });
+        return mergeScoresAndFines(reset, finesData);
+      });
+    });
+  };
+
   // Refresh fines when leaving fines view
   useEffect(() => {
     const prev = localStorage.getItem('gpga_previous_view');
-    if (prev === 'fines' && view !== 'fines') {
-      DB.getPlayerFinesByRound().then(finesData => {
-        setScores(prev => {
-          const merged = { ...prev };
-          Object.keys(finesData).forEach(pid => {
-            if (!merged[pid]) merged[pid] = {};
-            Object.keys(finesData[pid]).forEach(rid => {
-              if (!merged[pid][rid]) merged[pid][rid] = { strokes: 0, fines: 0 };
-              merged[pid][rid] = { ...merged[pid][rid], fines: finesData[pid][rid] };
-            });
-          });
-          return merged;
-        });
-      });
-    }
+    if (prev === 'fines' && view !== 'fines') refreshFines();
     localStorage.setItem('gpga_previous_view', view);
   }, [view]);
 
@@ -172,27 +178,7 @@ export default function App() {
       DB.getAllRounds(season.id), DB.getAllScores(), DB.getPlayerFinesByRound()
     ]);
     setRounds(roundsData);
-    const merged = { ...scoresData };
-    Object.keys(finesData).forEach(pid => {
-      if (!merged[pid]) merged[pid] = {};
-      Object.keys(finesData[pid]).forEach(rid => {
-        if (!merged[pid][rid]) merged[pid][rid] = { strokes: 0, fines: 0 };
-        merged[pid][rid].fines = finesData[pid][rid];
-      });
-    });
-    setScores(merged);
-  };
-
-  const handleEndSeason = () => {
-    const warning = rounds.length < 9
-      ? `The season has only completed ${rounds.length} of 9 rounds. Are you sure you want to end it early?\n\nScores, fines, and standings will be locked. This cannot be undone.`
-      : 'Scores, fines, and standings will be locked. You can still view the data but cannot make changes. This cannot be undone.';
-    showConfirm(`End ${activeSeason.name}?`, warning, async () => {
-      await fetch('/api/seasons/' + activeSeason.id, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ is_active: false }) });
-      setActiveSeason(prev => ({ ...prev, is_active: 0 }));
-      setAllSeasons(prev => prev.map(s => s.id === activeSeason.id ? { ...s, is_active: 0 } : s));
-      showToast(`${activeSeason.name} has ended`, 'success');
-    }, 'danger');
+    setScores(mergeScoresAndFines(scoresData, finesData));
   };
 
   const handleAddPlayer = async (e) => {
@@ -210,9 +196,9 @@ export default function App() {
     if (!activeSeason) { showToast('No active season found.', 'error'); return; }
     if (!selectedCourse) { showToast('Please select a golf course', 'error'); return; }
     const fd = new FormData(e.target);
-    const newRound = { name: fd.get('name'), date: fd.get('date'), courseId: selectedCourse.id, courseName: selectedCourse.name };
+    const newRound = { name: fd.get('name'), date: fd.get('date'), courseId: selectedCourse.id, courseName: selectedCourse.name, teeTime: fd.get('tee_time') || null, teeTime2: fd.get('tee_time_2') || null };
     const result = await DB.addRound(newRound, activeSeason.id);
-    setRounds(prev => [...prev, { id: result.id, season_id: activeSeason.id, name: newRound.name, date: newRound.date, course_id: newRound.courseId, course_name: newRound.courseName }]);
+    setRounds(prev => [...prev, { id: result.id, season_id: activeSeason.id, name: newRound.name, date: newRound.date, course_id: newRound.courseId, course_name: newRound.courseName, tee_time: newRound.teeTime, tee_time_2: newRound.teeTime2 }]);
     setIsAddRoundModalOpen(false); setSelectedCourse(null); setSearchTerm(''); setSelectedDate('');
     showToast(`Round "${newRound.name}" created successfully!`);
   };
@@ -226,9 +212,9 @@ export default function App() {
   const handleUpdateRoundSubmit = async (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
-    const updates = { name: fd.get('name'), date: fd.get('date'), courseId: selectedCourse?.id, courseName: selectedCourse?.name };
+    const updates = { name: fd.get('name'), date: fd.get('date'), courseId: selectedCourse?.id, courseName: selectedCourse?.name, teeTime: fd.get('tee_time') || null, teeTime2: fd.get('tee_time_2') || null };
     await DB.updateRound(editingRound.id, updates);
-    setRounds(prev => prev.map(r => r.id === editingRound.id ? { ...r, name: updates.name || r.name, date: updates.date || r.date, course_id: updates.courseId || r.course_id, course_name: updates.courseName || r.course_name } : r));
+    setRounds(prev => prev.map(r => r.id === editingRound.id ? { ...r, name: updates.name || r.name, date: updates.date || r.date, course_id: updates.courseId || r.course_id, course_name: updates.courseName || r.course_name, tee_time: updates.teeTime, tee_time_2: updates.teeTime2 } : r));
     setIsEditRoundModalOpen(false); setSelectedCourse(null); setSearchTerm(''); setEditingRound(null);
     showToast(`Round "${fd.get('name')}" updated successfully!`);
   };
@@ -245,7 +231,7 @@ export default function App() {
     e.preventDefault();
     if (!activeSeason) { showToast('No active season found.', 'error'); return; }
     const fd = new FormData(e.target);
-    await DB.addFineType(activeSeason.id, fd.get('name'), parseInt(fd.get('amount')), fd.get('description'));
+    await DB.addFineType(activeSeason.id, fd.get('name'), parseInt(fd.get('amount')), fd.get('description'), parseInt(fd.get('sort_order')) || 0);
     setIsAddFineTypeModalOpen(false);
   };
 
@@ -264,14 +250,14 @@ export default function App() {
   // --- Nav Config ---
 
   const navItems = [
-    { id: 'dashboard', icon: <TrendingUp size={20} />, label: 'Leaderboard' },
+    { id: 'dashboard', icon: <TrendingUp size={20} />, label: 'Dashboard' },
     { id: 'profile', icon: <User size={20} />, label: 'Profile' },
-    { id: 'fines', icon: <Banknote size={20} />, label: 'Fines' },
+    { id: 'fines', icon: <Banknote size={20} />, label: 'Finances' },
     ...(isAdmin ? [{ id: 'rounds', icon: <Calendar size={20} />, label: 'Rounds' }] : []),
     ...(isMaster ? [{ id: 'admin', icon: <Users size={20} />, label: 'Players' }] : []),
   ];
 
-  const navProps = { view, setNavView, navItems, currentUser, activeSeason, allSeasons, handleSeasonSwitch, handleLogout, isMaster, handleEndSeason, onNewSeason: () => setIsNewSeasonModalOpen(true) };
+  const navProps = { view, setNavView, navItems, currentUser, activeSeason, allSeasons, handleSeasonSwitch, handleLogout, isAdmin };
 
   // --- Render ---
 
@@ -280,13 +266,14 @@ export default function App() {
       <DesktopSidebar {...navProps} />
       <MobileNav {...navProps} />
 
-      <main className="p-4 md:p-8 md:ml-56 pt-20 pb-24 md:pt-8 md:pb-8">
-        {view === 'dashboard' && <DashboardView activeSeason={activeSeason} leaderboardData={leaderboardData} rounds={rounds} scores={scores} players={players} />}
-        {view === 'fines' && <FinesView leaderboardData={leaderboardData} rounds={rounds} scores={scores} players={players} activeSeason={activeSeason} isReadOnlySeason={isReadOnlySeason} currentUser={currentUser} showToast={showToast} onAddFineType={() => setIsAddFineTypeModalOpen(true)} onDeleteFineType={handleDeleteFineType} />}
+      <main className="p-4 md:p-8 md:ml-56 pt-16 pb-28 landscape:pb-20 md:pt-8 md:pb-8">
+        {view === 'dashboard' && <DashboardView activeSeason={activeSeason} leaderboardData={leaderboardData} rounds={rounds} scores={scores} players={players} golfCourses={golfCourses} />}
+        {view === 'fines' && <FinancesView leaderboardData={leaderboardData} rounds={rounds} scores={scores} players={players} activeSeason={activeSeason} isReadOnlySeason={isReadOnlySeason} currentUser={currentUser} showToast={showToast} onAddFineType={() => setIsAddFineTypeModalOpen(true)} onDeleteFineType={handleDeleteFineType} onFinesChanged={refreshFines} />}
         {view === 'rounds' && <RoundsView rounds={rounds} scores={scores} setScores={setScores} players={players} activeSeason={activeSeason} isReadOnlySeason={isReadOnlySeason} showToast={showToast} onAddRound={() => setIsAddRoundModalOpen(true)} onEditRound={handleEditRound} onDeleteRound={handleDeleteRound} />}
         {view === 'admin' && !managingPlayerId && <PlayersView players={players} scores={scores} rounds={rounds} activeSeason={activeSeason} isReadOnlySeason={isReadOnlySeason} currentUser={currentUser} showToast={showToast} showConfirm={showConfirm} setPlayers={setPlayers} onAddPlayer={() => setIsAddPlayerModalOpen(true)} managingPlayerId={managingPlayerId} setManagingPlayerId={setManagingPlayerId} />}
         {view === 'admin' && managingPlayerId && <PlayerProfilePage players={players} setPlayers={setPlayers} scores={scores} rounds={rounds} activeSeason={activeSeason} currentUser={currentUser} managingPlayerId={managingPlayerId} setManagingPlayerId={setManagingPlayerId} showToast={showToast} />}
         {view === 'profile' && <ProfileView currentUser={currentUser} players={players} setPlayers={setPlayers} scores={scores} rounds={rounds} activeSeason={activeSeason} showToast={showToast} />}
+        {view === 'settings' && isAdmin && <SeasonSettings activeSeason={activeSeason} allSeasons={allSeasons} players={players} rounds={rounds} showToast={showToast} showConfirm={showConfirm} onDataChanged={loadData} />}
       </main>
 
       {/* --- Modals --- */}
@@ -305,6 +292,7 @@ export default function App() {
         <form onSubmit={handleAddRound} className="space-y-4">
           <div className="form-control"><label className="label"><span className="label-text font-semibold">Round Name</span></label><input required name="name" defaultValue={nextRoundName} className="input input-bordered w-full focus:input-primary" placeholder="e.g. Round 7" /></div>
           <div className="form-control"><label className="label"><span className="label-text font-semibold">Date</span></label><DatePicker value={selectedDate} onChange={setSelectedDate} placeholder="Select round date" /><input type="hidden" name="date" value={selectedDate} required /></div>
+          <div className="grid grid-cols-2 gap-3"><div className="form-control"><label className="label"><span className="label-text font-semibold">Tee Time 1</span></label><input name="tee_time" type="time" className="input input-bordered w-full focus:input-primary" /></div><div className="form-control"><label className="label"><span className="label-text font-semibold">Tee Time 2</span></label><input name="tee_time_2" type="time" className="input input-bordered w-full focus:input-primary" /></div></div>
           <CourseSelector courses={golfCourses} selected={selectedCourse} onSelect={setSelectedCourse} searchTerm={searchTerm} onSearchChange={setSearchTerm} />
           <input type="hidden" name="course" value={selectedCourse?.name || ''} required />
           <button type="submit" className="w-full bg-emerald-600 text-white py-3 rounded-lg font-semibold hover:bg-emerald-700 flex items-center justify-center gap-2" disabled={!selectedCourse}><Plus size={18} /> Create Round</button>
@@ -316,6 +304,7 @@ export default function App() {
           <form onSubmit={handleUpdateRoundSubmit} className="space-y-4">
             <div className="form-control"><label className="label"><span className="label-text font-semibold">Round Name</span></label><input required name="name" defaultValue={editingRound.name} className="input input-bordered w-full focus:input-primary" /></div>
             <div className="form-control"><label className="label"><span className="label-text font-semibold">Date</span></label><input required name="date" type="date" defaultValue={editingRound.date} className="input input-bordered w-full focus:input-primary [color-scheme:light]" /></div>
+            <div className="grid grid-cols-2 gap-3"><div className="form-control"><label className="label"><span className="label-text font-semibold">Tee Time 1</span></label><input name="tee_time" type="time" defaultValue={editingRound.tee_time || ''} className="input input-bordered w-full focus:input-primary" /></div><div className="form-control"><label className="label"><span className="label-text font-semibold">Tee Time 2</span></label><input name="tee_time_2" type="time" defaultValue={editingRound.tee_time_2 || ''} className="input input-bordered w-full focus:input-primary" /></div></div>
             <CourseSelector courses={golfCourses} selected={selectedCourse} onSelect={setSelectedCourse} searchTerm={searchTerm} onSearchChange={setSearchTerm} />
             <input type="hidden" name="course" value={selectedCourse?.name || editingRound.course} required />
             <button className="w-full bg-emerald-600 text-white py-3 rounded-lg font-semibold hover:bg-emerald-700 flex items-center justify-center gap-2"><Save size={18} /> Update Round</button>
@@ -326,28 +315,15 @@ export default function App() {
       <Modal isOpen={isAddFineTypeModalOpen} onClose={() => setIsAddFineTypeModalOpen(false)} title="Add Fine Type">
         <form onSubmit={handleAddFineType} className="space-y-4">
           <div><label className="block text-sm font-medium text-slate-700 mb-1">Fine Name</label><input required name="name" className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="e.g. 3 Putt, Lost Ball, etc." /></div>
-          <div><label className="block text-sm font-medium text-slate-700 mb-1">Amount (R)</label><input required name="amount" type="number" min="0" className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="e.g. 20" /></div>
+          <div className="grid grid-cols-2 gap-3"><div><label className="block text-sm font-medium text-slate-700 mb-1">Amount (R)</label><input required name="amount" type="number" min="0" className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="e.g. 20" /></div><div><label className="block text-sm font-medium text-slate-700 mb-1">Sort Order</label><input name="sort_order" type="number" min="0" defaultValue="0" className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="0" /></div></div>
           <div><label className="block text-sm font-medium text-slate-700 mb-1">Description (Optional)</label><textarea name="description" rows="3" className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="Optional description..." /></div>
           <button className="w-full bg-emerald-600 text-white py-3 rounded-lg font-bold hover:bg-emerald-700">Create Fine Type</button>
         </form>
       </Modal>
 
-      <Modal isOpen={isNewSeasonModalOpen} onClose={() => setIsNewSeasonModalOpen(false)} title="Create New Season">
-        <form onSubmit={async (e) => { e.preventDefault(); const fd = new FormData(e.target); await DB.createSeason(Number(fd.get('year')), fd.get('name'), Number(fd.get('buyIn'))); await loadData(); setIsNewSeasonModalOpen(false); showToast(`${fd.get('name')} created!`, 'success'); }} className="space-y-4">
-          <div className="form-control"><label className="label"><span className="label-text font-semibold">Year</span></label><input name="year" type="number" defaultValue={new Date().getFullYear() + 1} className="input input-bordered" required /></div>
-          <div className="form-control"><label className="label"><span className="label-text font-semibold">Season Name</span></label><input name="name" type="text" defaultValue={`GPGA ${new Date().getFullYear() + 1} Season`} className="input input-bordered" required /></div>
-          <div className="form-control"><label className="label"><span className="label-text font-semibold">Buy-in Amount (R)</span></label><input name="buyIn" type="number" defaultValue={2500} className="input input-bordered" required /></div>
-          <div className="alert alert-warning text-sm">Creating a new season will deactivate the current one.</div>
-          <div className="flex gap-2 justify-end">
-            <button type="button" onClick={() => setIsNewSeasonModalOpen(false)} className="btn">Cancel</button>
-            <button type="submit" className="btn bg-emerald-600 text-white hover:bg-emerald-700 border-0">Create Season</button>
-          </div>
-        </form>
-      </Modal>
-
       {toast.show && (
         <div className="toast toast-top toast-end z-50">
-          <div className={`alert ${toast.type === 'success' ? 'alert-success' : 'alert-error'} shadow-lg`}>
+          <div className={`alert ${toast.type === 'success' ? 'alert-success' : 'alert-error'}`}>
             <span className="font-semibold">{toast.message}</span>
           </div>
         </div>

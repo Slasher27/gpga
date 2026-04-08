@@ -10,17 +10,17 @@ router.get('/types', async (req, res) => {
   if (!seasonId) return res.status(400).json({ error: 'season_id required' });
 
   const result = await getClient().execute({
-    sql: 'SELECT * FROM fine_types WHERE season_id = ? ORDER BY name',
+    sql: 'SELECT * FROM fine_types WHERE season_id = ? ORDER BY sort_order, name',
     args: [Number(seasonId)]
   });
   res.json(result.rows);
 });
 
 router.post('/types', async (req, res) => {
-  const { season_id, name, amount, description } = req.body;
+  const { season_id, name, amount, description, sort_order, is_open } = req.body;
   const result = await getClient().execute({
-    sql: 'INSERT INTO fine_types (season_id, name, amount, description) VALUES (?, ?, ?, ?)',
-    args: [season_id, name, amount, description || '']
+    sql: 'INSERT INTO fine_types (season_id, name, amount, description, sort_order, is_open) VALUES (?, ?, ?, ?, ?, ?)',
+    args: [season_id, name, amount, description || '', sort_order || 0, is_open ? 1 : 0]
   });
   res.status(201).json({ id: Number(result.lastInsertRowid) });
 });
@@ -31,7 +31,7 @@ router.put('/types/:id', async (req, res) => {
   const values: any[] = [];
 
   for (const [key, val] of Object.entries(req.body)) {
-    if (['name', 'amount', 'description'].includes(key)) {
+    if (['name', 'amount', 'description', 'sort_order'].includes(key)) {
       fields.push(`${key} = ?`);
       values.push(val);
     }
@@ -137,28 +137,6 @@ router.put('/set', async (req, res) => {
   res.json({ ok: true });
 });
 
-router.put('/pay', async (req, res) => {
-  const { player_id, round_id, fine_type_id, paid } = req.body;
-  const paidDate = paid ? new Date().toISOString().split('T')[0] : null;
-
-  await getClient().execute({
-    sql: 'UPDATE player_fines SET paid = ?, paid_date = ? WHERE player_id = ? AND round_id = ? AND fine_type_id = ?',
-    args: [paid ? 1 : 0, paidDate, player_id, round_id, fine_type_id]
-  });
-  res.json({ ok: true });
-});
-
-router.put('/pay-all', async (req, res) => {
-  const { player_id, paid } = req.body;
-  const paidDate = paid ? new Date().toISOString().split('T')[0] : null;
-
-  await getClient().execute({
-    sql: 'UPDATE player_fines SET paid = ?, paid_date = ? WHERE player_id = ?',
-    args: [paid ? 1 : 0, paidDate, player_id]
-  });
-  res.json({ ok: true });
-});
-
 router.put('/pay-round', async (req, res) => {
   const { player_id, round_id, paid } = req.body;
   const paidDate = paid ? new Date().toISOString().split('T')[0] : null;
@@ -189,17 +167,31 @@ router.get('/confirmed/:playerId/:roundId', async (req, res) => {
   res.json({ confirmed: result.rows.length > 0 && Number(result.rows[0].confirmed) === 1 });
 });
 
-router.get('/payment-summary', async (_req, res) => {
-  const result = await getClient().execute(
-    `SELECT p.id as player_id, p.name as player_name,
-       COALESCE(SUM(pf.quantity * ft.amount), 0) as total_fines,
-       COALESCE(SUM(CASE WHEN pf.paid = 1 THEN pf.quantity * ft.amount ELSE 0 END), 0) as paid_fines,
-       COALESCE(SUM(CASE WHEN pf.paid = 0 THEN pf.quantity * ft.amount ELSE 0 END), 0) as unpaid_fines
-     FROM players p
-     LEFT JOIN player_fines pf ON p.id = pf.player_id
-     LEFT JOIN fine_types ft ON pf.fine_type_id = ft.id
-     GROUP BY p.id, p.name ORDER BY total_fines DESC`
-  );
+router.get('/payment-summary', async (req, res) => {
+  const seasonId = req.query.season_id;
+  const result = await getClient().execute({
+    sql: seasonId
+      ? `SELECT p.id as player_id, p.name as player_name,
+           COALESCE(SUM(pf.quantity * ft.amount), 0) as total_fines,
+           COALESCE(SUM(CASE WHEN pf.paid = 1 THEN pf.quantity * ft.amount ELSE 0 END), 0) as paid_fines,
+           COALESCE(SUM(CASE WHEN pf.paid = 0 THEN pf.quantity * ft.amount ELSE 0 END), 0) as unpaid_fines
+         FROM players p
+         LEFT JOIN (
+           SELECT pf.* FROM player_fines pf
+           INNER JOIN rounds r ON pf.round_id = r.id AND r.season_id = ?
+         ) pf ON p.id = pf.player_id
+         LEFT JOIN fine_types ft ON pf.fine_type_id = ft.id
+         GROUP BY p.id, p.name ORDER BY total_fines DESC`
+      : `SELECT p.id as player_id, p.name as player_name,
+           COALESCE(SUM(pf.quantity * ft.amount), 0) as total_fines,
+           COALESCE(SUM(CASE WHEN pf.paid = 1 THEN pf.quantity * ft.amount ELSE 0 END), 0) as paid_fines,
+           COALESCE(SUM(CASE WHEN pf.paid = 0 THEN pf.quantity * ft.amount ELSE 0 END), 0) as unpaid_fines
+         FROM players p
+         LEFT JOIN player_fines pf ON p.id = pf.player_id
+         LEFT JOIN fine_types ft ON pf.fine_type_id = ft.id
+         GROUP BY p.id, p.name ORDER BY total_fines DESC`,
+    args: seasonId ? [Number(seasonId)] : []
+  });
 
   res.json(result.rows.map(row => ({
     ...row,
@@ -212,6 +204,7 @@ router.get('/payment-summary', async (_req, res) => {
 });
 
 router.get('/player/:playerId/rounds', async (req, res) => {
+  const seasonId = req.query.season_id;
   const result = await getClient().execute({
     sql: `SELECT r.id as round_id, r.name as round_name, r.date as round_date,
             SUM(pf.quantity * ft.amount) as total_amount,
@@ -219,9 +212,9 @@ router.get('/player/:playerId/rounds', async (req, res) => {
           FROM rounds r
           INNER JOIN player_fines pf ON r.id = pf.round_id
           INNER JOIN fine_types ft ON pf.fine_type_id = ft.id
-          WHERE pf.player_id = ?
+          WHERE pf.player_id = ? ${seasonId ? 'AND r.season_id = ?' : ''}
           GROUP BY r.id, r.name, r.date ORDER BY r.date DESC`,
-    args: [req.params.playerId]
+    args: seasonId ? [req.params.playerId, Number(seasonId)] : [req.params.playerId]
   });
 
   res.json(result.rows.map(row => ({

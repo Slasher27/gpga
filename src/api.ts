@@ -50,19 +50,21 @@ export async function getAllRounds(seasonId?: number | null) {
   return request<any[]>(`/rounds${qs}`);
 }
 
-export async function addRound(round: { name: string; date: string; courseId: number; courseName: string }, seasonId: number) {
+export async function addRound(round: { name: string; date: string; courseId: number; courseName: string; teeTime?: string; teeTime2?: string }, seasonId: number) {
   return request<{ id: number }>('/rounds', {
     method: 'POST',
-    body: JSON.stringify({ season_id: seasonId, name: round.name, date: round.date, course_id: round.courseId, course_name: round.courseName })
+    body: JSON.stringify({ season_id: seasonId, name: round.name, date: round.date, course_id: round.courseId, course_name: round.courseName, tee_time: round.teeTime || null, tee_time_2: round.teeTime2 || null })
   });
 }
 
-export async function updateRound(id: number, updates: { name?: string; date?: string; courseId?: number; courseName?: string }) {
+export async function updateRound(id: number, updates: { name?: string; date?: string; courseId?: number; courseName?: string; teeTime?: string; teeTime2?: string }) {
   const body: Record<string, any> = {};
   if (updates.name !== undefined) body.name = updates.name;
   if (updates.date !== undefined) body.date = updates.date;
   if (updates.courseId !== undefined) body.course_id = updates.courseId;
   if (updates.courseName !== undefined) body.course_name = updates.courseName;
+  if (updates.teeTime !== undefined) body.tee_time = updates.teeTime;
+  if (updates.teeTime2 !== undefined) body.tee_time_2 = updates.teeTime2;
   return request(`/rounds/${id}`, { method: 'PUT', body: JSON.stringify(body) });
 }
 
@@ -95,11 +97,15 @@ export async function getFineTypes(seasonId: number) {
   return request<any[]>(`/fines/types?season_id=${seasonId}`);
 }
 
-export async function addFineType(seasonId: number, name: string, amount: number, description: string = '') {
+export async function addFineType(seasonId: number, name: string, amount: number, description: string = '', sortOrder: number = 0, isOpen: boolean = false) {
   return request<{ id: number }>('/fines/types', {
     method: 'POST',
-    body: JSON.stringify({ season_id: seasonId, name, amount, description })
+    body: JSON.stringify({ season_id: seasonId, name, amount, description, sort_order: sortOrder, is_open: isOpen })
   });
+}
+
+export async function updateFineType(id: number, updates: { name?: string; amount?: number; sort_order?: number }) {
+  return request(`/fines/types/${id}`, { method: 'PUT', body: JSON.stringify(updates) });
 }
 
 export async function deleteFineType(id: number) {
@@ -161,17 +167,33 @@ export async function isPlayerRoundConfirmed(playerId: string, roundId: number) 
   return data.confirmed;
 }
 
-export async function getPaymentSummary() {
-  return request<any[]>('/fines/payment-summary');
+export async function getPaymentSummary(seasonId?: number) {
+  const qs = seasonId ? `?season_id=${seasonId}` : '';
+  return request<any[]>(`/fines/payment-summary${qs}`);
 }
 
-export async function getPlayerRoundFines(playerId: string) {
-  return request<any[]>(`/fines/player/${playerId}/rounds`);
+export async function getPlayerRoundFines(playerId: string, seasonId?: number) {
+  const qs = seasonId ? `?season_id=${seasonId}` : '';
+  return request<any[]>(`/fines/player/${playerId}/rounds${qs}`);
 }
 
 export async function getPlayerFinesSummary(playerId: string, seasonId?: number) {
   const qs = seasonId ? `?season_id=${seasonId}` : '';
   return request<any>(`/fines/player/${playerId}/summary${qs}`);
+}
+
+// ---- Season Players ----
+
+export async function getSeasonPlayers(seasonId: number) {
+  return request<any[]>(`/buy-in/season/${seasonId}`);
+}
+
+export async function addSeasonPlayer(seasonId: number, playerId: string) {
+  return request('/buy-in/season/' + seasonId + '/player', { method: 'POST', body: JSON.stringify({ player_id: playerId }) });
+}
+
+export async function removeSeasonPlayer(seasonId: number, playerId: string) {
+  return request(`/buy-in/season/${seasonId}/player/${playerId}`, { method: 'DELETE' });
 }
 
 // ---- Buy-In ----
@@ -210,11 +232,15 @@ export async function deleteTeam(id: number) {
 
 // ---- Seasons (create) ----
 
-export async function createSeason(year: number, name: string, buyInAmount: number) {
+export async function createSeason(year: number, name: string, buyInAmount: number, prizes?: { medal_1st?: number; medal_2nd?: number; stableford_1st?: number; stableford_2nd?: number; team_1st?: number }) {
   return request<{ id: number }>('/seasons', {
     method: 'POST',
-    body: JSON.stringify({ year, name, buy_in_amount: buyInAmount, is_active: true })
+    body: JSON.stringify({ year, name, buy_in_amount: buyInAmount, is_active: true, ...prizes })
   });
+}
+
+export async function updateSeason(id: number, updates: Record<string, any>) {
+  return request(`/seasons/${id}`, { method: 'PUT', body: JSON.stringify(updates) });
 }
 
 // ---- Auth ----

@@ -14,7 +14,7 @@ router.get('/active', async (_req, res) => {
 });
 
 router.post('/', async (req, res) => {
-  const { year, name, buy_in_amount, is_active } = req.body;
+  const { year, name, buy_in_amount, is_active, medal_1st, medal_2nd, stableford_1st, stableford_2nd, team_1st } = req.body;
   const db = getClient();
 
   if (is_active) {
@@ -22,8 +22,8 @@ router.post('/', async (req, res) => {
   }
 
   const result = await db.execute({
-    sql: 'INSERT INTO seasons (year, name, buy_in_amount, is_active) VALUES (?, ?, ?, ?)',
-    args: [year, name, buy_in_amount || 0, is_active ? 1 : 0]
+    sql: 'INSERT INTO seasons (year, name, buy_in_amount, medal_1st, medal_2nd, stableford_1st, stableford_2nd, team_1st, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    args: [year, name, buy_in_amount || 0, medal_1st || 0, medal_2nd || 0, stableford_1st || 0, stableford_2nd || 0, team_1st || 0, is_active ? 1 : 0]
   });
 
   res.status(201).json({ id: Number(result.lastInsertRowid) });
@@ -31,20 +31,20 @@ router.post('/', async (req, res) => {
 
 router.put('/:id', async (req, res) => {
   const { id } = req.params;
-  const { year, name, buy_in_amount, is_active } = req.body;
   const db = getClient();
 
-  if (is_active) {
+  if (req.body.is_active) {
     await db.execute('UPDATE seasons SET is_active = 0');
   }
 
+  const allowed = ['year', 'name', 'buy_in_amount', 'medal_1st', 'medal_2nd', 'stableford_1st', 'stableford_2nd', 'team_1st'];
   const fields: string[] = [];
   const values: any[] = [];
 
-  if (year !== undefined) { fields.push('year = ?'); values.push(year); }
-  if (name !== undefined) { fields.push('name = ?'); values.push(name); }
-  if (buy_in_amount !== undefined) { fields.push('buy_in_amount = ?'); values.push(buy_in_amount); }
-  if (is_active !== undefined) { fields.push('is_active = ?'); values.push(is_active ? 1 : 0); }
+  for (const key of allowed) {
+    if (req.body[key] !== undefined) { fields.push(`${key} = ?`); values.push(req.body[key]); }
+  }
+  if (req.body.is_active !== undefined) { fields.push('is_active = ?'); values.push(req.body.is_active ? 1 : 0); }
 
   if (fields.length === 0) return res.status(400).json({ error: 'No valid fields' });
 

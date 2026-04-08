@@ -149,7 +149,7 @@ export const CourseSelector = ({ courses, selected, onSelect, searchTerm, onSear
                 key={course.id}
                 onClick={() => onSelect(course)}
                 className={`card card-compact cursor-pointer transition-all ${
-                  selected?.id === course.id ? 'bg-emerald-600 text-white shadow-lg' : 'bg-base-100 hover:bg-base-300'
+                  selected?.id === course.id ? 'bg-emerald-600 text-white' : 'bg-base-100 hover:bg-base-300'
                 }`}
               >
                 <div className="card-body">

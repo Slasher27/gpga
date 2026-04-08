@@ -36,6 +36,11 @@ export async function initSchema(): Promise<void> {
       year INTEGER UNIQUE NOT NULL,
       name TEXT NOT NULL,
       buy_in_amount INTEGER DEFAULT 0,
+      medal_1st INTEGER DEFAULT 0,
+      medal_2nd INTEGER DEFAULT 0,
+      stableford_1st INTEGER DEFAULT 0,
+      stableford_2nd INTEGER DEFAULT 0,
+      team_1st INTEGER DEFAULT 0,
       is_active INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -54,6 +59,8 @@ export async function initSchema(): Promise<void> {
       date TEXT NOT NULL,
       course_id INTEGER NOT NULL,
       course_name TEXT NOT NULL,
+      tee_time TEXT,
+      tee_time_2 TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (season_id) REFERENCES seasons(id) ON DELETE CASCADE,
@@ -78,6 +85,8 @@ export async function initSchema(): Promise<void> {
       name TEXT NOT NULL,
       amount INTEGER NOT NULL,
       description TEXT,
+      sort_order INTEGER DEFAULT 0,
+      is_open INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (season_id) REFERENCES seasons(id) ON DELETE CASCADE
     )`,
@@ -129,4 +138,36 @@ export async function initSchema(): Promise<void> {
     'CREATE INDEX IF NOT EXISTS idx_fines_round ON player_fines(round_id)',
     'CREATE INDEX IF NOT EXISTS idx_season_players ON season_players(season_id, player_id)',
   ], 'write');
+
+  // Migrations for existing tables
+  try { await client.execute('ALTER TABLE fine_types ADD COLUMN sort_order INTEGER DEFAULT 0'); } catch {}
+  try { await client.execute('ALTER TABLE fine_types ADD COLUMN is_open INTEGER DEFAULT 0'); } catch {}
+  try { await client.execute('ALTER TABLE seasons ADD COLUMN medal_1st INTEGER DEFAULT 0'); } catch {}
+  try { await client.execute('ALTER TABLE seasons ADD COLUMN medal_2nd INTEGER DEFAULT 0'); } catch {}
+  try { await client.execute('ALTER TABLE seasons ADD COLUMN stableford_1st INTEGER DEFAULT 0'); } catch {}
+  try { await client.execute('ALTER TABLE seasons ADD COLUMN stableford_2nd INTEGER DEFAULT 0'); } catch {}
+  try { await client.execute('ALTER TABLE seasons ADD COLUMN team_1st INTEGER DEFAULT 0'); } catch {}
+  try { await client.execute('ALTER TABLE rounds ADD COLUMN tee_time TEXT'); } catch {}
+  try { await client.execute('ALTER TABLE rounds ADD COLUMN tee_time_2 TEXT'); } catch {}
+
+  // Add missing Western Cape courses
+  await client.execute(`INSERT OR IGNORE INTO golf_courses (id, name, location, par) VALUES
+    (31, 'Kingswood Golf Estate', 'George', 72),
+    (32, 'Fancourt Links', 'George', 73),
+    (33, 'Fancourt Montagu', 'George', 72),
+    (34, 'Fancourt Outeniqua', 'George', 72),
+    (35, 'Pinnacle Point Golf Club', 'Mossel Bay', 72),
+    (36, 'Mossel Bay Golf Club', 'Mossel Bay', 72),
+    (37, 'Simola Golf Estate', 'Knysna', 72),
+    (38, 'Pezula Golf Club', 'Knysna', 72),
+    (39, 'Goose Valley Golf Club', 'Plettenberg Bay', 72),
+    (40, 'Langebaan Country Estate', 'Langebaan', 72),
+    (41, 'Robertson Golf Club', 'Robertson', 72),
+    (42, 'Worcester Golf Club', 'Worcester', 72),
+    (43, 'Kleine Zalze Golf Club', 'Stellenbosch', 72),
+    (44, 'Kuilsrivier Golf Club', 'Kuilsrivier', 72),
+    (45, 'Swellendam Golf Club', 'Swellendam', 72),
+    (46, 'Oubaai Golf Club', 'Herolds Bay', 72),
+    (47, 'Val de Vie Estate Golf', 'Paarl', 72),
+    (48, 'Wines of Africa Golf Club', 'Franschhoek', 72)`);
 }

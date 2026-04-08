@@ -12,10 +12,10 @@ router.get('/', async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
-  const { season_id, name, date, course_id, course_name } = req.body;
+  const { season_id, name, date, course_id, course_name, tee_time, tee_time_2 } = req.body;
   const result = await getClient().execute({
-    sql: 'INSERT INTO rounds (season_id, name, date, course_id, course_name) VALUES (?, ?, ?, ?, ?)',
-    args: [season_id, name, date, course_id, course_name]
+    sql: 'INSERT INTO rounds (season_id, name, date, course_id, course_name, tee_time, tee_time_2) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    args: [season_id, name, date, course_id, course_name, tee_time || null, tee_time_2 || null]
   });
   res.status(201).json({ id: Number(result.lastInsertRowid) });
 });
@@ -26,7 +26,7 @@ router.put('/:id', async (req, res) => {
   const values: any[] = [];
 
   for (const [key, val] of Object.entries(req.body)) {
-    if (['name', 'date', 'course_id', 'course_name'].includes(key)) {
+    if (['name', 'date', 'course_id', 'course_name', 'tee_time', 'tee_time_2'].includes(key)) {
       fields.push(`${key} = ?`);
       values.push(val);
     }

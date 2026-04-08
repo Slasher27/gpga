@@ -1,11 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Plus, Save, Edit, Trash2, ChevronDown } from 'lucide-react';
 import * as DB from '../api.ts';
-import { NoPlayersEmptyState, Avatar } from './common';
-
-const Card = ({ children, className = '' }) => (
-  <div className={`card bg-base-100 shadow-xl ${className}`}>{children}</div>
-);
+import { NoPlayersEmptyState, Avatar, Card } from './common';
 
 const TeamManagementSection = ({ teams, setTeams, isAddingTeam, setIsAddingTeam, players, activeSeason, showToast }) => {
   const [newTeamName, setNewTeamName] = useState('');
@@ -201,12 +197,10 @@ export default function PlayersView({ players, scores, rounds, activeSeason, isR
     setBuyInLoaded(false);
     const loadBuyInStatuses = async () => {
       if (!activeSeason?.id || players.length === 0) return;
-      const results = await Promise.all(
-        players.map(p => DB.getPlayerBuyInStatus(p.id, activeSeason.id).then(status => [p.id, status]))
-      );
+      const sp = await DB.getSeasonPlayers(activeSeason.id);
       if (cancelled) return;
       const cache = {};
-      for (const [id, status] of results) cache[id] = status;
+      for (const p of sp) cache[p.player_id] = { isPaid: p.buy_in_paid, date: p.buy_in_date };
       setBuyInStatusCache(cache);
       setBuyInLoaded(true);
     };

@@ -1,11 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Save, Camera } from 'lucide-react';
 import * as DB from '../api.ts';
-import { TabBar, Avatar, PlayerRoundsTable, FinesSummaryCards, StatsGrid, usePlayerStats } from './common';
-
-const Card = ({ children, className = "" }) => (
-  <div className={`card bg-base-100 shadow-xl ${className}`}>{children}</div>
-);
+import { TabBar, Avatar, PlayerRoundsTable, FinesSummaryCards, StatsGrid, usePlayerStats, Card } from './common';
 
 export default function ProfileView({ currentUser, players, setPlayers, scores, rounds, activeSeason, showToast }) {
   const [profileTab, setProfileTab] = useState('stats');

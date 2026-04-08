@@ -51,7 +51,7 @@ export default function DatePicker({ value, onChange, placeholder = 'Select date
       {isOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-          <div className="absolute z-50 mt-1 p-3 bg-base-100 border border-base-300 rounded-lg shadow-xl w-64">
+          <div className="absolute z-50 mt-1 p-3 bg-base-100 border border-base-300 rounded-lg w-64">
             <div className="flex items-center justify-between mb-2">
               <button type="button" onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))}
                 className="btn btn-ghost btn-xs btn-circle">
