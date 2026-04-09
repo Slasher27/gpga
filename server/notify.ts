@@ -45,7 +45,7 @@ export async function notify({ playerIds, type, title, body, roundId, email = fa
     for (const player of recipients) {
       try {
         await resend.emails.send({
-          from: 'GPGA <noreply@gpga.vercel.app>',
+          from: process.env.RESEND_FROM || 'onboarding@resend.dev',
           to: player.email as string,
           subject: title,
           text: `Hi ${player.name},\n\n${body}\n\n— GPGA Score Manager`,
