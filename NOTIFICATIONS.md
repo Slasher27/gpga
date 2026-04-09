@@ -32,8 +32,8 @@
 ## TODO — Next Session
 
 ### High Priority
-- [ ] **Email setup** — Sign up at resend.com, get API key, add `RESEND_API_KEY` to .env. No code change needed.
-- [ ] **Trigger: Round Closed** — Admin action to mark a round complete, sends results (medal, SF, fines) to all participants
+- [x] **Email setup** — Resend API key added to .env. Also add to Vercel env vars for production.
+- [x] **Trigger: Round Closed** — Admin action to mark a round complete, sends results (medal, SF, fines) to all participants
 - [ ] **Course images** — Upload image when creating/editing a round, show on dashboard Next Round card
 - [ ] **Commit + deploy** — Nothing committed from this session. Need to commit all changes and push to deploy on Vercel.
 

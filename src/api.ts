@@ -72,6 +72,10 @@ export async function deleteRound(id: number) {
   return request(`/rounds/${id}`, { method: 'DELETE' });
 }
 
+export async function closeRound(id: number) {
+  return request(`/rounds/${id}/close`, { method: 'PUT' });
+}
+
 // ---- Scores ----
 
 export async function getAllScores() {

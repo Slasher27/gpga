@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Plus, Save, Edit, Trash2, MapPin, Calendar } from 'lucide-react';
+import { Plus, Save, Edit, Trash2, MapPin, Calendar, Lock, CheckCircle } from 'lucide-react';
 import * as DB from '../api.ts';
 import { Card } from './common';
 
-export default function RoundsView({ rounds, scores, setScores, players, activeSeason, isReadOnlySeason, showToast, onAddRound, onEditRound, onDeleteRound }) {
+export default function RoundsView({ rounds, scores, setScores, players, activeSeason, isReadOnlySeason, showToast, onAddRound, onEditRound, onDeleteRound, onCloseRound }) {
   // Auto-select latest round
   const [selectedRound, setSelectedRound] = useState(rounds[rounds.length - 1]?.id);
   const [editScores, setEditScores] = useState({});
@@ -134,7 +134,7 @@ export default function RoundsView({ rounds, scores, setScores, players, activeS
                 <div className="flex items-center gap-1.5 mt-1.5">
                   <Calendar size={10} className={isActive ? 'text-emerald-200' : 'text-slate-300'} />
                   <span className={`text-[10px] ${isActive ? 'text-emerald-100' : 'text-slate-400'}`}>{r.date}</span>
-                  {hasScores && <span className={`ml-auto w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-200' : 'bg-emerald-400'}`} />}
+                  {r.closed ? <Lock size={10} className={`ml-auto ${isActive ? 'text-emerald-200' : 'text-slate-400'}`} /> : hasScores && <span className={`ml-auto w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-200' : 'bg-emerald-400'}`} />}
                 </div>
               </button>
             );
@@ -156,12 +156,24 @@ export default function RoundsView({ rounds, scores, setScores, players, activeS
             </div>
             {!isReadOnlySeason && (
               <div className="flex items-center gap-1 flex-shrink-0">
-                <button onClick={() => onEditRound(currentRound)} className="p-2 rounded-lg text-slate-400 hover:bg-slate-200 hover:text-slate-600 transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center" aria-label="Edit round">
-                  <Edit size={14} />
-                </button>
-                <button onClick={() => onDeleteRound(currentRound.id, currentRound.name)} className="p-2 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center" aria-label="Delete round">
-                  <Trash2 size={14} />
-                </button>
+                {!currentRound.closed && (
+                  <>
+                    <button onClick={() => onEditRound(currentRound)} className="p-2 rounded-lg text-slate-400 hover:bg-slate-200 hover:text-slate-600 transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center" aria-label="Edit round">
+                      <Edit size={14} />
+                    </button>
+                    <button onClick={() => onDeleteRound(currentRound.id, currentRound.name)} className="p-2 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center" aria-label="Delete round">
+                      <Trash2 size={14} />
+                    </button>
+                    <button onClick={() => onCloseRound(currentRound.id, currentRound.name)} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-emerald-50 hover:text-emerald-600 transition-colors min-h-[36px] flex items-center gap-1.5" aria-label="Close round">
+                      <CheckCircle size={13} /> Close
+                    </button>
+                  </>
+                )}
+                {currentRound.closed && (
+                  <span className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-500 flex items-center gap-1.5">
+                    <Lock size={13} /> Closed
+                  </span>
+                )}
               </div>
             )}
           </div>
@@ -170,7 +182,7 @@ export default function RoundsView({ rounds, scores, setScores, players, activeS
           <Card>
             <div className="flex items-center justify-between p-4 border-b border-slate-100">
               <h3 className="font-semibold text-slate-800 text-sm">Scores — {currentRound.name}</h3>
-              {!isReadOnlySeason && (
+              {!isReadOnlySeason && !currentRound.closed && (
                 !isAnyPlayerEditing ? (
                   <button onClick={editAllPlayers} className="bg-emerald-600 text-white px-3 py-2 rounded-lg text-xs font-semibold hover:bg-emerald-700 flex items-center gap-1.5 min-h-[36px]">
                     <Edit size={13} /> Edit All
@@ -193,7 +205,7 @@ export default function RoundsView({ rounds, scores, setScores, players, activeS
                   <div key={p.id} className={`p-3 ${isEdited ? 'bg-emerald-50/50' : ''}`}>
                     <div className="flex items-center justify-between mb-2">
                       <span className="font-medium text-slate-800 text-sm">{p.name}</span>
-                      {!isReadOnlySeason && (
+                      {!isReadOnlySeason && !currentRound.closed && (
                         !isEditing ? (
                           <button onClick={() => setEditingPlayers(prev => ({ ...prev, [p.id]: true }))} className="text-xs text-emerald-600 font-semibold min-h-[32px] px-2">Edit</button>
                         ) : (

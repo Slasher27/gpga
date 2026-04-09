@@ -162,18 +162,19 @@ export async function initSchema(): Promise<void> {
   ], 'write');
 
   // Migrations for existing tables
-  try { await client.execute('ALTER TABLE fine_types ADD COLUMN sort_order INTEGER DEFAULT 0'); } catch {}
-  try { await client.execute('ALTER TABLE fine_types ADD COLUMN is_open INTEGER DEFAULT 0'); } catch {}
-  try { await client.execute('ALTER TABLE seasons ADD COLUMN medal_1st INTEGER DEFAULT 0'); } catch {}
-  try { await client.execute('ALTER TABLE seasons ADD COLUMN medal_2nd INTEGER DEFAULT 0'); } catch {}
-  try { await client.execute('ALTER TABLE seasons ADD COLUMN stableford_1st INTEGER DEFAULT 0'); } catch {}
-  try { await client.execute('ALTER TABLE seasons ADD COLUMN stableford_2nd INTEGER DEFAULT 0'); } catch {}
-  try { await client.execute('ALTER TABLE seasons ADD COLUMN team_1st INTEGER DEFAULT 0'); } catch {}
-  try { await client.execute('ALTER TABLE rounds ADD COLUMN tee_time TEXT'); } catch {}
-  try { await client.execute('ALTER TABLE rounds ADD COLUMN tee_time_2 TEXT'); } catch {}
+  try { await db.execute('ALTER TABLE fine_types ADD COLUMN sort_order INTEGER DEFAULT 0'); } catch {}
+  try { await db.execute('ALTER TABLE fine_types ADD COLUMN is_open INTEGER DEFAULT 0'); } catch {}
+  try { await db.execute('ALTER TABLE seasons ADD COLUMN medal_1st INTEGER DEFAULT 0'); } catch {}
+  try { await db.execute('ALTER TABLE seasons ADD COLUMN medal_2nd INTEGER DEFAULT 0'); } catch {}
+  try { await db.execute('ALTER TABLE seasons ADD COLUMN stableford_1st INTEGER DEFAULT 0'); } catch {}
+  try { await db.execute('ALTER TABLE seasons ADD COLUMN stableford_2nd INTEGER DEFAULT 0'); } catch {}
+  try { await db.execute('ALTER TABLE seasons ADD COLUMN team_1st INTEGER DEFAULT 0'); } catch {}
+  try { await db.execute('ALTER TABLE rounds ADD COLUMN tee_time TEXT'); } catch {}
+  try { await db.execute('ALTER TABLE rounds ADD COLUMN tee_time_2 TEXT'); } catch {}
+  try { await db.execute('ALTER TABLE rounds ADD COLUMN closed INTEGER DEFAULT 0'); } catch {}
 
   // Add missing Western Cape courses
-  await client.execute(`INSERT OR IGNORE INTO golf_courses (id, name, location, par) VALUES
+  await db.execute(`INSERT OR IGNORE INTO golf_courses (id, name, location, par) VALUES
     (31, 'Kingswood Golf Estate', 'George', 72),
     (32, 'Fancourt Links', 'George', 73),
     (33, 'Fancourt Montagu', 'George', 72),

@@ -76,6 +76,59 @@ router.put('/:id', async (req, res) => {
   res.json({ ok: true });
 });
 
+router.put('/:id/close', async (req, res) => {
+  const roundId = Number(req.params.id);
+  const db = getClient();
+
+  // Get round info
+  const roundResult = await db.execute({ sql: 'SELECT * FROM rounds WHERE id = ?', args: [roundId] });
+  const round = roundResult.rows[0];
+  if (!round) return res.status(404).json({ error: 'Round not found' });
+  if (round.closed) return res.status(400).json({ error: 'Round already closed' });
+
+  // Mark as closed
+  await db.execute({ sql: 'UPDATE rounds SET closed = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?', args: [roundId] });
+
+  // Get scores for this round
+  const scoresResult = await db.execute({
+    sql: `SELECT s.player_id, p.name, s.strokes, s.handicap, s.stableford
+          FROM scores s JOIN players p ON s.player_id = p.id
+          WHERE s.round_id = ? AND s.strokes > 0 ORDER BY s.strokes ASC`,
+    args: [roundId],
+  });
+
+  // Get fines summary for this round
+  const finesResult = await db.execute({
+    sql: `SELECT SUM(pf.quantity * ft.amount) as total_fines, COUNT(DISTINCT pf.player_id) as players_fined
+          FROM player_fines pf JOIN fine_types ft ON pf.fine_type_id = ft.id
+          WHERE pf.round_id = ?`,
+    args: [roundId],
+  });
+
+  // Build results summary
+  const scores = scoresResult.rows;
+  const medalWinner = scores[0]; // lowest net strokes
+  const sfWinner = [...scores].sort((a, b) => (Number(b.stableford) || 0) - (Number(a.stableford) || 0))[0];
+  const totalFines = Number(finesResult.rows[0]?.total_fines) || 0;
+
+  let body = `${round.course_name} — ${scores.length} players\n`;
+  if (medalWinner) body += `Medal: ${medalWinner.name} (${medalWinner.strokes} net)\n`;
+  if (sfWinner && Number(sfWinner.stableford) > 0) body += `Stableford: ${sfWinner.name} (${sfWinner.stableford} pts)\n`;
+  if (totalFines > 0) body += `Fines: R${totalFines.toLocaleString()}`;
+
+  // Notify all season players
+  const seasonId = Number(round.season_id);
+  const playerIds = await getSeasonPlayerIds(seasonId);
+  await notify({
+    playerIds, type: 'round_closed', roundId,
+    title: `Results: ${round.name}`,
+    body: body.trim(),
+    email: true, push: true,
+  });
+
+  res.json({ ok: true });
+});
+
 router.delete('/:id', async (req, res) => {
   await getClient().execute({ sql: 'DELETE FROM rounds WHERE id = ?', args: [Number(req.params.id)] });
   res.json({ ok: true });

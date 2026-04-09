@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { getClient } from '../db.js';
-import { notify, getSeasonPlayerIds } from '../notify.js';
+import { notify } from '../notify.js';
 
 const router = Router();
 
@@ -68,8 +68,6 @@ router.get('/check', async (req, res) => {
     sql: 'SELECT * FROM rounds WHERE season_id = ? AND date >= ? ORDER BY date',
     args: [Number(seasonId), today],
   });
-
-  const seasonPlayerIds = await getSeasonPlayerIds(Number(seasonId));
 
   for (const round of rounds.rows) {
     const roundDate = round.date as string;
