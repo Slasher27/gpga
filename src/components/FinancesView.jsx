@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Plus, Trash2, ChevronDown, Edit, Save, X } from 'lucide-react';
 import * as DB from '../api.ts';
 import { TabBar, Card } from './common';
@@ -72,21 +72,35 @@ export default function FinancesView({
 
   // --- Handlers ---
   const handlePlayerChange = (id) => { setSelectedPlayer(id); localStorage.setItem('gpga_selected_player', id); };
-  const refreshLocalData = () => {
-    if (activeSeason) DB.getPaymentSummary(activeSeason.id).then(setPaymentSummaryData);
-    if (selectedRound) DB.getRoundFines(selectedRound).then(setRoundFinesData);
-    onFinesChanged?.();
-  };
+  const refreshTimer = useRef(null);
+  const refreshLocalData = useCallback(() => {
+    clearTimeout(refreshTimer.current);
+    refreshTimer.current = setTimeout(() => {
+      if (activeSeason) DB.getPaymentSummary(activeSeason.id).then(setPaymentSummaryData);
+      if (selectedRound) DB.getRoundFines(selectedRound).then(setRoundFinesData);
+      onFinesChanged?.();
+    }, 500);
+  }, [activeSeason, selectedRound, onFinesChanged]);
   const handleAddFine = async (fineTypeId) => {
     if (!selectedPlayer || !selectedRound) return;
-    await DB.addPlayerFine(selectedPlayer, selectedRound, fineTypeId);
-    setPlayerFines(await DB.getPlayerFinesForRound(selectedPlayer, selectedRound));
+    const existing = playerFines.find(pf => pf.fine_type_id === fineTypeId);
+    const newQty = (existing?.quantity || 0) + 1;
+    setPlayerFines(prev => {
+      const idx = prev.findIndex(pf => pf.fine_type_id === fineTypeId);
+      if (idx >= 0) { const updated = [...prev]; updated[idx] = { ...updated[idx], quantity: newQty }; return updated; }
+      const ft = fineTypes.find(f => f.id === fineTypeId);
+      return [...prev, { fine_type_id: fineTypeId, quantity: 1, amount: ft?.amount || 0, name: ft?.name || '' }];
+    });
+    await DB.setPlayerFine(selectedPlayer, selectedRound, fineTypeId, newQty);
     refreshLocalData();
   };
   const handleRemoveFine = async (fineTypeId) => {
     if (!selectedPlayer || !selectedRound) return;
-    await DB.removePlayerFine(selectedPlayer, selectedRound, fineTypeId);
-    setPlayerFines(await DB.getPlayerFinesForRound(selectedPlayer, selectedRound));
+    const existing = playerFines.find(pf => pf.fine_type_id === fineTypeId);
+    if (!existing || existing.quantity <= 0) return;
+    const newQty = existing.quantity - 1;
+    setPlayerFines(prev => prev.map(pf => pf.fine_type_id === fineTypeId ? { ...pf, quantity: newQty } : pf).filter(pf => pf.quantity > 0));
+    await DB.setPlayerFine(selectedPlayer, selectedRound, fineTypeId, newQty);
     refreshLocalData();
   };
   const handleSaveFineType = async () => {
@@ -187,7 +201,12 @@ export default function FinancesView({
             {selectedPlayer && selectedRound ? (
               <>
                 <div className="flex justify-between items-center pt-2 border-t border-slate-100">
-                  <p className="text-sm font-semibold text-slate-700">{players.find(p => p.id === selectedPlayer)?.name}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold text-slate-700">{players.find(p => p.id === selectedPlayer)?.name}</p>
+                    <button onClick={() => { setSelectedPlayer(null); setPlayerFines([]); }} className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors" aria-label="Close">
+                      <X size={14} />
+                    </button>
+                  </div>
                   <p className="font-bold text-red-600">R{playerFinesTotal}</p>
                 </div>
 
@@ -280,16 +299,16 @@ export default function FinancesView({
       {isAdmin && finesTab === 'types' && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-slate-500">{fineTypes.length} fines</p>
+            <p className="text-sm text-slate-500">{fineTypes.filter(ft => !ft.is_open).length} fines</p>
             <button onClick={onAddFineType} className="bg-emerald-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-emerald-700 transition-colors flex items-center gap-2 text-sm min-h-[44px]">
               <Plus size={16} /> Add Fine
             </button>
           </div>
           <Card>
             <div className="divide-y divide-slate-50">
-              {fineTypes.length === 0 ? (
+              {fineTypes.filter(ft => !ft.is_open).length === 0 ? (
                 <div className="p-8 text-center text-slate-400 text-sm">No fines on the sheet yet</div>
-              ) : fineTypes.map(ft => (
+              ) : fineTypes.filter(ft => !ft.is_open).map(ft => (
                 <div key={ft.id} className="flex items-center gap-3 p-3">
                   {editingFineType?.id === ft.id ? (
                     <>
