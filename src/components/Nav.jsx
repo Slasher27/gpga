@@ -80,15 +80,15 @@ export function DesktopSidebar({ view, setNavView, navItems, activeSeason, allSe
 // Mobile bottom tab bar
 export function MobileBottomNav({ view, setNavView, navItems }) {
   return (
-    <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-30 safe-area-bottom">
+    <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-30 pb-[env(safe-area-inset-bottom)]">
       <div className="flex">
         {navItems.slice(0, 5).map(item => (
           <button key={item.id} onClick={() => setNavView(item.id)}
-            className={`flex-1 flex flex-col items-center justify-center py-1.5 min-h-[44px] transition-colors ${
+            className={`flex-1 flex flex-col items-center justify-center py-3 min-h-[64px] transition-colors ${
               view === item.id ? 'text-emerald-600' : 'text-slate-400'
             }`}>
             {item.icon}
-            <span className="text-[10px] font-medium leading-none mt-0.5">{item.label}</span>
+            <span className="text-[11px] font-medium leading-none mt-1">{item.label}</span>
           </button>
         ))}
       </div>
