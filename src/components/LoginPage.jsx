@@ -91,15 +91,8 @@ export default function LoginPage({ onLogin }) {
               {isLoading ? 'Signing In...' : 'Sign In'}
             </button>
 
-            <div className="mt-6 p-4 bg-slate-50 rounded-lg border border-slate-200">
-              <p className="text-xs text-slate-600 text-center mb-2 font-semibold">Demo Credentials</p>
-              <p className="text-xs text-slate-500 text-center">
-                Use any player's email with password: <span className="font-mono font-semibold">password</span>
-              </p>
-            </div>
           </form>
         </div>
-        <p className="text-center text-slate-500 text-sm mt-6">Manage scores, fines, and leaderboards for your golf league</p>
       </div>
     </div>
   );

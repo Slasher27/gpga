@@ -1,4 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <rect width="512" height="512" rx="96" fill="#059669"/>
-  <text x="256" y="340" text-anchor="middle" font-size="280" font-family="system-ui, sans-serif" font-weight="bold" fill="white">G</text>
+  <!-- Golf flag -->
+  <line x1="256" y1="80" x2="256" y2="320" stroke="white" stroke-width="12" stroke-linecap="round"/>
+  <polygon points="262,80 370,120 262,160" fill="white" opacity="0.9"/>
+  <!-- Golf ball -->
+  <circle cx="256" cy="340" r="36" fill="white"/>
+  <circle cx="248" cy="332" r="3" fill="#059669" opacity="0.4"/>
+  <circle cx="262" cy="336" r="3" fill="#059669" opacity="0.4"/>
+  <circle cx="254" cy="348" r="3" fill="#059669" opacity="0.4"/>
+  <!-- GPGA text -->
+  <text x="256" y="448" text-anchor="middle" font-size="88" font-family="system-ui, sans-serif" font-weight="800" fill="white" letter-spacing="4">GPGA</text>
 </svg>
