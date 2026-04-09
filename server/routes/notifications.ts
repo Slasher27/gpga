@@ -87,7 +87,7 @@ router.get('/check', async (req, res) => {
           playerIds: [playerId], type: 'round_reminder_7d', roundId,
           title: 'Round in 7 days',
           body: `${roundName} at ${courseName} on ${roundDate}`,
-          email: true,
+          email: true, push: true,
         });
       }
     }
@@ -135,7 +135,7 @@ router.get('/check', async (req, res) => {
             playerIds: [playerId], type: 'fine_overdue',
             title: 'Outstanding fines reminder',
             body: `R${total.toLocaleString()} unpaid — next round in ${daysUntil} days`,
-            email: true,
+            email: true, push: true,
           });
         }
       }

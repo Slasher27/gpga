@@ -38,8 +38,8 @@
 - [ ] **Commit + deploy** — Nothing committed from this session. Need to commit all changes and push to deploy on Vercel.
 
 ### Medium Priority
-- [ ] **Test push end-to-end** — Log in, accept permission, create round, verify push pops up on device
-- [ ] **Test on actual mobile device** — Install PWA, verify push works on Android/iOS
+- [x] **Test push end-to-end** — Verified: in-app, email (Resend), and browser push all working
+- [x] **Test on actual mobile device** — PWA installed on phone, push notifications confirmed working
 - [x] **Notification preferences** — Two global toggles (email/push) per player in Profile > Edit
 - [x] **Golf course seed data** — 18 Western Cape courses seeded in db.ts initSchema
 

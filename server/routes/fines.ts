@@ -152,7 +152,7 @@ router.put('/pay-round', async (req, res) => {
     const round = await db.execute({ sql: 'SELECT name FROM rounds WHERE id = ?', args: [round_id] });
     const amt = Number(total.rows[0]?.amt) || 0;
     const roundName = (round.rows[0]?.name as string) || 'Round';
-    notify({ playerIds: [player_id], type: 'fine_paid', roundId: round_id, title: 'Fine payment confirmed', body: `R${amt.toLocaleString()} for ${roundName} marked as paid`, push: true }).catch(() => {});
+    notify({ playerIds: [player_id], type: 'fine_paid', roundId: round_id, title: 'Fine payment confirmed', body: `R${amt.toLocaleString()} for ${roundName} marked as paid`, email: true, push: true }).catch(() => {});
   }
   res.json({ ok: true });
 });
@@ -172,7 +172,7 @@ router.put('/confirm', async (req, res) => {
     const cnt = Number(fines.rows[0]?.cnt) || 0;
     const amt = Number(fines.rows[0]?.amt) || 0;
     const roundName = (round.rows[0]?.name as string) || 'Round';
-    notify({ playerIds: [player_id], type: 'fines_closed', roundId: round_id, title: `Fines confirmed: ${roundName}`, body: `${cnt} fines totalling R${amt.toLocaleString()}`, push: true }).catch(() => {});
+    notify({ playerIds: [player_id], type: 'fines_closed', roundId: round_id, title: `Fines confirmed: ${roundName}`, body: `${cnt} fines totalling R${amt.toLocaleString()}`, email: true, push: true }).catch(() => {});
   }
   res.json({ ok: true });
 });

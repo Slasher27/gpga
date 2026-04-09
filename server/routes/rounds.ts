@@ -68,7 +68,7 @@ router.put('/:id', async (req, res) => {
         playerIds, type: 'round_updated', roundId,
         title: `${old.name} Updated`,
         body: `${changes.charAt(0).toUpperCase() + changes.slice(1)} changed — ${updated.course_name} on ${updated.date}${tees ? `. Tee times: ${tees}` : ''}`,
-        push: true,
+        email: true, push: true,
       }).catch(() => {});
     }
   }
