@@ -34,10 +34,14 @@ export async function notify({ playerIds, type, title, body, roundId, email = fa
     await db.execute({ sql: `INSERT INTO notifications (player_id, type, title, body, round_id) VALUES ${placeholders}`, args });
   }
 
+  // Fetch player preferences for email/push filtering
+  const prefs = (email || push) && playerIds.length > 0
+    ? await db.execute({ sql: `SELECT id, email, name, notify_email, notify_push FROM players WHERE id IN (${playerIds.map(() => '?').join(',')})`, args: playerIds })
+    : null;
+
   // 2. Email via Resend
-  if (email && resend && playerIds.length > 0) {
-    const players = await db.execute('SELECT id, email, name FROM players WHERE status = \'active\'');
-    const recipients = players.rows.filter(p => playerIds.includes(p.id as string));
+  if (email && resend && prefs) {
+    const recipients = prefs.rows.filter(p => playerIds.includes(p.id as string) && p.notify_email !== 0);
     for (const player of recipients) {
       try {
         await resend.emails.send({
@@ -52,20 +56,23 @@ export async function notify({ playerIds, type, title, body, roundId, email = fa
 
   // 3. Browser push
   if (push && playerIds.length > 0) {
-    const subs = await db.execute({
-      sql: `SELECT * FROM push_subscriptions WHERE player_id IN (${playerIds.map(() => '?').join(',')})`,
-      args: playerIds,
-    });
-    for (const sub of subs.rows) {
-      try {
-        await webpush.sendNotification(
-          { endpoint: sub.endpoint as string, keys: { p256dh: sub.p256dh as string, auth: sub.auth as string } },
-          JSON.stringify({ title, body })
-        );
-      } catch (err: any) {
-        // Remove invalid subscriptions
-        if (err.statusCode === 410 || err.statusCode === 404) {
-          await db.execute({ sql: 'DELETE FROM push_subscriptions WHERE id = ?', args: [sub.id] });
+    const pushEnabledIds = prefs ? prefs.rows.filter(p => p.notify_push !== 0).map(p => p.id as string) : playerIds;
+    if (pushEnabledIds.length > 0) {
+      const subs = await db.execute({
+        sql: `SELECT * FROM push_subscriptions WHERE player_id IN (${pushEnabledIds.map(() => '?').join(',')})`,
+        args: pushEnabledIds,
+      });
+      for (const sub of subs.rows) {
+        try {
+          await webpush.sendNotification(
+            { endpoint: sub.endpoint as string, keys: { p256dh: sub.p256dh as string, auth: sub.auth as string } },
+            JSON.stringify({ title, body })
+          );
+        } catch (err: any) {
+          // Remove invalid subscriptions
+          if (err.statusCode === 410 || err.statusCode === 404) {
+            await db.execute({ sql: 'DELETE FROM push_subscriptions WHERE id = ?', args: [sub.id] });
+          }
         }
       }
     }

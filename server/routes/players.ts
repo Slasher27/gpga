@@ -4,7 +4,7 @@ import { getClient } from '../db.js';
 const router = Router();
 
 router.get('/', async (_req, res) => {
-  const result = await getClient().execute('SELECT id, name, email, role, status, avatar, created_at, updated_at FROM players ORDER BY name');
+  const result = await getClient().execute('SELECT id, name, email, role, status, avatar, notify_email, notify_push, created_at, updated_at FROM players ORDER BY name');
   res.json(result.rows);
 });
 
@@ -24,7 +24,7 @@ router.put('/:id', async (req, res) => {
   const values: any[] = [];
 
   for (const [key, val] of Object.entries(updates)) {
-    if (['name', 'email', 'password', 'role', 'status', 'avatar'].includes(key)) {
+    if (['name', 'email', 'password', 'role', 'status', 'avatar', 'notify_email', 'notify_push'].includes(key)) {
       fields.push(`${key} = ?`);
       values.push(val);
     }

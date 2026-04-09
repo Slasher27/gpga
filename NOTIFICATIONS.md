@@ -40,8 +40,8 @@
 ### Medium Priority
 - [ ] **Test push end-to-end** — Log in, accept permission, create round, verify push pops up on device
 - [ ] **Test on actual mobile device** — Install PWA, verify push works on Android/iOS
-- [ ] **Notification preferences** — Let players mute email or push per notification type
-- [ ] **Golf course seed data** — 18 new Western Cape courses added to seed + migration, verify they show in course selector
+- [x] **Notification preferences** — Two global toggles (email/push) per player in Profile > Edit
+- [x] **Golf course seed data** — 18 Western Cape courses seeded in db.ts initSchema
 
 ### Low Priority
 - [ ] **Rich email templates** — HTML email design instead of plain text

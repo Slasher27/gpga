@@ -172,6 +172,8 @@ export async function initSchema(): Promise<void> {
   try { await db.execute('ALTER TABLE rounds ADD COLUMN tee_time TEXT'); } catch {}
   try { await db.execute('ALTER TABLE rounds ADD COLUMN tee_time_2 TEXT'); } catch {}
   try { await db.execute('ALTER TABLE rounds ADD COLUMN closed INTEGER DEFAULT 0'); } catch {}
+  try { await db.execute('ALTER TABLE players ADD COLUMN notify_email INTEGER DEFAULT 1'); } catch {}
+  try { await db.execute('ALTER TABLE players ADD COLUMN notify_push INTEGER DEFAULT 1'); } catch {}
 
   // Add missing Western Cape courses
   await db.execute(`INSERT OR IGNORE INTO golf_courses (id, name, location, par) VALUES

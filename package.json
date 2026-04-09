@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"tsx watch server/index.ts\" \"vite\"",
+    "dev": "tsx server/index.ts & vite",
     "dev:server": "tsx watch server/index.ts",
     "dev:client": "vite",
     "build": "vite build",
@@ -33,7 +33,6 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
     "autoprefixer": "^10.4.22",
-    "concurrently": "^9.2.1",
     "daisyui": "^5.5.8",
     "eslint": "^9.39.1",
     "eslint-plugin-react-hooks": "^7.0.1",
