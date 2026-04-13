@@ -3,6 +3,19 @@ import { Plus, Trash2, ChevronDown, Edit, Save, X } from 'lucide-react';
 import * as DB from '../api.ts';
 import { TabBar, Card } from './common';
 
+// Tiered fine total: first N units at base amount, remainder at tier_amount.
+// Mirrors FINE_TOTAL_SQL in server/routes/fines.ts — keep in sync.
+function calcFineTotal(quantity, amount, tierThreshold = 0, tierAmount = 0) {
+  const qty = Number(quantity) || 0;
+  const base = Number(amount) || 0;
+  const threshold = Number(tierThreshold) || 0;
+  const tier = Number(tierAmount) || 0;
+  if (threshold > 0 && qty > threshold) {
+    return threshold * base + (qty - threshold) * tier;
+  }
+  return qty * base;
+}
+
 export default function FinancesView({
   leaderboardData, rounds, scores, players, activeSeason,
   isReadOnlySeason, currentUser, showToast,
@@ -105,7 +118,14 @@ export default function FinancesView({
   };
   const handleSaveFineType = async () => {
     if (!editingFineType) return;
-    await DB.updateFineType(editingFineType.id, { name: editingFineType.name, amount: editingFineType.amount, sort_order: editingFineType.sort_order });
+    await DB.updateFineType(editingFineType.id, {
+      name: editingFineType.name,
+      amount: editingFineType.amount,
+      sort_order: editingFineType.sort_order,
+      description: editingFineType.description,
+      tier_threshold: editingFineType.tier_threshold || 0,
+      tier_amount: editingFineType.tier_amount || 0
+    });
     setFineTypes(prev => prev.map(ft => ft.id === editingFineType.id ? { ...ft, ...editingFineType } : ft).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0) || a.name.localeCompare(b.name)));
     setEditingFineType(null);
     showToast('Fine type updated');
@@ -123,7 +143,7 @@ export default function FinancesView({
     showToast(`Open fine "${openFineName.trim()}" added`);
   };
 
-  const playerFinesTotal = playerFines.reduce((sum, f) => sum + (f.amount * f.quantity), 0);
+  const playerFinesTotal = playerFines.reduce((sum, f) => sum + calcFineTotal(f.quantity, f.amount, f.tier_threshold, f.tier_amount), 0);
   const buyInAmount = activeSeason?.buy_in_amount || 2500;
   const paidBuyIns = Object.values(buyInStatuses).filter(s => s.isPaid).length;
   const totalBuyInPool = paidBuyIns * buyInAmount;
@@ -221,16 +241,20 @@ export default function FinancesView({
                 <div className={`space-y-1.5 max-h-[50vh] overflow-y-auto ${isRoundConfirmed ? 'opacity-50 pointer-events-none' : ''}`}>
                   {fineTypes.filter(ft => !ft.is_open).map(ft => {
                     const qty = playerFines.find(pf => pf.fine_type_id === ft.id)?.quantity || 0;
+                    const rowTotal = calcFineTotal(qty, ft.amount, ft.tier_threshold, ft.tier_amount);
+                    const hasTier = Number(ft.tier_threshold) > 0;
                     return (
                       <div key={ft.id} className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg">
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-slate-700 truncate">{ft.name}</p>
-                          <p className="text-[10px] text-slate-400">R{ft.amount}</p>
+                          <p className="text-[10px] text-slate-400">
+                            R{ft.amount}{hasTier && <> · R{ft.tier_amount} after {ft.tier_threshold}</>}
+                          </p>
                         </div>
                         <button type="button" onClick={() => handleRemoveFine(ft.id)} disabled={qty === 0} className="w-9 h-9 flex items-center justify-center rounded-lg bg-red-100 text-red-600 hover:bg-red-200 disabled:opacity-30 transition-colors font-bold min-h-[36px]">-</button>
                         <span className="w-6 text-center font-bold text-sm text-slate-800">{qty}</span>
                         <button type="button" onClick={() => handleAddFine(ft.id)} className="w-9 h-9 flex items-center justify-center rounded-lg bg-emerald-100 text-emerald-600 hover:bg-emerald-200 transition-colors font-bold min-h-[36px]">+</button>
-                        <span className="w-14 text-right text-sm font-semibold text-slate-600">R{qty * ft.amount}</span>
+                        <span className="w-14 text-right text-sm font-semibold text-slate-600">R{rowTotal}</span>
                       </div>
                     );
                   })}
@@ -239,6 +263,7 @@ export default function FinancesView({
                   {fineTypes.filter(ft => ft.is_open).map(ft => {
                     const qty = playerFines.find(pf => pf.fine_type_id === ft.id)?.quantity || 0;
                     if (qty === 0) return null;
+                    const rowTotal = calcFineTotal(qty, ft.amount, ft.tier_threshold, ft.tier_amount);
                     return (
                       <div key={ft.id} className="flex items-center gap-2 p-2 bg-red-50/50 rounded-lg border border-red-100">
                         <div className="flex-1 min-w-0">
@@ -248,7 +273,7 @@ export default function FinancesView({
                         <button type="button" onClick={() => handleRemoveFine(ft.id)} className="w-9 h-9 flex items-center justify-center rounded-lg bg-red-100 text-red-600 hover:bg-red-200 transition-colors font-bold min-h-[36px]">-</button>
                         <span className="w-6 text-center font-bold text-sm text-slate-800">{qty}</span>
                         <button type="button" onClick={() => handleAddFine(ft.id)} className="w-9 h-9 flex items-center justify-center rounded-lg bg-emerald-100 text-emerald-600 hover:bg-emerald-200 transition-colors font-bold min-h-[36px]">+</button>
-                        <span className="w-14 text-right text-sm font-semibold text-slate-600">R{qty * ft.amount}</span>
+                        <span className="w-14 text-right text-sm font-semibold text-slate-600">R{rowTotal}</span>
                       </div>
                     );
                   })}
@@ -312,13 +337,24 @@ export default function FinancesView({
                 <div key={ft.id} className="flex items-center gap-3 p-3">
                   {editingFineType?.id === ft.id ? (
                     <>
-                      <div className="flex-1 flex gap-2">
+                      <div className="flex-1 flex flex-wrap gap-2">
                         <input id="edit-ft-order" name="sort_order" aria-label="Sort order" type="number" value={editingFineType.sort_order} onChange={e => setEditingFineType(prev => ({ ...prev, sort_order: Number(e.target.value) }))}
                           className="input input-bordered input-sm w-14 min-h-[36px] text-center" min="0" placeholder="#" autoComplete="off" />
                         <input id="edit-ft-name" name="fine_name" aria-label="Fine name" value={editingFineType.name} onChange={e => setEditingFineType(prev => ({ ...prev, name: e.target.value }))}
-                          className="input input-bordered input-sm flex-1 min-h-[36px]" autoComplete="off" />
+                          className="input input-bordered input-sm flex-1 min-w-[120px] min-h-[36px]" autoComplete="off" />
                         <input id="edit-ft-amount" name="fine_amount" aria-label="Fine amount" type="number" value={editingFineType.amount} onChange={e => setEditingFineType(prev => ({ ...prev, amount: Number(e.target.value) }))}
                           className="input input-bordered input-sm w-20 min-h-[36px]" min="0" autoComplete="off" />
+                        <input id="edit-ft-description" name="fine_description" aria-label="Fine description" value={editingFineType.description || ''} onChange={e => setEditingFineType(prev => ({ ...prev, description: e.target.value }))}
+                          className="input input-bordered input-sm w-full min-h-[36px]" placeholder="Description (optional)" autoComplete="off" />
+                        <div className="flex items-center gap-2 w-full">
+                          <span className="text-[10px] text-slate-400 uppercase font-medium">Tier</span>
+                          <input id="edit-ft-tier-threshold" name="tier_threshold" aria-label="Tier threshold" type="number" value={editingFineType.tier_threshold || 0} onChange={e => setEditingFineType(prev => ({ ...prev, tier_threshold: Number(e.target.value) }))}
+                            className="input input-bordered input-sm w-16 min-h-[36px] text-center" min="0" placeholder="after" autoComplete="off" />
+                          <span className="text-[10px] text-slate-400">then R</span>
+                          <input id="edit-ft-tier-amount" name="tier_amount" aria-label="Tier amount" type="number" value={editingFineType.tier_amount || 0} onChange={e => setEditingFineType(prev => ({ ...prev, tier_amount: Number(e.target.value) }))}
+                            className="input input-bordered input-sm w-20 min-h-[36px]" min="0" autoComplete="off" />
+                          <span className="text-[10px] text-slate-400">each</span>
+                        </div>
                       </div>
                       <button onClick={handleSaveFineType} className="p-2 rounded-lg text-emerald-600 hover:bg-emerald-50 min-h-[36px] min-w-[36px] flex items-center justify-center"><Save size={16} /></button>
                       <button onClick={() => setEditingFineType(null)} className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 min-h-[36px] min-w-[36px] flex items-center justify-center"><X size={16} /></button>
@@ -329,9 +365,12 @@ export default function FinancesView({
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-slate-800 truncate">{ft.name}</p>
                         {ft.description && <p className="text-[10px] text-slate-400 truncate">{ft.description}</p>}
+                        {Number(ft.tier_threshold) > 0 && (
+                          <p className="text-[10px] text-emerald-600 truncate">R{ft.tier_amount} each after {ft.tier_threshold}</p>
+                        )}
                       </div>
                       <span className="text-sm font-bold text-red-600 flex-shrink-0">R{ft.amount}</span>
-                      <button onClick={() => setEditingFineType({ id: ft.id, name: ft.name, amount: ft.amount, sort_order: ft.sort_order || 0 })}
+                      <button onClick={() => setEditingFineType({ id: ft.id, name: ft.name, amount: ft.amount, sort_order: ft.sort_order || 0, description: ft.description || '', tier_threshold: Number(ft.tier_threshold) || 0, tier_amount: Number(ft.tier_amount) || 0 })}
                         className="p-2.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center flex-shrink-0">
                         <Edit size={16} />
                       </button>
@@ -374,9 +413,10 @@ export default function FinancesView({
               const playerSummary = {}, playerFineDetails = {};
               roundFinesData.forEach(f => {
                 if (!playerSummary[f.player_id]) { playerSummary[f.player_id] = { player_id: f.player_id, player_name: f.player_name, total_fines: 0, total_amount: 0 }; playerFineDetails[f.player_id] = []; }
-                playerSummary[f.player_id].total_fines += f.quantity;
-                playerSummary[f.player_id].total_amount += f.quantity * f.amount;
-                playerFineDetails[f.player_id].push({ name: f.name, quantity: f.quantity, amount: f.amount, total: f.quantity * f.amount });
+                const total = calcFineTotal(f.quantity, f.amount, f.tier_threshold, f.tier_amount);
+                playerSummary[f.player_id].total_fines += Number(f.quantity);
+                playerSummary[f.player_id].total_amount += total;
+                playerFineDetails[f.player_id].push({ name: f.name, quantity: f.quantity, amount: f.amount, total });
               });
               let arr = Object.values(playerSummary);
               if (roundViewPlayerFilter !== 'all') arr = arr.filter(s => s.player_id === roundViewPlayerFilter);

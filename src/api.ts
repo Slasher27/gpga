@@ -101,14 +101,14 @@ export async function getFineTypes(seasonId: number) {
   return request<any[]>(`/fines/types?season_id=${seasonId}`);
 }
 
-export async function addFineType(seasonId: number, name: string, amount: number, description: string = '', sortOrder: number = 0, isOpen: boolean = false) {
+export async function addFineType(seasonId: number, name: string, amount: number, description: string = '', sortOrder: number = 0, isOpen: boolean = false, tierThreshold: number = 0, tierAmount: number = 0) {
   return request<{ id: number }>('/fines/types', {
     method: 'POST',
-    body: JSON.stringify({ season_id: seasonId, name, amount, description, sort_order: sortOrder, is_open: isOpen })
+    body: JSON.stringify({ season_id: seasonId, name, amount, description, sort_order: sortOrder, is_open: isOpen, tier_threshold: tierThreshold, tier_amount: tierAmount })
   });
 }
 
-export async function updateFineType(id: number, updates: { name?: string; amount?: number; sort_order?: number }) {
+export async function updateFineType(id: number, updates: { name?: string; amount?: number; description?: string; sort_order?: number; tier_threshold?: number; tier_amount?: number }) {
   return request(`/fines/types/${id}`, { method: 'PUT', body: JSON.stringify(updates) });
 }
 

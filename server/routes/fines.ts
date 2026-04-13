@@ -2,6 +2,16 @@ import { Router } from 'express';
 import { getClient } from '../db.js';
 import { notify } from '../notify.js';
 
+// Tiered fine total: first N units at base amount, remainder at tier_amount.
+// When tier_threshold = 0, it's a flat fine (quantity * amount).
+const FINE_TOTAL_SQL = `(
+  CASE
+    WHEN ft.tier_threshold > 0 AND pf.quantity > ft.tier_threshold
+      THEN (ft.tier_threshold * ft.amount) + ((pf.quantity - ft.tier_threshold) * ft.tier_amount)
+    ELSE pf.quantity * ft.amount
+  END
+)`;
+
 const router = Router();
 
 // ---- Fine Types ----
@@ -18,10 +28,10 @@ router.get('/types', async (req, res) => {
 });
 
 router.post('/types', async (req, res) => {
-  const { season_id, name, amount, description, sort_order, is_open } = req.body;
+  const { season_id, name, amount, description, sort_order, is_open, tier_threshold, tier_amount } = req.body;
   const result = await getClient().execute({
-    sql: 'INSERT INTO fine_types (season_id, name, amount, description, sort_order, is_open) VALUES (?, ?, ?, ?, ?, ?)',
-    args: [season_id, name, amount, description || '', sort_order || 0, is_open ? 1 : 0]
+    sql: 'INSERT INTO fine_types (season_id, name, amount, description, sort_order, is_open, tier_threshold, tier_amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    args: [season_id, name, amount, description || '', sort_order || 0, is_open ? 1 : 0, tier_threshold || 0, tier_amount || 0]
   });
   res.status(201).json({ id: Number(result.lastInsertRowid) });
 });
@@ -32,7 +42,7 @@ router.put('/types/:id', async (req, res) => {
   const values: any[] = [];
 
   for (const [key, val] of Object.entries(req.body)) {
-    if (['name', 'amount', 'description', 'sort_order'].includes(key)) {
+    if (['name', 'amount', 'description', 'sort_order', 'tier_threshold', 'tier_amount'].includes(key)) {
       fields.push(`${key} = ?`);
       values.push(val);
     }
@@ -58,7 +68,7 @@ router.delete('/types/:id', async (req, res) => {
 router.get('/player/:playerId/round/:roundId', async (req, res) => {
   const { playerId, roundId } = req.params;
   const result = await getClient().execute({
-    sql: `SELECT pf.id, pf.fine_type_id, ft.name, ft.amount, pf.quantity, pf.paid
+    sql: `SELECT pf.id, pf.fine_type_id, ft.name, ft.amount, ft.tier_threshold, ft.tier_amount, pf.quantity, pf.paid
           FROM player_fines pf JOIN fine_types ft ON pf.fine_type_id = ft.id
           WHERE pf.player_id = ? AND pf.round_id = ?`,
     args: [playerId, Number(roundId)]
@@ -69,6 +79,8 @@ router.get('/player/:playerId/round/:roundId', async (req, res) => {
     id: Number(row.id),
     fine_type_id: Number(row.fine_type_id),
     amount: Number(row.amount),
+    tier_threshold: Number(row.tier_threshold) || 0,
+    tier_amount: Number(row.tier_amount) || 0,
     quantity: Number(row.quantity),
     paid: Number(row.paid),
     player_id: playerId,
@@ -80,7 +92,7 @@ router.get('/round/:roundId', async (req, res) => {
   const result = await getClient().execute({
     sql: `SELECT pf.id, pf.player_id, pf.round_id, pf.fine_type_id, pf.quantity,
             pf.paid, pf.paid_date, pf.confirmed, pf.confirmed_date, pf.created_at,
-            ft.name, ft.amount, p.name as player_name
+            ft.name, ft.amount, ft.tier_threshold, ft.tier_amount, p.name as player_name
           FROM player_fines pf
           JOIN fine_types ft ON pf.fine_type_id = ft.id
           JOIN players p ON pf.player_id = p.id
@@ -93,7 +105,7 @@ router.get('/round/:roundId', async (req, res) => {
 
 router.get('/by-round', async (_req, res) => {
   const result = await getClient().execute(
-    `SELECT pf.player_id, pf.round_id, SUM(ft.amount * pf.quantity) as total_fines
+    `SELECT pf.player_id, pf.round_id, SUM(${FINE_TOTAL_SQL}) as total_fines
      FROM player_fines pf JOIN fine_types ft ON pf.fine_type_id = ft.id
      GROUP BY pf.player_id, pf.round_id`
   );
@@ -148,7 +160,7 @@ router.put('/pay-round', async (req, res) => {
     args: [paid ? 1 : 0, paidDate, player_id, round_id]
   });
   if (paid) {
-    const total = await db.execute({ sql: 'SELECT SUM(pf.quantity * ft.amount) as amt FROM player_fines pf INNER JOIN fine_types ft ON pf.fine_type_id = ft.id WHERE pf.player_id = ? AND pf.round_id = ?', args: [player_id, round_id] });
+    const total = await db.execute({ sql: `SELECT SUM(${FINE_TOTAL_SQL}) as amt FROM player_fines pf INNER JOIN fine_types ft ON pf.fine_type_id = ft.id WHERE pf.player_id = ? AND pf.round_id = ?`, args: [player_id, round_id] });
     const round = await db.execute({ sql: 'SELECT name FROM rounds WHERE id = ?', args: [round_id] });
     const amt = Number(total.rows[0]?.amt) || 0;
     const roundName = (round.rows[0]?.name as string) || 'Round';
@@ -167,7 +179,7 @@ router.put('/confirm', async (req, res) => {
     args: [confirmed ? 1 : 0, confirmedDate, player_id, round_id]
   });
   if (confirmed) {
-    const fines = await db.execute({ sql: 'SELECT COUNT(*) as cnt, SUM(pf.quantity * ft.amount) as amt FROM player_fines pf INNER JOIN fine_types ft ON pf.fine_type_id = ft.id WHERE pf.player_id = ? AND pf.round_id = ? AND pf.quantity > 0', args: [player_id, round_id] });
+    const fines = await db.execute({ sql: `SELECT COUNT(*) as cnt, SUM(${FINE_TOTAL_SQL}) as amt FROM player_fines pf INNER JOIN fine_types ft ON pf.fine_type_id = ft.id WHERE pf.player_id = ? AND pf.round_id = ? AND pf.quantity > 0`, args: [player_id, round_id] });
     const round = await db.execute({ sql: 'SELECT name FROM rounds WHERE id = ?', args: [round_id] });
     const cnt = Number(fines.rows[0]?.cnt) || 0;
     const amt = Number(fines.rows[0]?.amt) || 0;
@@ -190,9 +202,9 @@ router.get('/payment-summary', async (req, res) => {
   const result = await getClient().execute({
     sql: seasonId
       ? `SELECT p.id as player_id, p.name as player_name,
-           COALESCE(SUM(pf.quantity * ft.amount), 0) as total_fines,
-           COALESCE(SUM(CASE WHEN pf.paid = 1 THEN pf.quantity * ft.amount ELSE 0 END), 0) as paid_fines,
-           COALESCE(SUM(CASE WHEN pf.paid = 0 THEN pf.quantity * ft.amount ELSE 0 END), 0) as unpaid_fines
+           COALESCE(SUM(${FINE_TOTAL_SQL}), 0) as total_fines,
+           COALESCE(SUM(CASE WHEN pf.paid = 1 THEN ${FINE_TOTAL_SQL} ELSE 0 END), 0) as paid_fines,
+           COALESCE(SUM(CASE WHEN pf.paid = 0 THEN ${FINE_TOTAL_SQL} ELSE 0 END), 0) as unpaid_fines
          FROM players p
          LEFT JOIN (
            SELECT pf.* FROM player_fines pf
@@ -201,9 +213,9 @@ router.get('/payment-summary', async (req, res) => {
          LEFT JOIN fine_types ft ON pf.fine_type_id = ft.id
          GROUP BY p.id, p.name ORDER BY total_fines DESC`
       : `SELECT p.id as player_id, p.name as player_name,
-           COALESCE(SUM(pf.quantity * ft.amount), 0) as total_fines,
-           COALESCE(SUM(CASE WHEN pf.paid = 1 THEN pf.quantity * ft.amount ELSE 0 END), 0) as paid_fines,
-           COALESCE(SUM(CASE WHEN pf.paid = 0 THEN pf.quantity * ft.amount ELSE 0 END), 0) as unpaid_fines
+           COALESCE(SUM(${FINE_TOTAL_SQL}), 0) as total_fines,
+           COALESCE(SUM(CASE WHEN pf.paid = 1 THEN ${FINE_TOTAL_SQL} ELSE 0 END), 0) as paid_fines,
+           COALESCE(SUM(CASE WHEN pf.paid = 0 THEN ${FINE_TOTAL_SQL} ELSE 0 END), 0) as unpaid_fines
          FROM players p
          LEFT JOIN player_fines pf ON p.id = pf.player_id
          LEFT JOIN fine_types ft ON pf.fine_type_id = ft.id
@@ -225,7 +237,7 @@ router.get('/player/:playerId/rounds', async (req, res) => {
   const seasonId = req.query.season_id;
   const result = await getClient().execute({
     sql: `SELECT r.id as round_id, r.name as round_name, r.date as round_date,
-            SUM(pf.quantity * ft.amount) as total_amount,
+            SUM(${FINE_TOTAL_SQL}) as total_amount,
             MIN(pf.paid) as all_paid, MIN(pf.confirmed) as all_confirmed
           FROM rounds r
           INNER JOIN player_fines pf ON r.id = pf.round_id
@@ -248,9 +260,9 @@ router.get('/player/:playerId/summary', async (req, res) => {
   const seasonId = req.query.season_id;
   const result = await getClient().execute({
     sql: `SELECT
-            COALESCE(SUM(pf.quantity * ft.amount), 0) as total_fines,
-            COALESCE(SUM(CASE WHEN pf.paid = 1 THEN pf.quantity * ft.amount ELSE 0 END), 0) as paid_fines,
-            COALESCE(SUM(CASE WHEN pf.paid = 0 THEN pf.quantity * ft.amount ELSE 0 END), 0) as outstanding_fines,
+            COALESCE(SUM(${FINE_TOTAL_SQL}), 0) as total_fines,
+            COALESCE(SUM(CASE WHEN pf.paid = 1 THEN ${FINE_TOTAL_SQL} ELSE 0 END), 0) as paid_fines,
+            COALESCE(SUM(CASE WHEN pf.paid = 0 THEN ${FINE_TOTAL_SQL} ELSE 0 END), 0) as outstanding_fines,
             COUNT(DISTINCT CASE WHEN pf.confirmed = 1 THEN pf.round_id END) as confirmed_rounds,
             COUNT(DISTINCT pf.round_id) as total_rounds_with_fines
           FROM player_fines pf

@@ -265,8 +265,18 @@ export default function App() {
     e.preventDefault();
     if (!activeSeason) { showToast('No active season found.', 'error'); return; }
     const fd = new FormData(e.target);
-    await DB.addFineType(activeSeason.id, fd.get('name'), parseInt(fd.get('amount')), fd.get('description'), parseInt(fd.get('sort_order')) || 0);
+    await DB.addFineType(
+      activeSeason.id,
+      fd.get('name'),
+      parseInt(fd.get('amount')),
+      fd.get('description'),
+      parseInt(fd.get('sort_order')) || 0,
+      false,
+      parseInt(fd.get('tier_threshold')) || 0,
+      parseInt(fd.get('tier_amount')) || 0
+    );
     setIsAddFineTypeModalOpen(false);
+    refreshFines?.();
   };
 
   const handleDeleteFineType = (id, name) => {
@@ -352,6 +362,14 @@ export default function App() {
           <div><label className="block text-sm font-medium text-slate-700 mb-1">Fine Name</label><input required name="name" className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="e.g. 3 Putt, Lost Ball, etc." /></div>
           <div className="grid grid-cols-2 gap-3"><div><label className="block text-sm font-medium text-slate-700 mb-1">Amount (R)</label><input required name="amount" type="number" min="0" className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="e.g. 20" /></div><div><label className="block text-sm font-medium text-slate-700 mb-1">Sort Order</label><input name="sort_order" type="number" min="0" defaultValue="0" className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="0" /></div></div>
           <div><label className="block text-sm font-medium text-slate-700 mb-1">Description (Optional)</label><textarea name="description" rows="3" className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="Optional description..." /></div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Escalation (Optional)</label>
+            <p className="text-xs text-slate-500 mb-2">First N at base amount, remainder at tier amount. Leave blank for flat fine.</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div><label className="block text-xs text-slate-500 mb-1">After quantity</label><input name="tier_threshold" type="number" min="0" defaultValue="0" className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="e.g. 3" /></div>
+              <div><label className="block text-xs text-slate-500 mb-1">Tier amount (R)</label><input name="tier_amount" type="number" min="0" defaultValue="0" className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="e.g. 20" /></div>
+            </div>
+          </div>
           <button className="w-full bg-emerald-600 text-white py-3 rounded-lg font-bold hover:bg-emerald-700">Create Fine Type</button>
         </form>
       </Modal>

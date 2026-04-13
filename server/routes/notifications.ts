@@ -117,7 +117,13 @@ router.get('/check', async (req, res) => {
     if (daysUntil <= 7 && daysUntil > 0) {
       // Check unpaid fines
       const unpaid = await db.execute({
-        sql: `SELECT SUM(pf.quantity * ft.amount) as total FROM player_fines pf
+        sql: `SELECT SUM(
+                CASE
+                  WHEN ft.tier_threshold > 0 AND pf.quantity > ft.tier_threshold
+                    THEN (ft.tier_threshold * ft.amount) + ((pf.quantity - ft.tier_threshold) * ft.tier_amount)
+                  ELSE pf.quantity * ft.amount
+                END
+              ) as total FROM player_fines pf
               INNER JOIN fine_types ft ON pf.fine_type_id = ft.id
               INNER JOIN rounds r ON pf.round_id = r.id AND r.season_id = ?
               WHERE pf.player_id = ? AND pf.paid = 0`,

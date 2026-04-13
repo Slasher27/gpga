@@ -99,7 +99,13 @@ router.put('/:id/close', async (req, res) => {
 
   // Get fines summary for this round
   const finesResult = await db.execute({
-    sql: `SELECT SUM(pf.quantity * ft.amount) as total_fines, COUNT(DISTINCT pf.player_id) as players_fined
+    sql: `SELECT SUM(
+            CASE
+              WHEN ft.tier_threshold > 0 AND pf.quantity > ft.tier_threshold
+                THEN (ft.tier_threshold * ft.amount) + ((pf.quantity - ft.tier_threshold) * ft.tier_amount)
+              ELSE pf.quantity * ft.amount
+            END
+          ) as total_fines, COUNT(DISTINCT pf.player_id) as players_fined
           FROM player_fines pf JOIN fine_types ft ON pf.fine_type_id = ft.id
           WHERE pf.round_id = ?`,
     args: [roundId],

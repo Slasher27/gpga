@@ -87,6 +87,8 @@ export async function initSchema(): Promise<void> {
       description TEXT,
       sort_order INTEGER DEFAULT 0,
       is_open INTEGER DEFAULT 0,
+      tier_threshold INTEGER DEFAULT 0,
+      tier_amount INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (season_id) REFERENCES seasons(id) ON DELETE CASCADE
     )`,
@@ -164,6 +166,8 @@ export async function initSchema(): Promise<void> {
   // Migrations for existing tables
   try { await db.execute('ALTER TABLE fine_types ADD COLUMN sort_order INTEGER DEFAULT 0'); } catch {}
   try { await db.execute('ALTER TABLE fine_types ADD COLUMN is_open INTEGER DEFAULT 0'); } catch {}
+  try { await db.execute('ALTER TABLE fine_types ADD COLUMN tier_threshold INTEGER DEFAULT 0'); } catch {}
+  try { await db.execute('ALTER TABLE fine_types ADD COLUMN tier_amount INTEGER DEFAULT 0'); } catch {}
   try { await db.execute('ALTER TABLE seasons ADD COLUMN medal_1st INTEGER DEFAULT 0'); } catch {}
   try { await db.execute('ALTER TABLE seasons ADD COLUMN medal_2nd INTEGER DEFAULT 0'); } catch {}
   try { await db.execute('ALTER TABLE seasons ADD COLUMN stableford_1st INTEGER DEFAULT 0'); } catch {}
