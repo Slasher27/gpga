@@ -1,10 +1,16 @@
-import React, { useState, useMemo } from 'react';
-import { X, Search, MapPin, ChevronDown } from 'lucide-react';
+import { useMemo } from 'react';
+import { X, Search } from 'lucide-react';
+import type { GolfCourse, Round, FinesSummary, ScoresMap } from '../../api';
 
 // --- TabBar ---
-export const TabBar = ({ tabs, active, onChange }) => (
+export interface TabDef {
+  id: string;
+  label: string;
+}
+
+export const TabBar = ({ tabs, active, onChange }: { tabs: TabDef[]; active: string; onChange: (id: string) => void }) => (
   <div className="flex border-b border-slate-200 overflow-x-auto scrollbar-hide">
-    {tabs.map(tab => (
+    {tabs.map((tab) => (
       <button
         key={tab.id}
         onClick={() => onChange(tab.id)}
@@ -21,9 +27,15 @@ export const TabBar = ({ tabs, active, onChange }) => (
 );
 
 // --- Avatar ---
-export const Avatar = ({ src, name, size = 'md' }) => {
-  const sizes = { sm: 'w-8 h-8 text-xs', md: 'w-11 h-11 text-sm', lg: 'w-16 h-16 text-xl' };
-  const initials = name.split(' ').map(n => n.charAt(0)).slice(0, 2).join('');
+type AvatarSize = 'sm' | 'md' | 'lg';
+
+export const Avatar = ({ src, name, size = 'md' }: { src?: string | null; name: string; size?: AvatarSize }) => {
+  const sizes: Record<AvatarSize, string> = {
+    sm: 'w-8 h-8 text-xs',
+    md: 'w-11 h-11 text-sm',
+    lg: 'w-16 h-16 text-xl',
+  };
+  const initials = name.split(' ').map((n) => n.charAt(0)).slice(0, 2).join('');
   if (src) return <img src={src} alt="" className={`${sizes[size]} rounded-full object-cover`} />;
   return (
     <div className={`${sizes[size]} rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-bold`}>
@@ -33,7 +45,9 @@ export const Avatar = ({ src, name, size = 'md' }) => {
 };
 
 // --- PlayerRoundsTable ---
-export const PlayerRoundsTable = ({ rounds, playerScores }) => (
+type PlayerScoreMap = Record<number, { strokes?: number; handicap?: number; stableford?: number }>;
+
+export const PlayerRoundsTable = ({ rounds, playerScores }: { rounds: Round[]; playerScores: PlayerScoreMap }) => (
   <div className="overflow-x-auto -mx-4">
     {rounds.length > 0 ? (
       <table className="w-full text-sm">
@@ -47,7 +61,7 @@ export const PlayerRoundsTable = ({ rounds, playerScores }) => (
           </tr>
         </thead>
         <tbody>
-          {rounds.map(r => {
+          {rounds.map((r) => {
             const s = playerScores[r.id];
             return (
               <tr key={r.id} className={`border-b border-slate-50 ${!s?.strokes ? 'opacity-30' : ''}`}>
@@ -68,7 +82,7 @@ export const PlayerRoundsTable = ({ rounds, playerScores }) => (
 );
 
 // --- FinesSummaryCards ---
-export const FinesSummaryCards = ({ summary }) => (
+export const FinesSummaryCards = ({ summary }: { summary: FinesSummary }) => (
   <div className="grid grid-cols-3 gap-3">
     <div className="bg-red-50 rounded-lg p-3 text-center">
       <p className="text-xs text-red-500">Total</p>
@@ -86,11 +100,25 @@ export const FinesSummaryCards = ({ summary }) => (
 );
 
 // --- StatsGrid ---
-export const StatsGrid = ({ roundsPlayed, totalRounds, avgScore, totalStrokes, totalStableford }) => (
+export const StatsGrid = ({
+  roundsPlayed,
+  totalRounds,
+  avgScore,
+  totalStrokes,
+  totalStableford,
+}: {
+  roundsPlayed: number;
+  totalRounds: number;
+  avgScore: number;
+  totalStrokes: number;
+  totalStableford: number;
+}) => (
   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
     <div className="bg-slate-50 rounded-lg p-3 text-center">
       <p className="text-xs text-slate-500">Rounds</p>
-      <p className="text-xl font-bold text-slate-800 mt-0.5">{roundsPlayed} <span className="text-sm font-normal text-slate-400">/ {totalRounds}</span></p>
+      <p className="text-xl font-bold text-slate-800 mt-0.5">
+        {roundsPlayed} <span className="text-sm font-normal text-slate-400">/ {totalRounds}</span>
+      </p>
     </div>
     <div className="bg-slate-50 rounded-lg p-3 text-center">
       <p className="text-xs text-slate-500">Average</p>
@@ -108,33 +136,48 @@ export const StatsGrid = ({ roundsPlayed, totalRounds, avgScore, totalStrokes, t
 );
 
 // --- CourseSelector ---
-export const CourseSelector = ({ courses, selected, onSelect, searchTerm, onSearchChange }) => {
+export const CourseSelector = ({
+  courses,
+  selected,
+  onSelect,
+  searchTerm,
+  onSearchChange,
+}: {
+  courses: GolfCourse[];
+  selected: GolfCourse | null;
+  onSelect: (c: GolfCourse) => void;
+  searchTerm: string;
+  onSearchChange: (s: string) => void;
+}) => {
   const filtered = useMemo(() => {
     if (!searchTerm) return courses;
     const term = searchTerm.toLowerCase();
-    return courses.filter(c => c.name.toLowerCase().includes(term) || c.location.toLowerCase().includes(term));
+    return courses.filter((c) => c.name.toLowerCase().includes(term) || c.location.toLowerCase().includes(term));
   }, [courses, searchTerm]);
 
   return (
     <>
       <div className="form-control">
-        <label className="label">
-          <span className="label-text font-semibold flex items-center gap-2">
+        <label htmlFor="course-search" className="block text-sm font-semibold text-slate-700 mb-1">
+          <span className="flex items-center gap-2">
             <span>Golf Course</span>
             {selected && <span className="badge badge-success badge-sm">{selected.name}</span>}
           </span>
         </label>
-        <div className="input input-bordered w-full flex items-center gap-2 focus-within:input-primary">
+        <div className="input input-bordered w-full flex items-center gap-2 focus-within:border-emerald-500">
           <Search size={16} className="opacity-70" />
           <input
-            type="text"
+            id="course-search"
+            name="course-search"
+            type="search"
+            autoComplete="off"
             value={searchTerm}
             onChange={(e) => onSearchChange(e.target.value)}
             className="grow"
             placeholder="Search courses..."
           />
           {searchTerm && (
-            <button type="button" onClick={() => onSearchChange('')} className="btn btn-ghost btn-xs btn-circle">
+            <button type="button" onClick={() => onSearchChange('')} className="btn btn-ghost btn-xs btn-circle" aria-label="Clear search">
               <X size={14} />
             </button>
           )}
@@ -142,33 +185,31 @@ export const CourseSelector = ({ courses, selected, onSelect, searchTerm, onSear
       </div>
 
       {searchTerm && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto p-3 bg-base-200 rounded-lg">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto p-3 bg-slate-100 rounded-lg">
           {filtered.length > 0 ? (
-            filtered.map(course => (
+            filtered.map((course) => (
               <div
                 key={course.id}
                 onClick={() => onSelect(course)}
-                className={`card card-compact cursor-pointer transition-all ${
-                  selected?.id === course.id ? 'bg-emerald-600 text-white' : 'bg-base-100 hover:bg-base-300'
+                className={`rounded-lg p-3 cursor-pointer transition-all border ${
+                  selected?.id === course.id ? 'bg-emerald-600 text-white border-emerald-700' : 'bg-white hover:bg-slate-50 border-slate-200'
                 }`}
               >
-                <div className="card-body">
-                  <div className="flex items-start justify-between gap-2">
-                    <h4 className="text-sm font-semibold leading-tight">{course.name}</h4>
-                    {selected?.id === course.id && (
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
-                      </svg>
-                    )}
-                  </div>
-                  <p className={`text-xs ${selected?.id === course.id ? 'opacity-90' : 'opacity-60'}`}>{course.location}</p>
-                  <div className={`badge badge-sm ${selected?.id === course.id ? 'badge-neutral' : 'badge-ghost'}`}>Par {course.par}</div>
+                <div className="flex items-start justify-between gap-2">
+                  <h4 className="text-sm font-semibold leading-tight">{course.name}</h4>
+                  {selected?.id === course.id && (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
                 </div>
+                <p className={`text-xs mt-1 ${selected?.id === course.id ? 'opacity-90' : 'text-slate-500'}`}>{course.location}</p>
+                <div className={`inline-block mt-2 px-2 py-0.5 rounded-full text-[10px] font-semibold ${selected?.id === course.id ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'}`}>Par {course.par}</div>
               </div>
             ))
           ) : (
             <div className="col-span-full text-center py-8">
-              <p className="text-base-content/60 text-sm">No courses found</p>
+              <p className="text-slate-400 text-sm">No courses found</p>
             </div>
           )}
         </div>
@@ -178,15 +219,22 @@ export const CourseSelector = ({ courses, selected, onSelect, searchTerm, onSear
 };
 
 // --- usePlayerStats hook ---
-export function usePlayerStats(playerId, scores, rounds) {
+type ScoreWithFines = { strokes?: number; handicap?: number; stableford?: number; fines?: number };
+
+export function usePlayerStats(playerId: string, scores: ScoresMap | Record<string, Record<number, ScoreWithFines>>, rounds: Round[]) {
   return useMemo(() => {
-    const playerScores = scores[playerId] || {};
-    const seasonRoundIds = new Set(rounds.map(r => r.id));
+    const playerScores = (scores[playerId] || {}) as Record<number, ScoreWithFines>;
+    const seasonRoundIds = new Set(rounds.map((r) => r.id));
     let roundsPlayed = 0, totalStrokes = 0, totalStableford = 0, totalFines = 0;
     for (const [rid, s] of Object.entries(playerScores)) {
       if (!seasonRoundIds.has(Number(rid))) continue;
-      if (s.strokes > 0) { roundsPlayed++; totalStrokes += s.strokes; totalStableford += (s.stableford || 0); }
-      totalFines += (s.fines || 0);
+      const strokes = s.strokes || 0;
+      if (strokes > 0) {
+        roundsPlayed++;
+        totalStrokes += strokes;
+        totalStableford += s.stableford || 0;
+      }
+      totalFines += s.fines || 0;
     }
     const avgScore = roundsPlayed > 0 ? Math.round(totalStrokes / roundsPlayed) : 0;
     return { playerScores, roundsPlayed, totalStrokes, totalStableford, totalFines, avgScore };

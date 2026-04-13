@@ -2,11 +2,93 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Reserve a stable scrollbar gutter so locking body scroll (when a modal or
+   popover opens) does not cause the page behind it to shift horizontally. */
+html {
+  scrollbar-gutter: stable;
+}
+
 body {
   margin: 0;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Minimal replacements for the handful of DaisyUI classes we actually use.
+   Swapped in instead of pulling the full DaisyUI plugin (~10 kB gz). */
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-semibold cursor-pointer border transition-colors min-h-[36px];
+  }
+  .btn-primary  { @apply bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700; }
+  .btn-ghost    { @apply bg-transparent border-transparent hover:bg-slate-100 text-slate-700; }
+  .btn-error    { @apply bg-red-600 text-white border-red-600 hover:bg-red-700; }
+  .btn-warning  { @apply bg-amber-500 text-white border-amber-500 hover:bg-amber-600; }
+  .btn-xs       { @apply px-2 py-1 text-xs min-h-0; }
+  .btn-sm       { @apply px-3 py-1.5 text-sm min-h-0; }
+  .btn-circle   { @apply rounded-full aspect-square p-0; }
+
+  /* Modal — mobile-first: rounded sheet with safe-area padding, grows to a
+     centered card on sm+ viewports. */
+  .modal {
+    @apply fixed inset-0 z-50 hidden items-end sm:items-center justify-center;
+  }
+  .modal.modal-open {
+    @apply flex;
+  }
+  .modal-backdrop {
+    @apply fixed inset-0 bg-slate-900/50 -z-10;
+  }
+  .modal-box {
+    @apply relative bg-white w-full max-w-lg shadow-xl;
+    @apply rounded-t-2xl sm:rounded-xl;
+    @apply p-5 sm:p-6;
+    @apply max-h-[calc(100dvh-2rem)] sm:max-h-[90vh];
+    @apply overflow-y-auto overscroll-contain;
+    padding-bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px));
+  }
+  @screen sm {
+    .modal-box {
+      padding-bottom: 1.5rem;
+    }
+  }
+
+  .input,
+  .select {
+    @apply px-3 py-2 rounded-lg border bg-white text-sm;
+  }
+  .input-sm { @apply py-1 text-sm min-h-0; }
+
+  .alert         { @apply flex items-center gap-3 p-4 rounded-lg; }
+  .alert-success { @apply bg-emerald-50 text-emerald-800 border border-emerald-200; }
+  .alert-error   { @apply bg-red-50 text-red-800 border border-red-200; }
+
+  .badge         { @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold; }
+  .badge-sm      { @apply px-1.5 py-0 text-[10px]; }
+  .badge-ghost   { @apply bg-slate-100 text-slate-700; }
+  .badge-success { @apply bg-emerald-100 text-emerald-700; }
+  .badge-error   { @apply bg-red-100 text-red-700; }
+
+  .toast     { @apply fixed flex flex-col gap-2 pointer-events-none; }
+  .toast-top { @apply top-4; }
+  .toast-end { @apply right-4; }
+  .toast > * { @apply pointer-events-auto; }
+
+  .form-control { @apply flex flex-col gap-1; }
+  .label        { @apply flex flex-col; }
+  .label-text   { @apply text-sm text-slate-700; }
+
+  .card         { @apply bg-white rounded-xl; }
+  .text-error   { @apply text-red-600; }
+
+  /* focus:input-primary and focus:select-primary were used on a few inputs —
+     the existing input/select :focus rules already handle the emerald border. */
+  .focus\:input-primary:focus,
+  .focus-within\:input-primary:focus-within,
+  .focus\:select-primary:focus {
+    border-color: rgb(16 185 129);
+  }
 }
 
 /* Consistent styling for ALL inputs across the entire app */
@@ -22,6 +104,20 @@ select,
   border-width: 1.5px !important;
   border-color: rgb(203 213 225) !important; /* slate-300 */
   padding: 0.625rem 0.75rem !important; /* py-2.5 px-3 */
+}
+
+/* Custom select dropdown: remove browser chevron, add our own with proper spacing */
+select,
+.select,
+.select-bordered {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.875rem center;
+  background-size: 1rem 1rem;
+  padding-right: 2.5rem !important;
 }
 
 /* Exception: inputs with .grow class (inside wrapper divs) should have no border/padding */

@@ -35,3 +35,9 @@ dist-ssr
 # Environment variables
 .env
 .env.local
+
+# TypeScript incremental build info
+*.tsbuildinfo
+
+# Claude Code agent files
+.claude/

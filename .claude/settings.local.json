@@ -40,7 +40,11 @@
       "Bash(pkill -f \"tsx server\")",
       "Bash(netstat -ano)",
       "Bash(tasklist //FI \"PID eq 34160\")",
-      "Bash(taskkill //PID 34160 //F)"
+      "Bash(taskkill //PID 34160 //F)",
+      "Bash(npm uninstall:*)",
+      "Bash(ls -la dist/assets/*.css)",
+      "Bash(awk -F'\\(' '{print $1}')",
+      "Bash(awk '/<input|<select|<textarea/,/\\\\/>|>$/{print NR\": \"$0; if\\($0~/\\\\/>/||$0~/>$/&&!/\\\\/$/\\) print \"===\"}' src/components/PlayersView.tsx)"
     ],
     "deny": [],
     "ask": []

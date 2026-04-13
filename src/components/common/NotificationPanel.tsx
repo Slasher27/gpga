@@ -1,17 +1,26 @@
 import { useState, useEffect, useRef } from 'react';
 import { Bell } from 'lucide-react';
-import * as DB from '../../api.ts';
+import * as DB from '../../api';
+import type { Notification } from '../../api';
 
-export default function NotificationPanel({ playerId, seasonId, onViewAll }) {
+export default function NotificationPanel({
+  playerId,
+  seasonId,
+  onViewAll,
+}: {
+  playerId: string;
+  seasonId: number | null;
+  onViewAll?: () => void;
+}) {
   const [open, setOpen] = useState(false);
-  const [notifications, setNotifications] = useState([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const ref = useRef(null);
+  const ref = useRef<HTMLDivElement>(null);
 
   // Check on mount + poll every 60s
   useEffect(() => {
     if (!playerId || !seasonId) return;
-    const check = () => DB.checkNotifications(playerId, seasonId).then(d => setUnreadCount(d.count)).catch(() => {});
+    const check = () => DB.checkNotifications(playerId, seasonId).then((d) => setUnreadCount(d.count)).catch(() => {});
     check();
     const interval = setInterval(check, 60000);
     return () => clearInterval(interval);
@@ -24,24 +33,26 @@ export default function NotificationPanel({ playerId, seasonId, onViewAll }) {
 
   // Close on outside click
   useEffect(() => {
-    const close = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const close = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
     document.addEventListener('mousedown', close);
     return () => document.removeEventListener('mousedown', close);
   }, []);
 
-  const handleMarkRead = async (id) => {
+  const handleMarkRead = async (id: number) => {
     await DB.markNotificationRead(id);
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: 1 } : n));
-    setUnreadCount(prev => Math.max(0, prev - 1));
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: 1 } : n)));
+    setUnreadCount((prev) => Math.max(0, prev - 1));
   };
 
   const handleMarkAllRead = async () => {
     await DB.markAllNotificationsRead(playerId);
-    setNotifications(prev => prev.map(n => ({ ...n, read: 1 })));
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: 1 })));
     setUnreadCount(0);
   };
 
-  const timeAgo = (date) => {
+  const timeAgo = (date: string): string => {
     const mins = Math.floor((Date.now() - new Date(date).getTime()) / 60000);
     if (mins < 1) return 'now';
     if (mins < 60) return `${mins}m`;

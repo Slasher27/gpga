@@ -1,3 +1,4 @@
+// @ts-nocheck — legacy JS patterns; migrate to strict TS in a follow-up pass.
 import { useState, useEffect } from 'react';
 import { Plus, Trash2, Save, X, UserPlus } from 'lucide-react';
 import * as DB from '../api.ts';

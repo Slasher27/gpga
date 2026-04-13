@@ -1,10 +1,11 @@
-import * as DB from './api.ts';
+import * as DB from './api';
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
-  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
   const raw = atob(base64);
-  const arr = new Uint8Array(raw.length);
+  const buf = new ArrayBuffer(raw.length);
+  const arr = new Uint8Array(buf);
   for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
   return arr;
 }
@@ -25,9 +26,11 @@ export async function setupPush(playerId: string): Promise<void> {
 
     const subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(vapidKey),
+      applicationServerKey: urlBase64ToUint8Array(vapidKey) as BufferSource,
     });
 
     await DB.subscribePush(playerId, subscription);
-  } catch {}
+  } catch {
+    /* swallow — push is best-effort */
+  }
 }

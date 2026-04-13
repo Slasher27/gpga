@@ -3,6 +3,231 @@
 const BASE = '/api';
 const TOKEN_KEY = 'gpga_token';
 
+// ============================================================================
+// Types
+// ============================================================================
+
+export type Role = 'master' | 'admin' | 'player';
+export type Status = 'active' | 'inactive';
+
+export interface Player {
+  id: string;
+  name: string;
+  email: string;
+  role: Role;
+  status: Status;
+  avatar: string | null;
+  notify_email?: number;
+  notify_push?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface AuthedPlayer extends Omit<Player, 'avatar'> {
+  avatar?: string | null;
+  token: string;
+}
+
+export interface Season {
+  id: number;
+  year: number;
+  name: string;
+  buy_in_amount: number;
+  medal_1st: number;
+  medal_2nd: number;
+  stableford_1st: number;
+  stableford_2nd: number;
+  team_1st: number;
+  is_active: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface Round {
+  id: number;
+  season_id: number;
+  name: string;
+  date: string;
+  course_id: number;
+  course_name: string;
+  tee_time?: string | null;
+  tee_time_2?: string | null;
+  closed?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface Score {
+  strokes: number;
+  handicap: number;
+  stableford: number;
+}
+
+export type ScoresMap = Record<string, Record<number, Score>>;
+
+export interface GolfCourse {
+  id: number;
+  name: string;
+  location: string;
+  par: number;
+}
+
+export interface FineType {
+  id: number;
+  season_id: number;
+  name: string;
+  amount: number;
+  description?: string;
+  sort_order?: number;
+  is_open?: number;
+  tier_threshold?: number;
+  tier_amount?: number;
+}
+
+export interface PlayerFine {
+  id?: number;
+  player_id?: string;
+  round_id?: number;
+  fine_type_id: number;
+  name?: string;
+  amount: number;
+  quantity: number;
+  paid?: number;
+  tier_threshold?: number;
+  tier_amount?: number;
+}
+
+export interface RoundFine {
+  id: number;
+  player_id: string;
+  player_name: string;
+  round_id: number;
+  fine_type_id: number;
+  name: string;
+  amount: number;
+  quantity: number;
+  paid: number;
+  paid_date?: string | null;
+  confirmed: number;
+  confirmed_date?: string | null;
+  tier_threshold?: number;
+  tier_amount?: number;
+  created_at?: string;
+}
+
+export type FinesByRound = Record<string, Record<number, number>>;
+
+export interface PaymentSummary {
+  player_id: string;
+  player_name: string;
+  total_fines: number;
+  paid_fines: number;
+  unpaid_fines: number;
+  payment_percentage: number;
+}
+
+export interface PlayerRoundFineRow {
+  round_id: number;
+  round_name: string;
+  round_date: string;
+  total_amount: number;
+  paid: boolean;
+  confirmed: boolean;
+}
+
+export interface FinesSummary {
+  total_fines: number;
+  paid_fines: number;
+  outstanding_fines: number;
+  confirmed_rounds: number;
+  total_rounds_with_fines: number;
+}
+
+export interface SeasonPlayer {
+  player_id: string;
+  name: string;
+  email: string;
+  buy_in_paid: boolean;
+  buy_in_date: string | null;
+}
+
+export interface BuyInStatus {
+  isPaid: boolean;
+  date: string | null;
+}
+
+export interface Team {
+  id: number;
+  season_id: number;
+  name: string;
+  player1_id: string;
+  player2_id: string;
+  player1_name: string;
+  player2_name: string;
+}
+
+export interface Notification {
+  id: number;
+  player_id: string;
+  type: string;
+  title: string;
+  body: string;
+  round_id?: number | null;
+  read: number;
+  created_at: string;
+}
+
+export interface IdResult { id: number }
+export interface OkResult { ok: boolean }
+
+export interface PlayerUpdate {
+  name?: string;
+  email?: string;
+  password?: string;
+  role?: Role;
+  status?: Status;
+  avatar?: string | null;
+  notify_email?: number;
+  notify_push?: number;
+}
+
+export interface RoundUpdate {
+  name?: string;
+  date?: string;
+  courseId?: number;
+  courseName?: string;
+  teeTime?: string | null;
+  teeTime2?: string | null;
+}
+
+export interface FineTypeUpdate {
+  name?: string;
+  amount?: number;
+  description?: string;
+  sort_order?: number;
+  tier_threshold?: number;
+  tier_amount?: number;
+}
+
+export interface SeasonPrizes {
+  medal_1st?: number;
+  medal_2nd?: number;
+  stableford_1st?: number;
+  stableford_2nd?: number;
+  team_1st?: number;
+}
+
+export interface SeasonUpdate extends SeasonPrizes {
+  year?: number;
+  name?: string;
+  buy_in_amount?: number;
+  is_active?: boolean | number;
+}
+
+// ============================================================================
+// Token + request helpers
+// ============================================================================
+
 function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
 }
@@ -40,281 +265,367 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   return res.json();
 }
 
-// ---- Players ----
+// ============================================================================
+// Players
+// ============================================================================
 
-export async function getAllPlayers() {
-  return request<any[]>('/players');
+export async function getAllPlayers(): Promise<Player[]> {
+  return request<Player[]>('/players');
 }
 
-export async function addPlayer(player: { id: string; name: string; email: string; password?: string; role: string; status: string; avatar: string | null }) {
-  return request('/players', { method: 'POST', body: JSON.stringify(player) });
+export async function addPlayer(player: {
+  id: string;
+  name: string;
+  email: string;
+  password?: string;
+  role: Role;
+  status: Status;
+  avatar: string | null;
+}): Promise<OkResult> {
+  return request<OkResult>('/players', { method: 'POST', body: JSON.stringify(player) });
 }
 
-export async function updatePlayer(id: string, updates: Record<string, any>) {
-  return request(`/players/${id}`, { method: 'PUT', body: JSON.stringify(updates) });
+export async function updatePlayer(id: string, updates: PlayerUpdate): Promise<OkResult> {
+  return request<OkResult>(`/players/${id}`, { method: 'PUT', body: JSON.stringify(updates) });
 }
 
-export async function deletePlayer(id: string) {
-  return request(`/players/${id}`, { method: 'DELETE' });
+export async function deletePlayer(id: string): Promise<OkResult> {
+  return request<OkResult>(`/players/${id}`, { method: 'DELETE' });
 }
 
-// ---- Seasons ----
+// ============================================================================
+// Seasons
+// ============================================================================
 
-export async function getActiveSeason() {
-  return request<any | null>('/seasons/active');
+export async function getActiveSeason(): Promise<Season | null> {
+  return request<Season | null>('/seasons/active');
 }
 
-export async function getAllSeasons() {
-  return request<any[]>('/seasons');
+export async function getAllSeasons(): Promise<Season[]> {
+  return request<Season[]>('/seasons');
 }
 
-// ---- Rounds ----
-
-export async function getAllRounds(seasonId?: number | null) {
-  const qs = seasonId ? `?season_id=${seasonId}` : '';
-  return request<any[]>(`/rounds${qs}`);
-}
-
-export async function addRound(round: { name: string; date: string; courseId: number; courseName: string; teeTime?: string; teeTime2?: string }, seasonId: number) {
-  return request<{ id: number }>('/rounds', {
+export async function createSeason(
+  year: number,
+  name: string,
+  buyInAmount: number,
+  prizes?: SeasonPrizes
+): Promise<IdResult> {
+  return request<IdResult>('/seasons', {
     method: 'POST',
-    body: JSON.stringify({ season_id: seasonId, name: round.name, date: round.date, course_id: round.courseId, course_name: round.courseName, tee_time: round.teeTime || null, tee_time_2: round.teeTime2 || null })
+    body: JSON.stringify({ year, name, buy_in_amount: buyInAmount, is_active: true, ...prizes }),
   });
 }
 
-export async function updateRound(id: number, updates: { name?: string; date?: string; courseId?: number; courseName?: string; teeTime?: string; teeTime2?: string }) {
-  const body: Record<string, any> = {};
+export async function updateSeason(id: number, updates: SeasonUpdate): Promise<OkResult> {
+  return request<OkResult>(`/seasons/${id}`, { method: 'PUT', body: JSON.stringify(updates) });
+}
+
+// ============================================================================
+// Rounds
+// ============================================================================
+
+export async function getAllRounds(seasonId?: number | null): Promise<Round[]> {
+  const qs = seasonId ? `?season_id=${seasonId}` : '';
+  return request<Round[]>(`/rounds${qs}`);
+}
+
+export async function addRound(
+  round: { name: string; date: string; courseId: number; courseName: string; teeTime?: string; teeTime2?: string },
+  seasonId: number
+): Promise<IdResult> {
+  return request<IdResult>('/rounds', {
+    method: 'POST',
+    body: JSON.stringify({
+      season_id: seasonId,
+      name: round.name,
+      date: round.date,
+      course_id: round.courseId,
+      course_name: round.courseName,
+      tee_time: round.teeTime || null,
+      tee_time_2: round.teeTime2 || null,
+    }),
+  });
+}
+
+export async function updateRound(id: number, updates: RoundUpdate): Promise<OkResult> {
+  const body: Record<string, unknown> = {};
   if (updates.name !== undefined) body.name = updates.name;
   if (updates.date !== undefined) body.date = updates.date;
   if (updates.courseId !== undefined) body.course_id = updates.courseId;
   if (updates.courseName !== undefined) body.course_name = updates.courseName;
   if (updates.teeTime !== undefined) body.tee_time = updates.teeTime;
   if (updates.teeTime2 !== undefined) body.tee_time_2 = updates.teeTime2;
-  return request(`/rounds/${id}`, { method: 'PUT', body: JSON.stringify(body) });
+  return request<OkResult>(`/rounds/${id}`, { method: 'PUT', body: JSON.stringify(body) });
 }
 
-export async function deleteRound(id: number) {
-  return request(`/rounds/${id}`, { method: 'DELETE' });
+export async function deleteRound(id: number): Promise<OkResult> {
+  return request<OkResult>(`/rounds/${id}`, { method: 'DELETE' });
 }
 
-export async function closeRound(id: number) {
-  return request(`/rounds/${id}/close`, { method: 'PUT' });
+export async function closeRound(id: number): Promise<OkResult> {
+  return request<OkResult>(`/rounds/${id}/close`, { method: 'PUT' });
 }
 
-// ---- Scores ----
+// ============================================================================
+// Scores
+// ============================================================================
 
-export async function getAllScores() {
-  return request<Record<string, Record<number, { strokes: number; handicap: number; stableford: number }>>>('/scores');
+export async function getAllScores(): Promise<ScoresMap> {
+  return request<ScoresMap>('/scores');
 }
 
-export async function updateScore(playerId: string, roundId: number, strokes: number, handicap: number = 0, stableford: number = 0) {
-  return request('/scores', {
+export async function updateScore(
+  playerId: string,
+  roundId: number,
+  strokes: number,
+  handicap: number = 0,
+  stableford: number = 0
+): Promise<OkResult> {
+  return request<OkResult>('/scores', {
     method: 'PUT',
-    body: JSON.stringify({ player_id: playerId, round_id: roundId, strokes, handicap, stableford })
+    body: JSON.stringify({ player_id: playerId, round_id: roundId, strokes, handicap, stableford }),
   });
 }
 
-// ---- Golf Courses ----
+// ============================================================================
+// Golf Courses
+// ============================================================================
 
-export async function getAllGolfCourses() {
-  return request<any[]>('/courses');
+export async function getAllGolfCourses(): Promise<GolfCourse[]> {
+  return request<GolfCourse[]>('/courses');
 }
 
-// ---- Fine Types ----
+// ============================================================================
+// Fine Types
+// ============================================================================
 
-export async function getFineTypes(seasonId: number) {
-  return request<any[]>(`/fines/types?season_id=${seasonId}`);
+export async function getFineTypes(seasonId: number): Promise<FineType[]> {
+  return request<FineType[]>(`/fines/types?season_id=${seasonId}`);
 }
 
-export async function addFineType(seasonId: number, name: string, amount: number, description: string = '', sortOrder: number = 0, isOpen: boolean = false, tierThreshold: number = 0, tierAmount: number = 0) {
-  return request<{ id: number }>('/fines/types', {
+export async function addFineType(
+  seasonId: number,
+  name: string,
+  amount: number,
+  description: string = '',
+  sortOrder: number = 0,
+  isOpen: boolean = false,
+  tierThreshold: number = 0,
+  tierAmount: number = 0
+): Promise<IdResult> {
+  return request<IdResult>('/fines/types', {
     method: 'POST',
-    body: JSON.stringify({ season_id: seasonId, name, amount, description, sort_order: sortOrder, is_open: isOpen, tier_threshold: tierThreshold, tier_amount: tierAmount })
+    body: JSON.stringify({
+      season_id: seasonId,
+      name,
+      amount,
+      description,
+      sort_order: sortOrder,
+      is_open: isOpen,
+      tier_threshold: tierThreshold,
+      tier_amount: tierAmount,
+    }),
   });
 }
 
-export async function updateFineType(id: number, updates: { name?: string; amount?: number; description?: string; sort_order?: number; tier_threshold?: number; tier_amount?: number }) {
-  return request(`/fines/types/${id}`, { method: 'PUT', body: JSON.stringify(updates) });
+export async function updateFineType(id: number, updates: FineTypeUpdate): Promise<OkResult> {
+  return request<OkResult>(`/fines/types/${id}`, { method: 'PUT', body: JSON.stringify(updates) });
 }
 
-export async function deleteFineType(id: number) {
-  return request(`/fines/types/${id}`, { method: 'DELETE' });
+export async function deleteFineType(id: number): Promise<OkResult> {
+  return request<OkResult>(`/fines/types/${id}`, { method: 'DELETE' });
 }
 
-// ---- Player Fines ----
+// ============================================================================
+// Player Fines
+// ============================================================================
 
-export async function getPlayerFinesForRound(playerId: string, roundId: number) {
-  return request<any[]>(`/fines/player/${playerId}/round/${roundId}`);
+export async function getPlayerFinesForRound(playerId: string, roundId: number): Promise<PlayerFine[]> {
+  return request<PlayerFine[]>(`/fines/player/${playerId}/round/${roundId}`);
 }
 
-export async function getPlayerFinesByRound() {
-  return request<Record<string, Record<number, number>>>('/fines/by-round');
+export async function getPlayerFinesByRound(): Promise<FinesByRound> {
+  return request<FinesByRound>('/fines/by-round');
 }
 
-export async function getRoundFines(roundId: number) {
-  return request<any[]>(`/fines/round/${roundId}`);
+export async function getRoundFines(roundId: number): Promise<RoundFine[]> {
+  return request<RoundFine[]>(`/fines/round/${roundId}`);
 }
 
-export async function setPlayerFine(playerId: string, roundId: number, fineTypeId: number, quantity: number) {
-  return request('/fines/set', {
+export async function setPlayerFine(
+  playerId: string,
+  roundId: number,
+  fineTypeId: number,
+  quantity: number
+): Promise<OkResult> {
+  return request<OkResult>('/fines/set', {
     method: 'PUT',
-    body: JSON.stringify({ player_id: playerId, round_id: roundId, fine_type_id: fineTypeId, quantity })
+    body: JSON.stringify({ player_id: playerId, round_id: roundId, fine_type_id: fineTypeId, quantity }),
   });
 }
 
-export async function addPlayerFine(playerId: string, roundId: number, fineTypeId: number) {
-  // Get current fines then increment
+export async function addPlayerFine(playerId: string, roundId: number, fineTypeId: number): Promise<OkResult | undefined> {
   const fines = await getPlayerFinesForRound(playerId, roundId);
-  const existing = fines.find((f: any) => f.fine_type_id === fineTypeId);
+  const existing = fines.find((f) => f.fine_type_id === fineTypeId);
   const currentQty = existing ? existing.quantity : 0;
   return setPlayerFine(playerId, roundId, fineTypeId, currentQty + 1);
 }
 
-export async function removePlayerFine(playerId: string, roundId: number, fineTypeId: number) {
+export async function removePlayerFine(playerId: string, roundId: number, fineTypeId: number): Promise<OkResult | undefined> {
   const fines = await getPlayerFinesForRound(playerId, roundId);
-  const existing = fines.find((f: any) => f.fine_type_id === fineTypeId);
+  const existing = fines.find((f) => f.fine_type_id === fineTypeId);
   if (!existing) return;
   return setPlayerFine(playerId, roundId, fineTypeId, existing.quantity - 1);
 }
 
-export async function markRoundFinesPaid(playerId: string, roundId: number, paid: boolean) {
-  return request('/fines/pay-round', {
+export async function markRoundFinesPaid(playerId: string, roundId: number, paid: boolean): Promise<OkResult> {
+  return request<OkResult>('/fines/pay-round', {
     method: 'PUT',
-    body: JSON.stringify({ player_id: playerId, round_id: roundId, paid })
+    body: JSON.stringify({ player_id: playerId, round_id: roundId, paid }),
   });
 }
 
-export async function confirmPlayerRoundFines(playerId: string, roundId: number, confirmed: boolean) {
-  return request('/fines/confirm', {
+export async function confirmPlayerRoundFines(playerId: string, roundId: number, confirmed: boolean): Promise<OkResult> {
+  return request<OkResult>('/fines/confirm', {
     method: 'PUT',
-    body: JSON.stringify({ player_id: playerId, round_id: roundId, confirmed })
+    body: JSON.stringify({ player_id: playerId, round_id: roundId, confirmed }),
   });
 }
 
-export async function isPlayerRoundConfirmed(playerId: string, roundId: number) {
+export async function isPlayerRoundConfirmed(playerId: string, roundId: number): Promise<boolean> {
   const data = await request<{ confirmed: boolean }>(`/fines/confirmed/${playerId}/${roundId}`);
   return data.confirmed;
 }
 
-export async function getPaymentSummary(seasonId?: number) {
+export async function getPaymentSummary(seasonId?: number): Promise<PaymentSummary[]> {
   const qs = seasonId ? `?season_id=${seasonId}` : '';
-  return request<any[]>(`/fines/payment-summary${qs}`);
+  return request<PaymentSummary[]>(`/fines/payment-summary${qs}`);
 }
 
-export async function getPlayerRoundFines(playerId: string, seasonId?: number) {
+export async function getPlayerRoundFines(playerId: string, seasonId?: number): Promise<PlayerRoundFineRow[]> {
   const qs = seasonId ? `?season_id=${seasonId}` : '';
-  return request<any[]>(`/fines/player/${playerId}/rounds${qs}`);
+  return request<PlayerRoundFineRow[]>(`/fines/player/${playerId}/rounds${qs}`);
 }
 
-export async function getPlayerFinesSummary(playerId: string, seasonId?: number) {
+export async function getPlayerFinesSummary(playerId: string, seasonId?: number): Promise<FinesSummary> {
   const qs = seasonId ? `?season_id=${seasonId}` : '';
-  return request<any>(`/fines/player/${playerId}/summary${qs}`);
+  return request<FinesSummary>(`/fines/player/${playerId}/summary${qs}`);
 }
 
-// ---- Season Players ----
+// ============================================================================
+// Season Players / Buy-In
+// ============================================================================
 
-export async function getSeasonPlayers(seasonId: number) {
-  return request<any[]>(`/buy-in/season/${seasonId}`);
+export async function getSeasonPlayers(seasonId: number): Promise<SeasonPlayer[]> {
+  return request<SeasonPlayer[]>(`/buy-in/season/${seasonId}`);
 }
 
-export async function addSeasonPlayer(seasonId: number, playerId: string) {
-  return request('/buy-in/season/' + seasonId + '/player', { method: 'POST', body: JSON.stringify({ player_id: playerId }) });
+export async function addSeasonPlayer(seasonId: number, playerId: string): Promise<OkResult> {
+  return request<OkResult>(`/buy-in/season/${seasonId}/player`, {
+    method: 'POST',
+    body: JSON.stringify({ player_id: playerId }),
+  });
 }
 
-export async function removeSeasonPlayer(seasonId: number, playerId: string) {
-  return request(`/buy-in/season/${seasonId}/player/${playerId}`, { method: 'DELETE' });
+export async function removeSeasonPlayer(seasonId: number, playerId: string): Promise<OkResult> {
+  return request<OkResult>(`/buy-in/season/${seasonId}/player/${playerId}`, { method: 'DELETE' });
 }
 
-// ---- Buy-In ----
-
-export async function getPlayerBuyInStatus(playerId: string, seasonId: number) {
-  return request<{ isPaid: boolean; date: string | null }>(`/buy-in/${playerId}/${seasonId}`);
+export async function getPlayerBuyInStatus(playerId: string, seasonId: number): Promise<BuyInStatus> {
+  return request<BuyInStatus>(`/buy-in/${playerId}/${seasonId}`);
 }
 
-export async function markBuyInPaid(playerId: string, seasonId: number, paid: boolean) {
-  return request('/buy-in', {
+export async function markBuyInPaid(playerId: string, seasonId: number, paid: boolean): Promise<OkResult> {
+  return request<OkResult>('/buy-in', {
     method: 'PUT',
-    body: JSON.stringify({ player_id: playerId, season_id: seasonId, paid })
+    body: JSON.stringify({ player_id: playerId, season_id: seasonId, paid }),
   });
 }
 
-// ---- Teams ----
+// ============================================================================
+// Teams
+// ============================================================================
 
-export async function getTeams(seasonId: number) {
-  return request<any[]>(`/teams?season_id=${seasonId}`);
+export async function getTeams(seasonId: number): Promise<Team[]> {
+  return request<Team[]>(`/teams?season_id=${seasonId}`);
 }
 
-export async function createTeam(seasonId: number, name: string, player1Id: string, player2Id: string) {
-  return request<{ id: number }>('/teams', {
+export async function createTeam(
+  seasonId: number,
+  name: string,
+  player1Id: string,
+  player2Id: string
+): Promise<IdResult> {
+  return request<IdResult>('/teams', {
     method: 'POST',
-    body: JSON.stringify({ season_id: seasonId, name, player1_id: player1Id, player2_id: player2Id })
+    body: JSON.stringify({ season_id: seasonId, name, player1_id: player1Id, player2_id: player2Id }),
   });
 }
 
-export async function updateTeam(id: number, updates: { name?: string; player1_id?: string; player2_id?: string }) {
-  return request(`/teams/${id}`, { method: 'PUT', body: JSON.stringify(updates) });
+export async function updateTeam(
+  id: number,
+  updates: { name?: string; player1_id?: string; player2_id?: string }
+): Promise<OkResult> {
+  return request<OkResult>(`/teams/${id}`, { method: 'PUT', body: JSON.stringify(updates) });
 }
 
-export async function deleteTeam(id: number) {
-  return request(`/teams/${id}`, { method: 'DELETE' });
+export async function deleteTeam(id: number): Promise<OkResult> {
+  return request<OkResult>(`/teams/${id}`, { method: 'DELETE' });
 }
 
-// ---- Seasons (create) ----
+// ============================================================================
+// Notifications
+// ============================================================================
 
-export async function createSeason(year: number, name: string, buyInAmount: number, prizes?: { medal_1st?: number; medal_2nd?: number; stableford_1st?: number; stableford_2nd?: number; team_1st?: number }) {
-  return request<{ id: number }>('/seasons', {
-    method: 'POST',
-    body: JSON.stringify({ year, name, buy_in_amount: buyInAmount, is_active: true, ...prizes })
-  });
+export async function getNotifications(playerId: string): Promise<Notification[]> {
+  return request<Notification[]>(`/notifications?player_id=${playerId}`);
 }
 
-export async function updateSeason(id: number, updates: Record<string, any>) {
-  return request(`/seasons/${id}`, { method: 'PUT', body: JSON.stringify(updates) });
-}
-
-// ---- Notifications ----
-
-export async function getNotifications(playerId: string) {
-  return request<any[]>(`/notifications?player_id=${playerId}`);
-}
-
-export async function getUnreadCount(playerId: string) {
+export async function getUnreadCount(playerId: string): Promise<{ count: number }> {
   return request<{ count: number }>(`/notifications/unread-count?player_id=${playerId}`);
 }
 
-export async function markNotificationRead(id: number) {
-  return request(`/notifications/${id}/read`, { method: 'PUT' });
+export async function markNotificationRead(id: number): Promise<OkResult> {
+  return request<OkResult>(`/notifications/${id}/read`, { method: 'PUT' });
 }
 
-export async function markAllNotificationsRead(playerId: string) {
-  return request(`/notifications/read-all?player_id=${playerId}`, { method: 'PUT' });
+export async function markAllNotificationsRead(playerId: string): Promise<OkResult> {
+  return request<OkResult>(`/notifications/read-all?player_id=${playerId}`, { method: 'PUT' });
 }
 
-export async function clearReadNotifications(playerId: string) {
-  return request(`/notifications/clear-read?player_id=${playerId}`, { method: 'DELETE' });
+export async function clearReadNotifications(playerId: string): Promise<OkResult> {
+  return request<OkResult>(`/notifications/clear-read?player_id=${playerId}`, { method: 'DELETE' });
 }
 
-export async function checkNotifications(playerId: string, seasonId: number) {
+export async function checkNotifications(playerId: string, seasonId: number): Promise<{ count: number }> {
   return request<{ count: number }>(`/notifications/check?player_id=${playerId}&season_id=${seasonId}`);
 }
 
-// ---- Push ----
+// ============================================================================
+// Push
+// ============================================================================
 
-export async function subscribePush(playerId: string, subscription: PushSubscription) {
-  return request('/push/subscribe', { method: 'POST', body: JSON.stringify({ player_id: playerId, subscription: subscription.toJSON() }) });
+export async function subscribePush(playerId: string, subscription: PushSubscription): Promise<OkResult> {
+  return request<OkResult>('/push/subscribe', {
+    method: 'POST',
+    body: JSON.stringify({ player_id: playerId, subscription: subscription.toJSON() }),
+  });
 }
 
-export async function unsubscribePush(endpoint: string) {
-  return request('/push/unsubscribe', { method: 'DELETE', body: JSON.stringify({ endpoint }) });
+export async function unsubscribePush(endpoint: string): Promise<OkResult> {
+  return request<OkResult>('/push/unsubscribe', { method: 'DELETE', body: JSON.stringify({ endpoint }) });
 }
 
-// ---- Auth ----
+// ============================================================================
+// Auth
+// ============================================================================
 
-export async function authenticateUser(email: string, password: string) {
+export async function authenticateUser(email: string, password: string): Promise<AuthedPlayer | null> {
   try {
-    const user = await request<{ id: string; name: string; email: string; role: string; status: string; token: string }>('/auth/login', {
+    const user = await request<AuthedPlayer>('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify({ email, password }),
     });
     if (user?.token) setToken(user.token);
     return user;
@@ -345,8 +656,11 @@ export function logout(): void {
   localStorage.removeItem('gpga_current_user');
 }
 
-export async function initDatabase() { /* server handles DB init */ }
-export function resetDatabase() {
+export async function initDatabase(): Promise<void> {
+  /* server handles DB init */
+}
+
+export function resetDatabase(): void {
   logout();
   window.location.reload();
 }

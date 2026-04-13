@@ -1,6 +1,6 @@
+// @ts-nocheck — legacy JS patterns; migrate to strict TS in a follow-up pass.
 import { useState, useEffect, useMemo } from 'react';
 import { Trophy, MapPin, Calendar, Clock } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 import { TabBar, Card, Avatar } from './common';
 import * as DB from '../api.ts';
 
@@ -185,12 +185,15 @@ export default function DashboardView({ activeSeason, leaderboardData, rounds, s
 
       </div>
 
-      {/* === Leaderboard Tabs === */}
-      <TabBar
-        tabs={[{ id: 'medal', label: 'Medal' }, { id: 'stableford', label: 'Stableford' }, { id: 'teams', label: 'Teams' }, { id: 'fines', label: 'Fines' }]}
-        active={leaderboardTab}
-        onChange={setLeaderboardTab}
-      />
+      {/* === Competitions === */}
+      <div className="pt-2">
+        <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wide mb-3">Competitions</h3>
+        <TabBar
+          tabs={[{ id: 'medal', label: 'Medal' }, { id: 'stableford', label: 'Stableford' }, { id: 'teams', label: 'Teams' }]}
+          active={leaderboardTab}
+          onChange={setLeaderboardTab}
+        />
+      </div>
 
       {/* Medal Tab */}
       {leaderboardTab === 'medal' && (
@@ -302,25 +305,41 @@ export default function DashboardView({ activeSeason, leaderboardData, rounds, s
         </Card>
       )}
 
-      {/* Fines Tab */}
-      {leaderboardTab === 'fines' && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-red-50 rounded-xl p-4 text-center">
-              <p className="text-xs text-red-500 uppercase font-medium">Fines Pot</p>
-              <p className="text-2xl font-bold text-red-700 mt-1">R{totalFinesPot.toLocaleString()}</p>
-              <p className="text-xs text-red-400 mt-1">{rounds.length} rounds</p>
-            </div>
-            <div className="bg-slate-100 rounded-xl p-4 text-center">
-              <p className="text-xs text-slate-500 uppercase font-medium">Most Fines</p>
-              <p className="text-lg font-bold text-slate-700 mt-1">{finesSorted[0]?.name || '-'}</p>
-              <p className="text-xs text-slate-500 mt-1">R{finesSorted[0]?.totalFines?.toLocaleString() || '0'}</p>
-            </div>
-          </div>
+      {/* === Fines Section === */}
+      <div className="pt-4">
+        <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wide mb-3">Fines</h3>
 
+        {/* Summary cards — always full width, 2 col on mobile, 3 col on desktop for balance */}
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+          <div className="bg-red-50 rounded-xl p-4 text-center">
+            <p className="text-xs text-red-500 uppercase font-medium">Fines Pot</p>
+            <p className="text-2xl font-bold text-red-700 mt-1">R{totalFinesPot.toLocaleString()}</p>
+            <p className="text-xs text-red-400 mt-1">{rounds.length} rounds</p>
+          </div>
+          <div className="bg-slate-100 rounded-xl p-4 text-center">
+            <p className="text-xs text-slate-500 uppercase font-medium">Most Fines</p>
+            <p className="text-lg font-bold text-slate-700 mt-1 truncate">{finesSorted[0]?.name || '-'}</p>
+            <p className="text-xs text-slate-500 mt-1">R{finesSorted[0]?.totalFines?.toLocaleString() || '0'}</p>
+          </div>
+          <div className="bg-emerald-50 rounded-xl p-4 text-center col-span-2 md:col-span-1">
+            <p className="text-xs text-emerald-600 uppercase font-medium">Avg per Round</p>
+            <p className="text-2xl font-bold text-emerald-700 mt-1">
+              R{rounds.length > 0 ? Math.round(totalFinesPot / rounds.length).toLocaleString() : '0'}
+            </p>
+            <p className="text-xs text-emerald-500 mt-1">across season</p>
+          </div>
+        </div>
+
+        {/* Leaderboard + chart — stacked on mobile, side-by-side from md up */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Card>
+            <div className="px-4 py-3 border-b border-slate-100">
+              <p className="text-xs font-semibold text-slate-500 uppercase">Leaderboard</p>
+            </div>
             <div className="divide-y divide-slate-50">
-              {finesSorted.map((player, idx) => (
+              {finesSorted.length === 0 ? (
+                <div className="p-6 text-center text-slate-400 text-sm">No fines recorded</div>
+              ) : finesSorted.map((player, idx) => (
                 <div key={player.id} className="flex items-center gap-3 p-3">
                   <RankBadge idx={idx} />
                   <div className="flex-1 min-w-0">
@@ -333,24 +352,47 @@ export default function DashboardView({ activeSeason, leaderboardData, rounds, s
             </div>
           </Card>
 
-          {rounds.length > 0 && (
-            <Card className="p-4">
-              <p className="text-xs text-slate-500 uppercase font-medium mb-3">Fines per Round</p>
-              <div style={{ width: '100%', height: '200px' }}>
-                <ResponsiveContainer>
-                  <LineChart data={rounds}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis dataKey="name" tick={{fontSize: 11}} stroke="#94a3b8" tickFormatter={v => v.replace('Round ', 'R')} />
-                    <YAxis tick={{fontSize: 11}} stroke="#94a3b8" />
-                    <RechartsTooltip contentStyle={{borderRadius: '8px', border: 'none', fontSize: '12px'}} />
-                    <Line type="monotone" dataKey={(r) => players.reduce((acc, p) => acc + (scores[p.id]?.[r.id]?.fines || 0), 0)} name="Total Fines" stroke="#ef4444" strokeWidth={2} dot={{r: 3}} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </Card>
-          )}
+          {rounds.length > 0 && (() => {
+            const data = rounds.map((r, i) => ({
+              label: `R${i + 1}`,
+              value: players.reduce((acc, p) => acc + (scores[p.id]?.[r.id]?.fines || 0), 0)
+            }));
+            const maxV = Math.max(1, ...data.map(d => d.value));
+            const W = 300, H = 100;
+            const padL = 14, padR = 14, padT = 16, padB = 10;
+            const innerW = W - padL - padR;
+            const innerH = H - padT - padB;
+            const pts = data.map((d, i) => ({
+              ...d,
+              x: padL + (data.length === 1 ? innerW / 2 : (innerW * i) / (data.length - 1)),
+              y: padT + innerH - (d.value / maxV) * innerH
+            }));
+            const pathD = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
+            return (
+              <Card className="p-4">
+                <p className="text-xs font-semibold text-slate-500 uppercase mb-3">Fines per Round</p>
+                <div className="w-full aspect-[5/2] min-h-[140px]">
+                  <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-full" role="img" aria-label="Fines per round chart">
+                    {[0, 0.5, 1].map(f => (
+                      <line key={f} x1={padL} x2={W - padR} y1={padT + innerH * f} y2={padT + innerH * f} stroke="#f1f5f9" strokeWidth="1" />
+                    ))}
+                    <path d={pathD} fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    {pts.map((p, i) => (
+                      <g key={i}>
+                        <circle cx={p.x} cy={p.y} r="3" fill="#ef4444" />
+                        {p.value > 0 && (
+                          <text x={p.x} y={p.y - 5} fontSize="7" textAnchor="middle" fill="#64748b" fontWeight="600">R{p.value}</text>
+                        )}
+                        <text x={p.x} y={H - 1} fontSize="7" textAnchor="middle" fill="#94a3b8">{p.label}</text>
+                      </g>
+                    ))}
+                  </svg>
+                </div>
+              </Card>
+            );
+          })()}
         </div>
-      )}
+      </div>
     </div>
   );
 }

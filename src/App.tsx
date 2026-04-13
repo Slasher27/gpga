@@ -1,18 +1,21 @@
-import { useState, useEffect, useMemo } from 'react';
+// @ts-nocheck — legacy JS patterns; migrate to strict TS in a follow-up pass.
+import { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { TrendingUp, Banknote, Calendar, Users, Plus, Save } from 'lucide-react';
-import * as DB from './api.ts';
+import * as DB from './api';
 import { DashboardSkeleton, useConfirm, Modal, DatePicker, CourseSelector } from './components/common';
 import LoginPage from './components/LoginPage';
-import { setupPush } from './pushSetup.ts';
+import { setupPush } from './pushSetup';
 import { TopBar, DesktopSidebar, MobileBottomNav } from './components/Nav';
 import DashboardView from './components/DashboardView';
-import FinancesView from './components/FinancesView';
-import RoundsView from './components/RoundsView';
-import ProfileView from './components/ProfileView';
-import PlayersView from './components/PlayersView';
-import PlayerProfilePage from './components/PlayerProfilePage';
-import SeasonSettings from './components/SeasonSettings';
-import NotificationsView from './components/NotificationsView';
+
+// Lazy-loaded views — kept out of the initial bundle until the user navigates to them
+const FinancesView = lazy(() => import('./components/FinancesView'));
+const RoundsView = lazy(() => import('./components/RoundsView'));
+const ProfileView = lazy(() => import('./components/ProfileView'));
+const PlayersView = lazy(() => import('./components/PlayersView'));
+const PlayerProfilePage = lazy(() => import('./components/PlayerProfilePage'));
+const SeasonSettings = lazy(() => import('./components/SeasonSettings'));
+const NotificationsView = lazy(() => import('./components/NotificationsView'));
 
 const mergeScoresAndFines = (scoresData, finesData) => {
   const merged = { ...scoresData };
@@ -315,33 +318,66 @@ export default function App() {
       <MobileBottomNav view={view} setNavView={setNavView} navItems={navItems} />
 
       <main className="p-4 md:p-8 md:ml-56 pt-16 pb-28 landscape:pb-20 md:pt-16 md:pb-8">
-        {view === 'dashboard' && <DashboardView activeSeason={activeSeason} leaderboardData={leaderboardData} rounds={rounds} scores={scores} players={players} golfCourses={golfCourses} />}
-        {view === 'fines' && <FinancesView leaderboardData={leaderboardData} rounds={rounds} scores={scores} players={players} activeSeason={activeSeason} isReadOnlySeason={isReadOnlySeason} currentUser={currentUser} showToast={showToast} onAddFineType={() => setIsAddFineTypeModalOpen(true)} onDeleteFineType={handleDeleteFineType} onFinesChanged={refreshFines} fineTypesVersion={fineTypesVersion} />}
-        {view === 'rounds' && <RoundsView rounds={rounds} scores={scores} setScores={setScores} players={players} activeSeason={activeSeason} isReadOnlySeason={isReadOnlySeason} showToast={showToast} onAddRound={() => setIsAddRoundModalOpen(true)} onEditRound={handleEditRound} onDeleteRound={handleDeleteRound} onCloseRound={handleCloseRound} />}
-        {view === 'admin' && !managingPlayerId && <PlayersView players={players} scores={scores} rounds={rounds} activeSeason={activeSeason} isReadOnlySeason={isReadOnlySeason} currentUser={currentUser} showToast={showToast} showConfirm={showConfirm} setPlayers={setPlayers} onAddPlayer={() => setIsAddPlayerModalOpen(true)} managingPlayerId={managingPlayerId} setManagingPlayerId={setManagingPlayerId} />}
-        {view === 'admin' && managingPlayerId && <PlayerProfilePage players={players} setPlayers={setPlayers} scores={scores} rounds={rounds} activeSeason={activeSeason} currentUser={currentUser} managingPlayerId={managingPlayerId} setManagingPlayerId={setManagingPlayerId} showToast={showToast} />}
-        {view === 'profile' && <ProfileView currentUser={currentUser} players={players} setPlayers={setPlayers} scores={scores} rounds={rounds} activeSeason={activeSeason} showToast={showToast} />}
-        {view === 'notifications' && <NotificationsView currentUser={currentUser} />}
-        {view === 'settings' && isAdmin && <SeasonSettings activeSeason={activeSeason} allSeasons={allSeasons} players={players} rounds={rounds} showToast={showToast} showConfirm={showConfirm} onDataChanged={loadData} />}
+        <Suspense fallback={<DashboardSkeleton />}>
+          {view === 'dashboard' && <DashboardView activeSeason={activeSeason} leaderboardData={leaderboardData} rounds={rounds} scores={scores} players={players} golfCourses={golfCourses} />}
+          {view === 'fines' && <FinancesView leaderboardData={leaderboardData} rounds={rounds} scores={scores} players={players} activeSeason={activeSeason} isReadOnlySeason={isReadOnlySeason} currentUser={currentUser} showToast={showToast} onAddFineType={() => setIsAddFineTypeModalOpen(true)} onDeleteFineType={handleDeleteFineType} onFinesChanged={refreshFines} fineTypesVersion={fineTypesVersion} />}
+          {view === 'rounds' && <RoundsView rounds={rounds} scores={scores} setScores={setScores} players={players} activeSeason={activeSeason} isReadOnlySeason={isReadOnlySeason} showToast={showToast} onAddRound={() => setIsAddRoundModalOpen(true)} onEditRound={handleEditRound} onDeleteRound={handleDeleteRound} onCloseRound={handleCloseRound} />}
+          {view === 'admin' && !managingPlayerId && <PlayersView players={players} scores={scores} rounds={rounds} activeSeason={activeSeason} isReadOnlySeason={isReadOnlySeason} currentUser={currentUser} showToast={showToast} showConfirm={showConfirm} setPlayers={setPlayers} onAddPlayer={() => setIsAddPlayerModalOpen(true)} managingPlayerId={managingPlayerId} setManagingPlayerId={setManagingPlayerId} />}
+          {view === 'admin' && managingPlayerId && <PlayerProfilePage players={players} setPlayers={setPlayers} scores={scores} rounds={rounds} activeSeason={activeSeason} currentUser={currentUser} managingPlayerId={managingPlayerId} setManagingPlayerId={setManagingPlayerId} showToast={showToast} />}
+          {view === 'profile' && <ProfileView currentUser={currentUser} players={players} setPlayers={setPlayers} scores={scores} rounds={rounds} activeSeason={activeSeason} showToast={showToast} />}
+          {view === 'notifications' && <NotificationsView currentUser={currentUser} />}
+          {view === 'settings' && isAdmin && <SeasonSettings activeSeason={activeSeason} allSeasons={allSeasons} players={players} rounds={rounds} showToast={showToast} showConfirm={showConfirm} onDataChanged={loadData} />}
+        </Suspense>
       </main>
 
       {/* --- Modals --- */}
 
       <Modal isOpen={isAddPlayerModalOpen} onClose={() => setIsAddPlayerModalOpen(false)} title="Add New Player">
         <form onSubmit={handleAddPlayer} className="space-y-4">
-          <div className="form-control"><label className="label"><span className="label-text font-semibold">Full Name <span className="text-error">*</span></span></label><input required name="name" className="input input-bordered w-full focus:input-primary" placeholder="e.g. Tiger Woods" /></div>
-          <div className="form-control"><label className="label"><span className="label-text font-semibold">Email Address <span className="text-error">*</span></span></label><input required name="email" type="email" className="input input-bordered w-full focus:input-primary" placeholder="tiger@golf.com" /></div>
-          <div className="form-control"><label className="label"><span className="label-text font-semibold">Password <span className="text-error">*</span></span></label><input required name="password" type="password" className="input input-bordered w-full focus:input-primary" placeholder="Enter password" minLength="6" /></div>
-          <div className="form-control"><label className="label"><span className="label-text font-semibold">Role</span></label><select name="role" className="select select-bordered w-full pr-10" defaultValue="player"><option value="player">Player</option><option value="admin">Admin</option></select></div>
+          <div className="form-control">
+            <label htmlFor="add-player-name" className="block text-sm font-semibold text-slate-700 mb-1">Full Name <span className="text-red-600">*</span></label>
+            <input id="add-player-name" name="name" required autoComplete="name" className="input input-bordered w-full" placeholder="e.g. Tiger Woods" />
+          </div>
+          <div className="form-control">
+            <label htmlFor="add-player-email" className="block text-sm font-semibold text-slate-700 mb-1">Email Address <span className="text-red-600">*</span></label>
+            <input id="add-player-email" name="email" type="email" required autoComplete="email" className="input input-bordered w-full" placeholder="tiger@golf.com" />
+          </div>
+          <div className="form-control">
+            <label htmlFor="add-player-password" className="block text-sm font-semibold text-slate-700 mb-1">Password <span className="text-red-600">*</span></label>
+            <input id="add-player-password" name="password" type="password" required autoComplete="new-password" minLength={6} className="input input-bordered w-full" placeholder="Enter password" />
+          </div>
+          <div className="form-control">
+            <label htmlFor="add-player-role" className="block text-sm font-semibold text-slate-700 mb-1">Role</label>
+            <select id="add-player-role" name="role" defaultValue="player" className="select select-bordered w-full pr-10">
+              <option value="player">Player</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
           <button className="w-full bg-emerald-600 text-white py-3 rounded-lg font-semibold hover:bg-emerald-700 flex items-center justify-center gap-2"><Plus size={18} /> Create Player</button>
         </form>
       </Modal>
 
       <Modal isOpen={isAddRoundModalOpen} onClose={() => { setIsAddRoundModalOpen(false); setSelectedCourse(null); setSearchTerm(''); setSelectedDate(''); }} title="Add New Round">
         <form onSubmit={handleAddRound} className="space-y-4">
-          <div className="form-control"><label className="label"><span className="label-text font-semibold">Round Name</span></label><input required name="name" defaultValue={nextRoundName} className="input input-bordered w-full focus:input-primary" placeholder="e.g. Round 7" /></div>
-          <div className="form-control"><label className="label"><span className="label-text font-semibold">Date</span></label><DatePicker value={selectedDate} onChange={setSelectedDate} placeholder="Select round date" /><input type="hidden" name="date" value={selectedDate} required /></div>
-          <div className="grid grid-cols-2 gap-3"><div className="form-control"><label className="label"><span className="label-text font-semibold">Tee Time 1</span></label><input name="tee_time" type="time" className="input input-bordered w-full focus:input-primary" /></div><div className="form-control"><label className="label"><span className="label-text font-semibold">Tee Time 2</span></label><input name="tee_time_2" type="time" className="input input-bordered w-full focus:input-primary" /></div></div>
+          <div className="form-control">
+            <label htmlFor="add-round-name" className="block text-sm font-semibold text-slate-700 mb-1">Round Name</label>
+            <input id="add-round-name" name="name" required defaultValue={nextRoundName} autoComplete="off" className="input input-bordered w-full" placeholder="e.g. Round 7" />
+          </div>
+          <div className="form-control">
+            <label htmlFor="add-round-date" className="block text-sm font-semibold text-slate-700 mb-1">Date</label>
+            <DatePicker value={selectedDate} onChange={setSelectedDate} placeholder="Select round date" />
+            <input id="add-round-date" type="hidden" name="date" value={selectedDate} required />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="form-control">
+              <label htmlFor="add-round-tee1" className="block text-sm font-semibold text-slate-700 mb-1">Tee Time 1</label>
+              <input id="add-round-tee1" name="tee_time" type="time" autoComplete="off" className="input input-bordered w-full" />
+            </div>
+            <div className="form-control">
+              <label htmlFor="add-round-tee2" className="block text-sm font-semibold text-slate-700 mb-1">Tee Time 2</label>
+              <input id="add-round-tee2" name="tee_time_2" type="time" autoComplete="off" className="input input-bordered w-full" />
+            </div>
+          </div>
           <CourseSelector courses={golfCourses} selected={selectedCourse} onSelect={setSelectedCourse} searchTerm={searchTerm} onSearchChange={setSearchTerm} />
           <input type="hidden" name="course" value={selectedCourse?.name || ''} required />
           <button type="submit" className="w-full bg-emerald-600 text-white py-3 rounded-lg font-semibold hover:bg-emerald-700 flex items-center justify-center gap-2" disabled={!selectedCourse}><Plus size={18} /> Create Round</button>
@@ -351,9 +387,24 @@ export default function App() {
       <Modal isOpen={isEditRoundModalOpen} onClose={() => { setIsEditRoundModalOpen(false); setEditingRound(null); setSelectedCourse(null); setSearchTerm(''); }} title="Edit Round">
         {editingRound && (
           <form onSubmit={handleUpdateRoundSubmit} className="space-y-4">
-            <div className="form-control"><label className="label"><span className="label-text font-semibold">Round Name</span></label><input required name="name" defaultValue={editingRound.name} className="input input-bordered w-full focus:input-primary" /></div>
-            <div className="form-control"><label className="label"><span className="label-text font-semibold">Date</span></label><input required name="date" type="date" defaultValue={editingRound.date} className="input input-bordered w-full focus:input-primary [color-scheme:light]" /></div>
-            <div className="grid grid-cols-2 gap-3"><div className="form-control"><label className="label"><span className="label-text font-semibold">Tee Time 1</span></label><input name="tee_time" type="time" defaultValue={editingRound.tee_time || ''} className="input input-bordered w-full focus:input-primary" /></div><div className="form-control"><label className="label"><span className="label-text font-semibold">Tee Time 2</span></label><input name="tee_time_2" type="time" defaultValue={editingRound.tee_time_2 || ''} className="input input-bordered w-full focus:input-primary" /></div></div>
+            <div className="form-control">
+              <label htmlFor="edit-round-name" className="block text-sm font-semibold text-slate-700 mb-1">Round Name</label>
+              <input id="edit-round-name" name="name" required defaultValue={editingRound.name} autoComplete="off" className="input input-bordered w-full" />
+            </div>
+            <div className="form-control">
+              <label htmlFor="edit-round-date" className="block text-sm font-semibold text-slate-700 mb-1">Date</label>
+              <input id="edit-round-date" name="date" type="date" required defaultValue={editingRound.date} autoComplete="off" className="input input-bordered w-full [color-scheme:light]" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="form-control">
+                <label htmlFor="edit-round-tee1" className="block text-sm font-semibold text-slate-700 mb-1">Tee Time 1</label>
+                <input id="edit-round-tee1" name="tee_time" type="time" defaultValue={editingRound.tee_time || ''} autoComplete="off" className="input input-bordered w-full" />
+              </div>
+              <div className="form-control">
+                <label htmlFor="edit-round-tee2" className="block text-sm font-semibold text-slate-700 mb-1">Tee Time 2</label>
+                <input id="edit-round-tee2" name="tee_time_2" type="time" defaultValue={editingRound.tee_time_2 || ''} autoComplete="off" className="input input-bordered w-full" />
+              </div>
+            </div>
             <CourseSelector courses={golfCourses} selected={selectedCourse} onSelect={setSelectedCourse} searchTerm={searchTerm} onSearchChange={setSearchTerm} />
             <input type="hidden" name="course" value={selectedCourse?.name || editingRound.course} required />
             <button className="w-full bg-emerald-600 text-white py-3 rounded-lg font-semibold hover:bg-emerald-700 flex items-center justify-center gap-2"><Save size={18} /> Update Round</button>
@@ -363,15 +414,36 @@ export default function App() {
 
       <Modal isOpen={isAddFineTypeModalOpen} onClose={() => setIsAddFineTypeModalOpen(false)} title="Add Fine Type">
         <form onSubmit={handleAddFineType} className="space-y-4">
-          <div><label className="block text-sm font-medium text-slate-700 mb-1">Fine Name</label><input required name="name" className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="e.g. 3 Putt, Lost Ball, etc." /></div>
-          <div className="grid grid-cols-2 gap-3"><div><label className="block text-sm font-medium text-slate-700 mb-1">Amount (R)</label><input required name="amount" type="number" min="0" className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="e.g. 20" /></div><div><label className="block text-sm font-medium text-slate-700 mb-1">Sort Order</label><input name="sort_order" type="number" min="0" defaultValue="0" className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="0" /></div></div>
-          <div><label className="block text-sm font-medium text-slate-700 mb-1">Description (Optional)</label><textarea name="description" rows="3" className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="Optional description..." /></div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Escalation (Optional)</label>
+            <label htmlFor="add-fine-name" className="block text-sm font-medium text-slate-700 mb-1">Fine Name</label>
+            <input id="add-fine-name" name="name" required autoComplete="off" className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="e.g. 3 Putt, Lost Ball, etc." />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="add-fine-amount" className="block text-sm font-medium text-slate-700 mb-1">Amount (R)</label>
+              <input id="add-fine-amount" name="amount" type="number" required min="0" autoComplete="off" className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="e.g. 20" />
+            </div>
+            <div>
+              <label htmlFor="add-fine-sort-order" className="block text-sm font-medium text-slate-700 mb-1">Sort Order</label>
+              <input id="add-fine-sort-order" name="sort_order" type="number" min="0" defaultValue="0" autoComplete="off" className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="0" />
+            </div>
+          </div>
+          <div>
+            <label htmlFor="add-fine-description" className="block text-sm font-medium text-slate-700 mb-1">Description (Optional)</label>
+            <textarea id="add-fine-description" name="description" rows={3} autoComplete="off" className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="Optional description..." />
+          </div>
+          <div>
+            <p className="block text-sm font-medium text-slate-700 mb-1">Escalation (Optional)</p>
             <p className="text-xs text-slate-500 mb-2">First N at base amount, remainder at tier amount. Leave blank for flat fine.</p>
             <div className="grid grid-cols-2 gap-3">
-              <div><label className="block text-xs text-slate-500 mb-1">After quantity</label><input name="tier_threshold" type="number" min="0" defaultValue="0" className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="e.g. 3" /></div>
-              <div><label className="block text-xs text-slate-500 mb-1">Tier amount (R)</label><input name="tier_amount" type="number" min="0" defaultValue="0" className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="e.g. 20" /></div>
+              <div>
+                <label htmlFor="add-fine-tier-threshold" className="block text-xs text-slate-500 mb-1">After quantity</label>
+                <input id="add-fine-tier-threshold" name="tier_threshold" type="number" min="0" defaultValue="0" autoComplete="off" className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="e.g. 3" />
+              </div>
+              <div>
+                <label htmlFor="add-fine-tier-amount" className="block text-xs text-slate-500 mb-1">Tier amount (R)</label>
+                <input id="add-fine-tier-amount" name="tier_amount" type="number" min="0" defaultValue="0" autoComplete="off" className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="e.g. 20" />
+              </div>
             </div>
           </div>
           <button className="w-full bg-emerald-600 text-white py-3 rounded-lg font-bold hover:bg-emerald-700">Create Fine Type</button>

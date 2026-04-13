@@ -1,14 +1,31 @@
 import { useState, useRef, useEffect } from 'react';
 import { ChevronDown } from 'lucide-react';
 
-export default function Dropdown({ value, options, onChange, className = '' }) {
+export interface DropdownOption<T = string | number> {
+  value: T;
+  label: string;
+}
+
+export default function Dropdown<T extends string | number = string>({
+  value,
+  options,
+  onChange,
+  className = '',
+}: {
+  value: T;
+  options: DropdownOption<T>[];
+  onChange: (v: T) => void;
+  className?: string;
+}) {
   const [open, setOpen] = useState(false);
   const [dropUp, setDropUp] = useState(false);
-  const ref = useRef(null);
-  const selected = options.find(o => o.value === value);
+  const ref = useRef<HTMLDivElement>(null);
+  const selected = options.find((o) => o.value === value);
 
   useEffect(() => {
-    const close = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const close = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
     document.addEventListener('mousedown', close);
     return () => document.removeEventListener('mousedown', close);
   }, []);

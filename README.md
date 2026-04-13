@@ -1,16 +1,75 @@
-# React + Vite
+# GPGA Golf League Manager
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Society golf app for tracking a 9-round season across Medal, Stableford, and Team competitions, plus fines and finances. Deployed as a PWA at [gpga.vercel.app](https://gpga.vercel.app/).
 
-Currently, two official plugins are available:
+## Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Frontend:** React 19 + Vite 7 + Tailwind 3 (PWA with offline precache)
+- **Backend:** Express 5 + Turso cloud SQLite (`@libsql/client`)
+- **Auth:** JWT + bcrypt, rate-limited login
+- **Notifications:** Resend (email) + web-push + in-app (DB)
+- **Hosting:** Vercel (auto-deploy on push to `main`)
 
-## React Compiler
+## Local development
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Two terminals:
 
-## Expanding the ESLint configuration
+```bash
+npm run dev:server   # Express API on :3001
+npm run dev:client   # Vite dev server on :5173
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Required environment variables
+
+Set these in `.env` locally and in Vercel project settings for production:
+
+```dotenv
+TURSO_DATABASE_URL=libsql://...
+TURSO_AUTH_TOKEN=...
+JWT_SECRET=<48 random bytes hex>
+FRONTEND_URL=https://gpga.vercel.app
+VAPID_PUBLIC_KEY=...
+VITE_VAPID_PUBLIC_KEY=<same as VAPID_PUBLIC_KEY>
+VAPID_PRIVATE_KEY=...
+VAPID_EMAIL=mailto:admin@gpga.vercel.app
+RESEND_API_KEY=...
+```
+
+Generate a JWT secret with:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+```
+
+## Project layout
+
+```text
+src/
+  App.tsx              — shell, routing, auth guard
+  api.ts               — typed API client (talks to /api)
+  hooks/useFines.ts    — fines data layer
+  components/
+    common/            — Card, Modal, TabBar, DatePicker, Dropdown, SharedUI
+    DashboardView.tsx  — Medal/Stableford/Teams tabs + Fines section
+    FinancesView.tsx   — Start Fines / Fine Sheet / History / Payments
+    RoundsView.tsx     — rounds list + scoring
+    PlayersView.tsx    — master-only roster management
+    SeasonSettings.tsx — buy-in, prize pool, season creation
+    PlayerProfilePage.tsx, ProfileView.tsx, NotificationsView.tsx, LoginPage.tsx, Nav.tsx
+server/
+  index.ts             — Express app (local dev)
+  db.ts                — Turso client + schema + migrations
+  notify.ts            — unified email + push + in-app notifications
+  auth-middleware.ts   — bcrypt, JWT, requireAuth/requireAdmin/requireMaster
+  routes/              — per-resource routers
+api/
+  index.ts             — Vercel serverless wrapper
+```
+
+## Deploy
+
+```bash
+git push origin main
+```
+
+Vercel auto-deploys. Make sure all env vars above are set in the Vercel project before the first deploy after adding `JWT_SECRET`.

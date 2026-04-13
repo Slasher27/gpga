@@ -1,20 +1,9 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+// @ts-nocheck — legacy JS patterns; migrate to strict TS in a follow-up pass.
+import { useState, useEffect, useMemo } from 'react';
 import { Plus, Trash2, ChevronDown, Edit, Save, X } from 'lucide-react';
 import * as DB from '../api.ts';
 import { TabBar, Card } from './common';
-
-// Tiered fine total: first N units at base amount, remainder at tier_amount.
-// Mirrors FINE_TOTAL_SQL in server/routes/fines.ts — keep in sync.
-function calcFineTotal(quantity, amount, tierThreshold = 0, tierAmount = 0) {
-  const qty = Number(quantity) || 0;
-  const base = Number(amount) || 0;
-  const threshold = Number(tierThreshold) || 0;
-  const tier = Number(tierAmount) || 0;
-  if (threshold > 0 && qty > threshold) {
-    return threshold * base + (qty - threshold) * tier;
-  }
-  return qty * base;
-}
+import { useFines, calcFineTotal } from '../hooks/useFines';
 
 export default function FinancesView({
   leaderboardData, rounds, scores, players, activeSeason,
@@ -23,123 +12,41 @@ export default function FinancesView({
 }) {
   const isAdmin = currentUser.role === 'master' || currentUser.role === 'admin';
   const sortedByFines = useMemo(() => [...leaderboardData].sort((a, b) => b.totalFines - a.totalFines), [leaderboardData]);
-  const totalFinesPot = useMemo(() => leaderboardData.reduce((acc, p) => acc + p.totalFines, 0), [leaderboardData]);
   const mostRecentRound = rounds.length > 0 ? rounds[rounds.length - 1] : null;
 
-  // --- State ---
+  // --- UI state (data lives in useFines) ---
   const [finesTab, setFinesTab] = useState(() => isAdmin ? 'assign' : 'history');
   const [selectedRound, setSelectedRound] = useState(mostRecentRound?.id || null);
   const [selectedPlayer, setSelectedPlayer] = useState(null);
-  const [fineTypes, setFineTypes] = useState([]);
-  const [playerFines, setPlayerFines] = useState([]);
-  const [isRoundConfirmed, setIsRoundConfirmed] = useState(false);
-  const [roundFinesData, setRoundFinesData] = useState([]);
   const [roundViewPlayerFilter, setRoundViewPlayerFilter] = useState('all');
   const [expandedRoundViewPlayers, setExpandedRoundViewPlayers] = useState({});
-  const [paymentSummaryData, setPaymentSummaryData] = useState([]);
   const [expandedPlayers, setExpandedPlayers] = useState({});
-  const [playerRoundFinesCache, setPlayerRoundFinesCache] = useState({});
   const [editingFineType, setEditingFineType] = useState(null);
-  const [buyInStatuses, setBuyInStatuses] = useState({});
   const [showOpenFine, setShowOpenFine] = useState(false);
   const [openFineName, setOpenFineName] = useState('');
   const [openFineAmount, setOpenFineAmount] = useState('');
 
-  // --- Effects ---
+  // --- Data layer ---
+  const fines = useFines({ activeSeason, selectedPlayer, selectedRound, fineTypesVersion, onFinesChanged, showToast });
+  const { fineTypes, playerFines, isRoundConfirmed, roundFinesData, paymentSummaryData, playerRoundFinesCache, buyInStatuses } = fines;
+
   useEffect(() => {
     if (mostRecentRound && selectedRound !== mostRecentRound.id) setSelectedRound(mostRecentRound.id);
   }, [rounds.length]);
 
-  useEffect(() => {
-    if (activeSeason) {
-      DB.getFineTypes(activeSeason.id).then(setFineTypes);
-      DB.getSeasonPlayers(activeSeason.id).then(sp => {
-        const cache = {};
-        for (const p of sp) cache[p.player_id] = { isPaid: p.buy_in_paid, date: p.buy_in_date };
-        setBuyInStatuses(cache);
-      });
-    }
-  }, [activeSeason, players.length, fineTypesVersion]);
+  useEffect(() => { setExpandedPlayers({}); }, [activeSeason]);
 
-  useEffect(() => {
-    if (selectedPlayer && selectedRound) {
-      DB.getPlayerFinesForRound(selectedPlayer, selectedRound).then(setPlayerFines);
-    } else setPlayerFines([]);
-  }, [selectedPlayer, selectedRound]);
-
-  useEffect(() => {
-    if (selectedPlayer && selectedRound) {
-      DB.isPlayerRoundConfirmed(selectedPlayer, selectedRound).then(setIsRoundConfirmed);
-    } else setIsRoundConfirmed(false);
-  }, [selectedPlayer, selectedRound]);
-
-  useEffect(() => {
-    if (selectedRound) DB.getRoundFines(selectedRound).then(setRoundFinesData);
-  }, [selectedRound]);
-
-  useEffect(() => {
-    if (activeSeason) DB.getPaymentSummary(activeSeason.id).then(setPaymentSummaryData);
-    setPlayerRoundFinesCache({});
-    setExpandedPlayers({});
-  }, [activeSeason]);
-
-  // --- Handlers ---
-  const refreshTimer = useRef(null);
-  const refreshLocalData = useCallback(() => {
-    clearTimeout(refreshTimer.current);
-    refreshTimer.current = setTimeout(() => {
-      if (activeSeason) DB.getPaymentSummary(activeSeason.id).then(setPaymentSummaryData);
-      if (selectedRound) DB.getRoundFines(selectedRound).then(setRoundFinesData);
-      onFinesChanged?.();
-    }, 500);
-  }, [activeSeason, selectedRound, onFinesChanged]);
-  const handleAddFine = async (fineTypeId) => {
-    if (!selectedPlayer || !selectedRound) return;
-    const existing = playerFines.find(pf => pf.fine_type_id === fineTypeId);
-    const newQty = (existing?.quantity || 0) + 1;
-    setPlayerFines(prev => {
-      const idx = prev.findIndex(pf => pf.fine_type_id === fineTypeId);
-      if (idx >= 0) { const updated = [...prev]; updated[idx] = { ...updated[idx], quantity: newQty }; return updated; }
-      const ft = fineTypes.find(f => f.id === fineTypeId);
-      return [...prev, { fine_type_id: fineTypeId, quantity: 1, amount: ft?.amount || 0, name: ft?.name || '' }];
-    });
-    await DB.setPlayerFine(selectedPlayer, selectedRound, fineTypeId, newQty);
-    refreshLocalData();
-  };
-  const handleRemoveFine = async (fineTypeId) => {
-    if (!selectedPlayer || !selectedRound) return;
-    const existing = playerFines.find(pf => pf.fine_type_id === fineTypeId);
-    if (!existing || existing.quantity <= 0) return;
-    const newQty = existing.quantity - 1;
-    setPlayerFines(prev => prev.map(pf => pf.fine_type_id === fineTypeId ? { ...pf, quantity: newQty } : pf).filter(pf => pf.quantity > 0));
-    await DB.setPlayerFine(selectedPlayer, selectedRound, fineTypeId, newQty);
-    refreshLocalData();
-  };
   const handleSaveFineType = async () => {
     if (!editingFineType) return;
-    await DB.updateFineType(editingFineType.id, {
-      name: editingFineType.name,
-      amount: editingFineType.amount,
-      sort_order: editingFineType.sort_order,
-      description: editingFineType.description,
-      tier_threshold: editingFineType.tier_threshold || 0,
-      tier_amount: editingFineType.tier_amount || 0
-    });
-    setFineTypes(prev => prev.map(ft => ft.id === editingFineType.id ? { ...ft, ...editingFineType } : ft).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0) || a.name.localeCompare(b.name)));
+    await fines.saveFineType(editingFineType);
     setEditingFineType(null);
-    showToast('Fine type updated');
   };
+
   const handleAddOpenFine = async () => {
-    if (!openFineName.trim() || !openFineAmount || !activeSeason || !selectedPlayer || !selectedRound) return;
-    const amount = parseInt(openFineAmount);
-    if (amount <= 0) return;
-    const result = await DB.addFineType(activeSeason.id, openFineName.trim(), amount, '', 999, true);
-    await DB.addPlayerFine(selectedPlayer, selectedRound, result.id);
-    setFineTypes(prev => [...prev, { id: result.id, name: openFineName.trim(), amount, is_open: 1, sort_order: 999 }]);
-    setPlayerFines(await DB.getPlayerFinesForRound(selectedPlayer, selectedRound));
-    setOpenFineName(''); setOpenFineAmount(''); setShowOpenFine(false);
-    refreshLocalData();
-    showToast(`Open fine "${openFineName.trim()}" added`);
+    await fines.addOpenFine(openFineName, openFineAmount);
+    setOpenFineName('');
+    setOpenFineAmount('');
+    setShowOpenFine(false);
   };
 
   const playerFinesTotal = playerFines.reduce((sum, f) => sum + calcFineTotal(f.quantity, f.amount, f.tier_threshold, f.tier_amount), 0);
@@ -203,18 +110,24 @@ export default function FinancesView({
           <div className="p-4 space-y-4">
             {/* Round + Player selectors */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <select id="fines-select-round" value={selectedRound || ''} onChange={(e) => setSelectedRound(parseInt(e.target.value))}
-                className="select select-bordered w-full min-h-[44px]" aria-label="Select round">
-                <option value="">Select Round</option>
-                {rounds.map(r => <option key={r.id} value={r.id}>{r.name} — {r.course_name}</option>)}
-              </select>
-              <select id="fines-select-player" value={selectedPlayer || ''} onChange={(e) => setSelectedPlayer(e.target.value)}
-                className="select select-bordered w-full min-h-[44px]" aria-label="Select player">
-                <option value="">Select Player</option>
-                {players.filter(p => p.status === 'active').map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
+              <div>
+                <label htmlFor="fines-assign-round" className="sr-only">Select round</label>
+                <select id="fines-assign-round" value={selectedRound || ''} onChange={(e) => setSelectedRound(parseInt(e.target.value))}
+                  className="select select-bordered w-full min-h-[44px]">
+                  <option value="">Select Round</option>
+                  {rounds.map(r => <option key={r.id} value={r.id}>{r.name} — {r.course_name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="fines-assign-player" className="sr-only">Select player</label>
+                <select id="fines-assign-player" value={selectedPlayer || ''} onChange={(e) => setSelectedPlayer(e.target.value)}
+                  className="select select-bordered w-full min-h-[44px]">
+                  <option value="">Select Player</option>
+                  {players.filter(p => p.status === 'active').map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             {selectedPlayer && selectedRound ? (
@@ -250,9 +163,9 @@ export default function FinancesView({
                             R{ft.amount}{hasTier && <> · R{ft.tier_amount} after {ft.tier_threshold}</>}
                           </p>
                         </div>
-                        <button type="button" onClick={() => handleRemoveFine(ft.id)} disabled={qty === 0} className="w-9 h-9 flex items-center justify-center rounded-lg bg-red-100 text-red-600 hover:bg-red-200 disabled:opacity-30 transition-colors font-bold min-h-[36px]">-</button>
+                        <button type="button" onClick={() => fines.removeFine(ft.id)} disabled={qty === 0} className="w-9 h-9 flex items-center justify-center rounded-lg bg-red-100 text-red-600 hover:bg-red-200 disabled:opacity-30 transition-colors font-bold min-h-[36px]">-</button>
                         <span className="w-6 text-center font-bold text-sm text-slate-800">{qty}</span>
-                        <button type="button" onClick={() => handleAddFine(ft.id)} className="w-9 h-9 flex items-center justify-center rounded-lg bg-emerald-100 text-emerald-600 hover:bg-emerald-200 transition-colors font-bold min-h-[36px]">+</button>
+                        <button type="button" onClick={() => fines.addFine(ft.id)} className="w-9 h-9 flex items-center justify-center rounded-lg bg-emerald-100 text-emerald-600 hover:bg-emerald-200 transition-colors font-bold min-h-[36px]">+</button>
                         <span className="w-14 text-right text-sm font-semibold text-slate-600">R{rowTotal}</span>
                       </div>
                     );
@@ -269,9 +182,9 @@ export default function FinancesView({
                           <p className="text-sm font-medium text-slate-700 truncate">{ft.name} <span className="text-[10px] text-slate-400">open</span></p>
                           <p className="text-[10px] text-slate-400">R{ft.amount}</p>
                         </div>
-                        <button type="button" onClick={() => handleRemoveFine(ft.id)} className="w-9 h-9 flex items-center justify-center rounded-lg bg-red-100 text-red-600 hover:bg-red-200 transition-colors font-bold min-h-[36px]">-</button>
+                        <button type="button" onClick={() => fines.removeFine(ft.id)} className="w-9 h-9 flex items-center justify-center rounded-lg bg-red-100 text-red-600 hover:bg-red-200 transition-colors font-bold min-h-[36px]">-</button>
                         <span className="w-6 text-center font-bold text-sm text-slate-800">{qty}</span>
-                        <button type="button" onClick={() => handleAddFine(ft.id)} className="w-9 h-9 flex items-center justify-center rounded-lg bg-emerald-100 text-emerald-600 hover:bg-emerald-200 transition-colors font-bold min-h-[36px]">+</button>
+                        <button type="button" onClick={() => fines.addFine(ft.id)} className="w-9 h-9 flex items-center justify-center rounded-lg bg-emerald-100 text-emerald-600 hover:bg-emerald-200 transition-colors font-bold min-h-[36px]">+</button>
                         <span className="w-14 text-right text-sm font-semibold text-slate-600">R{rowTotal}</span>
                       </div>
                     );
@@ -282,17 +195,19 @@ export default function FinancesView({
                 {!isRoundConfirmed && (
                   showOpenFine ? (
                     <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-lg border border-slate-200">
-                      <input id="open-fine-name" name="open-fine-name" aria-label="Fine name" value={openFineName} onChange={e => setOpenFineName(e.target.value)} placeholder="Fine name"
+                      <label htmlFor="open-fine-name" className="sr-only">Fine name</label>
+                      <input id="open-fine-name" name="open-fine-name" value={openFineName} onChange={e => setOpenFineName(e.target.value)} placeholder="Fine name"
                         className="input input-bordered input-sm flex-1 min-h-[36px]" autoComplete="off" />
-                      <input id="open-fine-amount" name="open-fine-amount" aria-label="Fine amount" type="number" value={openFineAmount} onChange={e => setOpenFineAmount(e.target.value)} placeholder="R" min="1"
+                      <label htmlFor="open-fine-amount" className="sr-only">Fine amount</label>
+                      <input id="open-fine-amount" name="open-fine-amount" type="number" value={openFineAmount} onChange={e => setOpenFineAmount(e.target.value)} placeholder="R" min="1"
                         className="input input-bordered input-sm w-20 min-h-[36px]" autoComplete="off" />
-                      <button onClick={handleAddOpenFine} disabled={!openFineName.trim() || !openFineAmount}
+                      <button type="button" onClick={handleAddOpenFine} disabled={!openFineName.trim() || !openFineAmount}
                         className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-30 min-h-[36px]">Add</button>
-                      <button onClick={() => { setShowOpenFine(false); setOpenFineName(''); setOpenFineAmount(''); }}
-                        className="p-2 rounded-lg text-slate-400 hover:bg-slate-200 min-h-[36px]"><X size={16} /></button>
+                      <button type="button" onClick={() => { setShowOpenFine(false); setOpenFineName(''); setOpenFineAmount(''); }}
+                        className="p-2 rounded-lg text-slate-400 hover:bg-slate-200 min-h-[36px]" aria-label="Cancel open fine"><X size={16} /></button>
                     </div>
                   ) : (
-                    <button onClick={() => setShowOpenFine(true)} className="text-sm text-emerald-600 font-semibold hover:text-emerald-700 min-h-[44px]">
+                    <button type="button" onClick={() => setShowOpenFine(true)} className="text-sm text-emerald-600 font-semibold hover:text-emerald-700 min-h-[44px]">
                       + Open Fine
                     </button>
                   )
@@ -300,11 +215,7 @@ export default function FinancesView({
 
                 {/* Confirm / Reopen */}
                 <div className="pt-3 border-t border-slate-100 flex items-center gap-3">
-                  <button onClick={async () => {
-                    await DB.confirmPlayerRoundFines(selectedPlayer, selectedRound, !isRoundConfirmed);
-                    setIsRoundConfirmed(!isRoundConfirmed);
-                    showToast(isRoundConfirmed ? 'Fines reopened' : 'Fines confirmed!', isRoundConfirmed ? 'info' : 'success');
-                  }} className={`px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors min-h-[44px] ${
+                  <button onClick={fines.toggleRoundConfirmed} className={`px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors min-h-[44px] ${
                     isRoundConfirmed ? 'bg-slate-500 text-white hover:bg-slate-600' : 'bg-emerald-600 text-white hover:bg-emerald-700'
                   }`}>
                     {isRoundConfirmed ? 'Reopen' : 'Confirm'}
@@ -395,16 +306,22 @@ export default function FinancesView({
           </div>
           <div className="p-4 space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <select id="fines-select-round" value={selectedRound || ''} onChange={(e) => setSelectedRound(parseInt(e.target.value))}
-                className="select select-bordered w-full min-h-[44px]" aria-label="Select round">
-                <option value="">Select Round</option>
-                {rounds.map(r => <option key={r.id} value={r.id}>{r.name} ({r.date})</option>)}
-              </select>
-              <select id="fines-filter-player" value={roundViewPlayerFilter} onChange={(e) => setRoundViewPlayerFilter(e.target.value)}
-                className="select select-bordered w-full min-h-[44px]" aria-label="Filter by player">
-                <option value="all">All Players</option>
-                {players.filter(p => p.status === 'active').map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
+              <div>
+                <label htmlFor="fines-history-round" className="sr-only">Select round</label>
+                <select id="fines-history-round" value={selectedRound || ''} onChange={(e) => setSelectedRound(parseInt(e.target.value))}
+                  className="select select-bordered w-full min-h-[44px]">
+                  <option value="">Select Round</option>
+                  {rounds.map(r => <option key={r.id} value={r.id}>{r.name} ({r.date})</option>)}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="fines-history-player" className="sr-only">Filter by player</label>
+                <select id="fines-history-player" value={roundViewPlayerFilter} onChange={(e) => setRoundViewPlayerFilter(e.target.value)}
+                  className="select select-bordered w-full min-h-[44px]">
+                  <option value="all">All Players</option>
+                  {players.filter(p => p.status === 'active').map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
             </div>
 
             {selectedRound ? (() => {
@@ -473,10 +390,7 @@ export default function FinancesView({
               return (
                 <div key={summary.player_id} className="hover:bg-slate-50">
                   <div className="p-4 cursor-pointer select-none" onClick={async () => {
-                    if (!isExpanded && !playerRoundFinesCache[summary.player_id]) {
-                      const data = await DB.getPlayerRoundFines(summary.player_id, activeSeason?.id);
-                      setPlayerRoundFinesCache(prev => ({ ...prev, [summary.player_id]: data }));
-                    }
+                    if (!isExpanded) await fines.loadPlayerRoundFines(summary.player_id);
                     setExpandedPlayers(prev => ({ ...prev, [summary.player_id]: !isExpanded }));
                   }}>
                     <div className="flex items-center justify-between mb-3">
@@ -516,13 +430,9 @@ export default function FinancesView({
                             <div className="flex items-center gap-3">
                               <span className="text-sm font-bold text-slate-800">R{round.total_amount.toLocaleString()}</span>
                               {isAdmin ? (
-                                <button onClick={async (e) => {
+                                <button onClick={(e) => {
                                   e.stopPropagation();
-                                  await DB.markRoundFinesPaid(summary.player_id, round.round_id, !round.paid);
-                                  const updated = await DB.getPlayerRoundFines(summary.player_id, activeSeason?.id);
-                                  setPlayerRoundFinesCache(prev => ({ ...prev, [summary.player_id]: updated }));
-                                  DB.getPaymentSummary(activeSeason?.id).then(setPaymentSummaryData);
-                                  showToast(`${round.round_name} marked as ${!round.paid ? 'paid' : 'unpaid'}`, !round.paid ? 'success' : 'info');
+                                  fines.togglePlayerRoundPaid(summary.player_id, round.round_id, round.round_name, !round.paid);
                                 }} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                                   round.paid ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-red-600 text-white hover:bg-red-700'
                                 }`}>
