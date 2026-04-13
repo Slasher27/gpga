@@ -1,4 +1,5 @@
 import { getClient } from './db.js';
+import { hashPassword } from './auth-middleware.js';
 
 export async function seedDatabase(): Promise<void> {
   const db = getClient();
@@ -8,18 +9,20 @@ export async function seedDatabase(): Promise<void> {
 
   console.log('Seeding database...');
 
+  const defaultHash = await hashPassword('password');
+
   await db.batch([
     {
       sql: `INSERT OR IGNORE INTO players (id, name, email, password, role, status, avatar) VALUES
-        ('1', 'Wayne Windt', 'wayne@gpga.com', 'password', 'player', 'active', NULL),
-        ('2', 'Ryan Ambrose', 'ryan.a@gpga.com', 'password', 'player', 'active', NULL),
-        ('3', 'Duwayne Cowney', 'duwayne@gpga.com', 'password', 'master', 'active', NULL),
-        ('4', 'Ryan Strauss', 'ryan.s@gpga.com', 'password', 'player', 'active', NULL),
-        ('5', 'Justin Fish', 'justin@gpga.com', 'password', 'player', 'active', NULL),
-        ('6', 'Gareth Williams', 'gareth.w@gpga.com', 'password', 'player', 'active', NULL),
-        ('7', 'Gareth Roos', 'gareth.r@gpga.com', 'password', 'player', 'active', NULL),
-        ('8', 'Charl Cordier', 'charl@gpga.com', 'password', 'player', 'active', NULL)`,
-      args: []
+        ('1', 'Wayne Windt', 'wayne@gpga.com', ?, 'player', 'active', NULL),
+        ('2', 'Ryan Ambrose', 'ryan.a@gpga.com', ?, 'player', 'active', NULL),
+        ('3', 'Duwayne Cowney', 'duwayne@gpga.com', ?, 'master', 'active', NULL),
+        ('4', 'Ryan Strauss', 'ryan.s@gpga.com', ?, 'player', 'active', NULL),
+        ('5', 'Justin Fish', 'justin@gpga.com', ?, 'player', 'active', NULL),
+        ('6', 'Gareth Williams', 'gareth.w@gpga.com', ?, 'player', 'active', NULL),
+        ('7', 'Gareth Roos', 'gareth.r@gpga.com', ?, 'player', 'active', NULL),
+        ('8', 'Charl Cordier', 'charl@gpga.com', ?, 'player', 'active', NULL)`,
+      args: [defaultHash, defaultHash, defaultHash, defaultHash, defaultHash, defaultHash, defaultHash, defaultHash]
     },
     {
       sql: `INSERT OR IGNORE INTO seasons (id, year, name, buy_in_amount, is_active) VALUES (1, 2025, 'GPGA 2025 Season', 2500, 1)`,

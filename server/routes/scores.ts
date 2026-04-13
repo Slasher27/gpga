@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { getClient } from '../db.js';
+import { requireAdmin } from '../auth-middleware.js';
 
 const router = Router();
 
@@ -21,7 +22,7 @@ router.get('/', async (_req, res) => {
   res.json(scores);
 });
 
-router.put('/', async (req, res) => {
+router.put('/', requireAdmin, async (req, res) => {
   const { player_id, round_id, strokes, handicap, stableford } = req.body;
   await getClient().execute({
     sql: 'INSERT OR REPLACE INTO scores (player_id, round_id, strokes, handicap, stableford) VALUES (?, ?, ?, ?, ?)',

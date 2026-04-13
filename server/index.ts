@@ -1,8 +1,10 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import rateLimit from 'express-rate-limit';
 import { initSchema } from './db.js';
 import { seedDatabase } from './seed.js';
+import { requireAuth } from './auth-middleware.js';
 import playersRouter from './routes/players.js';
 import seasonsRouter from './routes/seasons.js';
 import roundsRouter from './routes/rounds.js';
@@ -18,27 +20,36 @@ import pushRouter from './routes/push.js';
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-app.use(cors());
+const allowedOrigin = process.env.FRONTEND_URL || 'http://localhost:5173';
+app.use(cors({ origin: allowedOrigin, credentials: false }));
 app.use(express.json());
 
-// API routes
-app.use('/api/players', playersRouter);
-app.use('/api/seasons', seasonsRouter);
-app.use('/api/rounds', roundsRouter);
-app.use('/api/scores', scoresRouter);
-app.use('/api/fines', finesRouter);
-app.use('/api/courses', coursesRouter);
-app.use('/api/auth', authRouter);
-app.use('/api/buy-in', buyInRouter);
-app.use('/api/teams', teamsRouter);
-app.use('/api/notifications', notificationsRouter);
-app.use('/api/push', pushRouter);
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many login attempts, please try again later' }
+});
 
+// Public routes
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+app.use('/api/auth', authLimiter, authRouter);
 
-// Initialize DB schema and seed, then start
+// Protected routes — all require a valid JWT
+app.use('/api/players', requireAuth, playersRouter);
+app.use('/api/seasons', requireAuth, seasonsRouter);
+app.use('/api/rounds', requireAuth, roundsRouter);
+app.use('/api/scores', requireAuth, scoresRouter);
+app.use('/api/fines', requireAuth, finesRouter);
+app.use('/api/courses', requireAuth, coursesRouter);
+app.use('/api/buy-in', requireAuth, buyInRouter);
+app.use('/api/teams', requireAuth, teamsRouter);
+app.use('/api/notifications', requireAuth, notificationsRouter);
+app.use('/api/push', requireAuth, pushRouter);
+
 async function start() {
   await initSchema();
   await seedDatabase();

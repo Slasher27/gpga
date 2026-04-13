@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { getClient } from '../db.js';
 import { notify } from '../notify.js';
+import { requireAdmin } from '../auth-middleware.js';
 
 // Tiered fine total: first N units at base amount, remainder at tier_amount.
 // When tier_threshold = 0, it's a flat fine (quantity * amount).
@@ -27,7 +28,7 @@ router.get('/types', async (req, res) => {
   res.json(result.rows);
 });
 
-router.post('/types', async (req, res) => {
+router.post('/types', requireAdmin, async (req, res) => {
   const { season_id, name, amount, description, sort_order, is_open, tier_threshold, tier_amount } = req.body;
   const result = await getClient().execute({
     sql: 'INSERT INTO fine_types (season_id, name, amount, description, sort_order, is_open, tier_threshold, tier_amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
@@ -36,7 +37,7 @@ router.post('/types', async (req, res) => {
   res.status(201).json({ id: Number(result.lastInsertRowid) });
 });
 
-router.put('/types/:id', async (req, res) => {
+router.put('/types/:id', requireAdmin, async (req, res) => {
   const { id } = req.params;
   const fields: string[] = [];
   const values: any[] = [];
@@ -58,7 +59,7 @@ router.put('/types/:id', async (req, res) => {
   res.json({ ok: true });
 });
 
-router.delete('/types/:id', async (req, res) => {
+router.delete('/types/:id', requireAdmin, async (req, res) => {
   await getClient().execute({ sql: 'DELETE FROM fine_types WHERE id = ?', args: [Number(req.params.id)] });
   res.json({ ok: true });
 });
@@ -120,7 +121,7 @@ router.get('/by-round', async (_req, res) => {
   res.json(fines);
 });
 
-router.put('/set', async (req, res) => {
+router.put('/set', requireAdmin, async (req, res) => {
   const { player_id, round_id, fine_type_id, quantity } = req.body;
   const db = getClient();
 
@@ -150,7 +151,7 @@ router.put('/set', async (req, res) => {
   res.json({ ok: true });
 });
 
-router.put('/pay-round', async (req, res) => {
+router.put('/pay-round', requireAdmin, async (req, res) => {
   const { player_id, round_id, paid } = req.body;
   const paidDate = paid ? new Date().toISOString().split('T')[0] : null;
 
@@ -169,7 +170,7 @@ router.put('/pay-round', async (req, res) => {
   res.json({ ok: true });
 });
 
-router.put('/confirm', async (req, res) => {
+router.put('/confirm', requireAdmin, async (req, res) => {
   const { player_id, round_id, confirmed } = req.body;
   const confirmedDate = confirmed ? new Date().toISOString().split('T')[0] : null;
 

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { getClient } from '../db.js';
+import { requireMaster, hashPassword } from '../auth-middleware.js';
 
 const router = Router();
 
@@ -8,11 +9,12 @@ router.get('/', async (_req, res) => {
   res.json(result.rows);
 });
 
-router.post('/', async (req, res) => {
+router.post('/', requireMaster, async (req, res) => {
   const { id, name, email, password, role, status, avatar } = req.body;
+  const hashed = await hashPassword(password || 'password');
   await getClient().execute({
     sql: 'INSERT INTO players (id, name, email, password, role, status, avatar) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    args: [id, name, email, password || 'password', role, status, avatar]
+    args: [id, name, email, hashed, role, status, avatar]
   });
   res.status(201).json({ id });
 });
@@ -20,13 +22,30 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   const { id } = req.params;
   const updates = req.body;
+
+  // Self-edit or master can edit anyone
+  const caller = req.auth;
+  const isSelf = caller?.sub === id;
+  const isMaster = caller?.role === 'master';
+  if (!isSelf && !isMaster) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  // Only master can change role or status
+  const selfEditable = ['name', 'email', 'password', 'avatar', 'notify_email', 'notify_push'];
+  const masterOnly = ['role', 'status'];
   const fields: string[] = [];
   const values: any[] = [];
 
   for (const [key, val] of Object.entries(updates)) {
-    if (['name', 'email', 'password', 'role', 'status', 'avatar', 'notify_email', 'notify_push'].includes(key)) {
-      fields.push(`${key} = ?`);
-      values.push(val);
+    if (selfEditable.includes(key) || (isMaster && masterOnly.includes(key))) {
+      if (key === 'password') {
+        fields.push('password = ?');
+        values.push(await hashPassword(String(val)));
+      } else {
+        fields.push(`${key} = ?`);
+        values.push(val);
+      }
     }
   }
 
@@ -40,7 +59,7 @@ router.put('/:id', async (req, res) => {
   res.json({ ok: true });
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireMaster, async (req, res) => {
   await getClient().execute({ sql: 'DELETE FROM players WHERE id = ?', args: [req.params.id] });
   res.json({ ok: true });
 });

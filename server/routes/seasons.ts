@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { getClient } from '../db.js';
+import { requireAdmin } from '../auth-middleware.js';
 
 const router = Router();
 
@@ -13,7 +14,7 @@ router.get('/active', async (_req, res) => {
   res.json(result.rows[0] || null);
 });
 
-router.post('/', async (req, res) => {
+router.post('/', requireAdmin, async (req, res) => {
   const { year, name, buy_in_amount, is_active, medal_1st, medal_2nd, stableford_1st, stableford_2nd, team_1st } = req.body;
   const db = getClient();
 
@@ -29,7 +30,7 @@ router.post('/', async (req, res) => {
   res.status(201).json({ id: Number(result.lastInsertRowid) });
 });
 
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireAdmin, async (req, res) => {
   const { id } = req.params;
   const db = getClient();
 

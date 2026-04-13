@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { getClient } from '../db.js';
+import { requireAdmin } from '../auth-middleware.js';
 
 const router = Router();
 
@@ -23,7 +24,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/teams
-router.post('/', async (req, res) => {
+router.post('/', requireAdmin, async (req, res) => {
   const { season_id, name, player1_id, player2_id } = req.body;
   const result = await getClient().execute({
     sql: 'INSERT INTO teams (season_id, name, player1_id, player2_id) VALUES (?, ?, ?, ?)',
@@ -33,7 +34,7 @@ router.post('/', async (req, res) => {
 });
 
 // PUT /api/teams/:id
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireAdmin, async (req, res) => {
   const { id } = req.params;
   const fields: string[] = [];
   const values: any[] = [];
@@ -56,7 +57,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // DELETE /api/teams/:id
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireAdmin, async (req, res) => {
   await getClient().execute({ sql: 'DELETE FROM teams WHERE id = ?', args: [Number(req.params.id)] });
   res.json({ ok: true });
 });

@@ -1,13 +1,38 @@
-// Frontend API client — replaces direct sql.js database calls
-// All functions mirror the old db.ts exports so AppOld.jsx can swap with minimal changes
+// Frontend API client — talks to the Express/Turso backend via /api
 
 const BASE = '/api';
+const TOKEN_KEY = 'gpga_token';
+
+function getToken(): string | null {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+function setToken(token: string): void {
+  localStorage.setItem(TOKEN_KEY, token);
+}
+
+function clearToken(): void {
+  localStorage.removeItem(TOKEN_KEY);
+}
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${url}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options
-  });
+  const token = getToken();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (options?.headers) Object.assign(headers, options.headers as Record<string, string>);
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const res = await fetch(`${BASE}${url}`, { ...options, headers });
+
+  if (res.status === 401) {
+    clearToken();
+    localStorage.removeItem('gpga_authenticated');
+    localStorage.removeItem('gpga_current_user');
+    if (typeof window !== 'undefined' && window.location.pathname !== '/') {
+      window.location.reload();
+    }
+    throw new Error('Session expired');
+  }
+
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error || `API error ${res.status}`);
@@ -287,18 +312,19 @@ export async function unsubscribePush(endpoint: string) {
 
 export async function authenticateUser(email: string, password: string) {
   try {
-    return await request<any>('/auth/login', {
+    const user = await request<{ id: string; name: string; email: string; role: string; status: string; token: string }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password })
     });
+    if (user?.token) setToken(user.token);
+    return user;
   } catch {
     return null;
   }
 }
 
-// Auth state helpers (still use localStorage for session)
 export function isAuthenticated(): boolean {
-  return localStorage.getItem('gpga_authenticated') === 'true';
+  return !!getToken() && localStorage.getItem('gpga_authenticated') === 'true';
 }
 
 export function setAuthenticated(value: boolean): void {
@@ -314,14 +340,13 @@ export function setCurrentUserId(id: string): void {
 }
 
 export function logout(): void {
+  clearToken();
   localStorage.removeItem('gpga_authenticated');
   localStorage.removeItem('gpga_current_user');
 }
 
-// No-op replacements for functions that no longer apply
 export async function initDatabase() { /* server handles DB init */ }
 export function resetDatabase() {
-  localStorage.removeItem('gpga_authenticated');
-  localStorage.removeItem('gpga_current_user');
+  logout();
   window.location.reload();
 }

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { getClient } from '../db.js';
 import { notify, getSeasonPlayerIds } from '../notify.js';
+import { requireAdmin } from '../auth-middleware.js';
 
 const router = Router();
 
@@ -12,7 +13,7 @@ router.get('/', async (req, res) => {
   res.json(result.rows);
 });
 
-router.post('/', async (req, res) => {
+router.post('/', requireAdmin, async (req, res) => {
   const { season_id, name, date, course_id, course_name, tee_time, tee_time_2 } = req.body;
   const result = await getClient().execute({
     sql: 'INSERT INTO rounds (season_id, name, date, course_id, course_name, tee_time, tee_time_2) VALUES (?, ?, ?, ?, ?, ?, ?)',
@@ -25,7 +26,7 @@ router.post('/', async (req, res) => {
   res.status(201).json({ id: roundId });
 });
 
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireAdmin, async (req, res) => {
   const { id } = req.params;
   const fields: string[] = [];
   const values: any[] = [];
@@ -76,7 +77,7 @@ router.put('/:id', async (req, res) => {
   res.json({ ok: true });
 });
 
-router.put('/:id/close', async (req, res) => {
+router.put('/:id/close', requireAdmin, async (req, res) => {
   const roundId = Number(req.params.id);
   const db = getClient();
 
@@ -135,7 +136,7 @@ router.put('/:id/close', async (req, res) => {
   res.json({ ok: true });
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireAdmin, async (req, res) => {
   await getClient().execute({ sql: 'DELETE FROM rounds WHERE id = ?', args: [Number(req.params.id)] });
   res.json({ ok: true });
 });

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { getClient } from '../db.js';
+import { requireAdmin } from '../auth-middleware.js';
 
 const router = Router();
 
@@ -16,7 +17,7 @@ router.get('/season/:seasonId', async (req, res) => {
 });
 
 // Add player to season
-router.post('/season/:seasonId/player', async (req, res) => {
+router.post('/season/:seasonId/player', requireAdmin, async (req, res) => {
   const { player_id } = req.body;
   await getClient().execute({
     sql: 'INSERT OR IGNORE INTO season_players (season_id, player_id) VALUES (?, ?)',
@@ -26,7 +27,7 @@ router.post('/season/:seasonId/player', async (req, res) => {
 });
 
 // Remove player from season
-router.delete('/season/:seasonId/player/:playerId', async (req, res) => {
+router.delete('/season/:seasonId/player/:playerId', requireAdmin, async (req, res) => {
   await getClient().execute({
     sql: 'DELETE FROM season_players WHERE season_id = ? AND player_id = ?',
     args: [Number(req.params.seasonId), req.params.playerId]
@@ -47,7 +48,7 @@ router.get('/:playerId/:seasonId', async (req, res) => {
   res.json({ isPaid: Number(row.buy_in_paid) === 1, date: row.buy_in_date || null });
 });
 
-router.put('/', async (req, res) => {
+router.put('/', requireAdmin, async (req, res) => {
   const { player_id, season_id, paid } = req.body;
   const date = paid ? new Date().toISOString().split('T')[0] : null;
 
