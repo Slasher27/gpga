@@ -19,7 +19,7 @@ function calcFineTotal(quantity, amount, tierThreshold = 0, tierAmount = 0) {
 export default function FinancesView({
   leaderboardData, rounds, scores, players, activeSeason,
   isReadOnlySeason, currentUser, showToast,
-  onAddFineType, onDeleteFineType, onFinesChanged
+  onAddFineType, onDeleteFineType, onFinesChanged, fineTypesVersion = 0
 }) {
   const isAdmin = currentUser.role === 'master' || currentUser.role === 'admin';
   const sortedByFines = useMemo(() => [...leaderboardData].sort((a, b) => b.totalFines - a.totalFines), [leaderboardData]);
@@ -29,7 +29,7 @@ export default function FinancesView({
   // --- State ---
   const [finesTab, setFinesTab] = useState(() => isAdmin ? 'assign' : 'history');
   const [selectedRound, setSelectedRound] = useState(mostRecentRound?.id || null);
-  const [selectedPlayer, setSelectedPlayer] = useState(() => localStorage.getItem('gpga_selected_player') || null);
+  const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [fineTypes, setFineTypes] = useState([]);
   const [playerFines, setPlayerFines] = useState([]);
   const [isRoundConfirmed, setIsRoundConfirmed] = useState(false);
@@ -59,7 +59,7 @@ export default function FinancesView({
         setBuyInStatuses(cache);
       });
     }
-  }, [activeSeason, players.length]);
+  }, [activeSeason, players.length, fineTypesVersion]);
 
   useEffect(() => {
     if (selectedPlayer && selectedRound) {
@@ -84,7 +84,6 @@ export default function FinancesView({
   }, [activeSeason]);
 
   // --- Handlers ---
-  const handlePlayerChange = (id) => { setSelectedPlayer(id); localStorage.setItem('gpga_selected_player', id); };
   const refreshTimer = useRef(null);
   const refreshLocalData = useCallback(() => {
     clearTimeout(refreshTimer.current);
@@ -209,7 +208,7 @@ export default function FinancesView({
                 <option value="">Select Round</option>
                 {rounds.map(r => <option key={r.id} value={r.id}>{r.name} — {r.course_name}</option>)}
               </select>
-              <select id="fines-select-player" value={selectedPlayer || ''} onChange={(e) => handlePlayerChange(e.target.value)}
+              <select id="fines-select-player" value={selectedPlayer || ''} onChange={(e) => setSelectedPlayer(e.target.value)}
                 className="select select-bordered w-full min-h-[44px]" aria-label="Select player">
                 <option value="">Select Player</option>
                 {players.filter(p => p.status === 'active').map(p => (
