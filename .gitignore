@@ -39,5 +39,8 @@ dist-ssr
 # TypeScript incremental build info
 *.tsbuildinfo
 
+# Generated declaration from the composite node tsconfig (vite.config.js)
+vite.config.d.ts
+
 # Claude Code agent files
 .claude/

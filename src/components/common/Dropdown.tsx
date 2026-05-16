@@ -47,7 +47,7 @@ export default function Dropdown<T extends string | number = string>({
       </button>
       {open && (
         <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <button type="button" aria-label="Close menu" className="fixed inset-0 z-40 cursor-default" onClick={() => setOpen(false)} />
           <div className={`absolute z-50 w-full bg-white border border-slate-200 rounded-lg overflow-hidden ${dropUp ? 'bottom-full mb-1' : 'top-full mt-1'}`}>
             {options.map(o => (
               <button key={o.value} onClick={() => { onChange(o.value); setOpen(false); }}

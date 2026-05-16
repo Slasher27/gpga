@@ -1,7 +1,7 @@
 // @ts-nocheck — legacy JS patterns; migrate to strict TS in a follow-up pass.
 import { useState, useEffect, useMemo } from 'react';
 import { Plus, Save, Edit, Trash2, ChevronDown } from 'lucide-react';
-import * as DB from '../api.ts';
+import * as DB from '../api';
 import { NoPlayersEmptyState, Avatar, Card } from './common';
 
 const TeamManagementSection = ({ teams, setTeams, isAddingTeam, setIsAddingTeam, players, activeSeason, showToast }) => {
@@ -110,14 +110,14 @@ const TeamManagementSection = ({ teams, setTeams, isAddingTeam, setIsAddingTeam,
                     <button
                       onClick={() => setEditingTeam(team)}
                       className="p-2.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
-                      aria-label={`Edit ${team.name}`}
+                      aria-label="Edit team"
                     >
                       <Edit size={16} />
                     </button>
                     <button
                       onClick={() => handleDeleteTeam(team.id)}
                       className="p-2.5 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
-                      aria-label={`Delete ${team.name}`}
+                      aria-label="Delete team"
                     >
                       <Trash2 size={16} />
                     </button>

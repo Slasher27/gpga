@@ -2,6 +2,20 @@ import { useMemo } from 'react';
 import { X, Search } from 'lucide-react';
 import type { GolfCourse, Round, FinesSummary, ScoresMap } from '../../api';
 
+// --- timeAgo ---
+// Relative time string. `long` => "5m ago" + date fallback past 7d (full page),
+// otherwise compact "5m" (notification dropdown).
+export function timeAgo(date: string, long = false): string {
+  const mins = Math.floor((Date.now() - new Date(date).getTime()) / 60000);
+  if (mins < 1) return long ? 'just now' : 'now';
+  if (mins < 60) return `${mins}m${long ? ' ago' : ''}`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h${long ? ' ago' : ''}`;
+  const days = Math.floor(hrs / 24);
+  if (long && days >= 7) return new Date(date).toLocaleDateString();
+  return `${days}d${long ? ' ago' : ''}`;
+}
+
 // --- TabBar ---
 export interface TabDef {
   id: string;
@@ -188,24 +202,25 @@ export const CourseSelector = ({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto p-3 bg-slate-100 rounded-lg">
           {filtered.length > 0 ? (
             filtered.map((course) => (
-              <div
+              <button
+                type="button"
                 key={course.id}
                 onClick={() => onSelect(course)}
-                className={`rounded-lg p-3 cursor-pointer transition-all border ${
+                className={`text-left w-full rounded-lg p-3 transition-all border ${
                   selected?.id === course.id ? 'bg-emerald-600 text-white border-emerald-700' : 'bg-white hover:bg-slate-50 border-slate-200'
                 }`}
               >
-                <div className="flex items-start justify-between gap-2">
-                  <h4 className="text-sm font-semibold leading-tight">{course.name}</h4>
+                <span className="flex items-start justify-between gap-2">
+                  <span className="text-sm font-semibold leading-tight">{course.name}</span>
                   {selected?.id === course.id && (
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
                     </svg>
                   )}
-                </div>
-                <p className={`text-xs mt-1 ${selected?.id === course.id ? 'opacity-90' : 'text-slate-500'}`}>{course.location}</p>
-                <div className={`inline-block mt-2 px-2 py-0.5 rounded-full text-[10px] font-semibold ${selected?.id === course.id ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'}`}>Par {course.par}</div>
-              </div>
+                </span>
+                <span className={`block text-xs mt-1 ${selected?.id === course.id ? 'opacity-90' : 'text-slate-500'}`}>{course.location}</span>
+                <span className={`inline-block mt-2 px-2 py-0.5 rounded-full text-[10px] font-semibold ${selected?.id === course.id ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'}`}>Par {course.par}</span>
+              </button>
             ))
           ) : (
             <div className="col-span-full text-center py-8">

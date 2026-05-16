@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Trophy, MapPin, Calendar, Clock } from 'lucide-react';
 import { TabBar, Card, Avatar } from './common';
-import * as DB from '../api.ts';
+import * as DB from '../api';
 
 const RankBadge = ({ idx, dq }) => (
   <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold flex-shrink-0 ${

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Plus, Save, Edit, Trash2, MapPin, Calendar, Lock, CheckCircle } from 'lucide-react';
-import * as DB from '../api.ts';
+import * as DB from '../api';
 import { Card } from './common';
 
 export default function RoundsView({ rounds, scores, setScores, players, activeSeason, isReadOnlySeason, showToast, onAddRound, onEditRound, onDeleteRound, onCloseRound }) {
@@ -239,7 +239,7 @@ export default function RoundsView({ rounds, scores, setScores, players, activeS
                         />
                       </div>
                       <div>
-                        <label className="text-[10px] text-slate-400 uppercase block mb-0.5">Net</label>
+                        <span className="text-[10px] text-slate-400 uppercase block mb-0.5">Net</span>
                         <div className="w-full text-center rounded-lg px-2 py-2 text-sm min-h-[40px] border border-slate-200 bg-slate-100 text-slate-700 font-semibold flex items-center justify-center">
                           {vals.net || '-'}
                         </div>

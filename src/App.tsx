@@ -1,6 +1,6 @@
 // @ts-nocheck — legacy JS patterns; migrate to strict TS in a follow-up pass.
 import { useState, useEffect, useMemo, lazy, Suspense } from 'react';
-import { TrendingUp, Banknote, Calendar, Users, Plus, Save } from 'lucide-react';
+import { TrendingUp, Banknote, Calendar, Users, Plus, Save, Shuffle } from 'lucide-react';
 import * as DB from './api';
 import { DashboardSkeleton, useConfirm, Modal, DatePicker, CourseSelector } from './components/common';
 import LoginPage from './components/LoginPage';
@@ -16,6 +16,12 @@ const PlayersView = lazy(() => import('./components/PlayersView'));
 const PlayerProfilePage = lazy(() => import('./components/PlayerProfilePage'));
 const SeasonSettings = lazy(() => import('./components/SeasonSettings'));
 const NotificationsView = lazy(() => import('./components/NotificationsView'));
+const TeamDrawPage = lazy(() => import('./components/TeamDraw/TeamDrawPage'));
+
+// A season is 9 rounds; the best 8 count for individual comps (medal & stableford).
+// The worst round is only dropped once the full season exists and the player
+// completed all 9 — never mid-season (that would inflate standings).
+const SEASON_ROUNDS = 9;
 
 const mergeScoresAndFines = (scoresData, finesData) => {
   const merged = { ...scoresData };
@@ -179,7 +185,7 @@ export default function App() {
       });
       const roundsMissed = totalRoundsCreated - roundsPlayed;
       const isDisqualified = roundsMissed > 1;
-      const canDropWorstRound = roundsPlayed === totalRoundsCreated && roundsPlayed > 0;
+      const canDropWorstRound = totalRoundsCreated >= SEASON_ROUNDS && roundsPlayed === totalRoundsCreated;
       const netTotal = canDropWorstRound ? totalStrokes - worstRound : totalStrokes;
       const netStableford = canDropWorstRound ? totalStableford - worstStableford : totalStableford;
       return { ...player, totalStrokes, totalStableford, netTotal, netStableford, worstRound: canDropWorstRound ? worstRound : 0, worstStableford: canDropWorstRound ? worstStableford : 0, totalFines, roundsPlayed, roundsMissed, isDisqualified, pScores, canDropWorstRound };
@@ -254,7 +260,7 @@ export default function App() {
       await DB.deleteRound(id);
       setRounds(prev => prev.filter(r => r.id !== id));
       showToast(`Round "${name}" deleted successfully!`, 'success');
-    }, 'danger');
+    });
   };
 
   const handleCloseRound = (id, name) => {
@@ -262,7 +268,7 @@ export default function App() {
       await DB.closeRound(id);
       setRounds(prev => prev.map(r => r.id === id ? { ...r, closed: 1 } : r));
       showToast(`${name} closed — results sent to all players!`);
-    }, 'danger');
+    });
   };
 
   const handleAddFineType = async (e) => {
@@ -290,7 +296,7 @@ export default function App() {
       setFineTypesVersion(v => v + 1);
       refreshFines?.();
       showToast(`Fine type "${name}" deleted`, 'success');
-    }, 'danger');
+    });
   };
 
   // --- Auth/Loading Guards ---
@@ -304,6 +310,7 @@ export default function App() {
     { id: 'dashboard', icon: <TrendingUp size={20} />, label: 'Dashboard' },
     { id: 'fines', icon: <Banknote size={20} />, label: 'Finances' },
     ...(isAdmin ? [{ id: 'rounds', icon: <Calendar size={20} />, label: 'Rounds' }] : []),
+    ...(isAdmin ? [{ id: 'teamdraw', icon: <Shuffle size={20} />, label: 'Team Draw' }] : []),
     ...(isMaster ? [{ id: 'admin', icon: <Users size={20} />, label: 'Players' }] : []),
   ];
 
@@ -322,6 +329,7 @@ export default function App() {
           {view === 'dashboard' && <DashboardView activeSeason={activeSeason} leaderboardData={leaderboardData} rounds={rounds} scores={scores} players={players} golfCourses={golfCourses} />}
           {view === 'fines' && <FinancesView leaderboardData={leaderboardData} rounds={rounds} scores={scores} players={players} activeSeason={activeSeason} isReadOnlySeason={isReadOnlySeason} currentUser={currentUser} showToast={showToast} onAddFineType={() => setIsAddFineTypeModalOpen(true)} onDeleteFineType={handleDeleteFineType} onFinesChanged={refreshFines} fineTypesVersion={fineTypesVersion} />}
           {view === 'rounds' && <RoundsView rounds={rounds} scores={scores} setScores={setScores} players={players} activeSeason={activeSeason} isReadOnlySeason={isReadOnlySeason} showToast={showToast} onAddRound={() => setIsAddRoundModalOpen(true)} onEditRound={handleEditRound} onDeleteRound={handleDeleteRound} onCloseRound={handleCloseRound} />}
+          {view === 'teamdraw' && isAdmin && <TeamDrawPage players={players} activeSeason={activeSeason} />}
           {view === 'admin' && !managingPlayerId && <PlayersView players={players} scores={scores} rounds={rounds} activeSeason={activeSeason} isReadOnlySeason={isReadOnlySeason} currentUser={currentUser} showToast={showToast} showConfirm={showConfirm} setPlayers={setPlayers} onAddPlayer={() => setIsAddPlayerModalOpen(true)} managingPlayerId={managingPlayerId} setManagingPlayerId={setManagingPlayerId} />}
           {view === 'admin' && managingPlayerId && <PlayerProfilePage players={players} setPlayers={setPlayers} scores={scores} rounds={rounds} activeSeason={activeSeason} currentUser={currentUser} managingPlayerId={managingPlayerId} setManagingPlayerId={setManagingPlayerId} showToast={showToast} />}
           {view === 'profile' && <ProfileView currentUser={currentUser} players={players} setPlayers={setPlayers} scores={scores} rounds={rounds} activeSeason={activeSeason} showToast={showToast} />}

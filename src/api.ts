@@ -574,6 +574,7 @@ export async function deleteTeam(id: number): Promise<OkResult> {
   return request<OkResult>(`/teams/${id}`, { method: 'DELETE' });
 }
 
+
 // ============================================================================
 // Notifications
 // ============================================================================

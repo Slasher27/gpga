@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Bell } from 'lucide-react';
 import * as DB from '../../api';
 import type { Notification } from '../../api';
+import { timeAgo } from './SharedUI';
 
 export default function NotificationPanel({
   playerId,
@@ -52,15 +53,6 @@ export default function NotificationPanel({
     setUnreadCount(0);
   };
 
-  const timeAgo = (date: string): string => {
-    const mins = Math.floor((Date.now() - new Date(date).getTime()) / 60000);
-    if (mins < 1) return 'now';
-    if (mins < 60) return `${mins}m`;
-    const hrs = Math.floor(mins / 60);
-    if (hrs < 24) return `${hrs}h`;
-    return `${Math.floor(hrs / 24)}d`;
-  };
-
   return (
     <div ref={ref} className="relative">
       <button onClick={() => setOpen(!open)} className="relative p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors" aria-label="Notifications">
@@ -74,7 +66,7 @@ export default function NotificationPanel({
 
       {open && (
         <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <button type="button" aria-label="Close notifications" className="fixed inset-0 z-40 cursor-default" onClick={() => setOpen(false)} />
           <div className="fixed left-2 right-2 top-16 z-50 sm:absolute sm:left-auto sm:top-auto sm:right-0 sm:mt-1 sm:w-80 bg-white border border-slate-200 rounded-lg overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
               <p className="text-sm font-semibold text-slate-800">Notifications</p>

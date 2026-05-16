@@ -16,6 +16,23 @@ export function getClient(): Client {
   return client;
 }
 
+// Add any missing columns to an existing table. Reads the current schema once
+// (PRAGMA), then issues ALTERs only for columns that don't exist yet — so an
+// already-migrated DB pays a single cheap read instead of N failing ALTERs.
+async function ensureColumns(
+  db: Client,
+  table: string,
+  columns: Record<string, string>
+): Promise<void> {
+  const info = await db.execute(`PRAGMA table_info(${table})`);
+  const existing = new Set(info.rows.map((r) => r.name as string));
+  for (const [name, definition] of Object.entries(columns)) {
+    if (!existing.has(name)) {
+      await db.execute(`ALTER TABLE ${table} ADD COLUMN ${name} ${definition}`);
+    }
+  }
+}
+
 export async function initSchema(): Promise<void> {
   const db = getClient();
 
@@ -163,21 +180,31 @@ export async function initSchema(): Promise<void> {
     )`,
   ], 'write');
 
-  // Migrations for existing tables
-  try { await db.execute('ALTER TABLE fine_types ADD COLUMN sort_order INTEGER DEFAULT 0'); } catch {}
-  try { await db.execute('ALTER TABLE fine_types ADD COLUMN is_open INTEGER DEFAULT 0'); } catch {}
-  try { await db.execute('ALTER TABLE fine_types ADD COLUMN tier_threshold INTEGER DEFAULT 0'); } catch {}
-  try { await db.execute('ALTER TABLE fine_types ADD COLUMN tier_amount INTEGER DEFAULT 0'); } catch {}
-  try { await db.execute('ALTER TABLE seasons ADD COLUMN medal_1st INTEGER DEFAULT 0'); } catch {}
-  try { await db.execute('ALTER TABLE seasons ADD COLUMN medal_2nd INTEGER DEFAULT 0'); } catch {}
-  try { await db.execute('ALTER TABLE seasons ADD COLUMN stableford_1st INTEGER DEFAULT 0'); } catch {}
-  try { await db.execute('ALTER TABLE seasons ADD COLUMN stableford_2nd INTEGER DEFAULT 0'); } catch {}
-  try { await db.execute('ALTER TABLE seasons ADD COLUMN team_1st INTEGER DEFAULT 0'); } catch {}
-  try { await db.execute('ALTER TABLE rounds ADD COLUMN tee_time TEXT'); } catch {}
-  try { await db.execute('ALTER TABLE rounds ADD COLUMN tee_time_2 TEXT'); } catch {}
-  try { await db.execute('ALTER TABLE rounds ADD COLUMN closed INTEGER DEFAULT 0'); } catch {}
-  try { await db.execute('ALTER TABLE players ADD COLUMN notify_email INTEGER DEFAULT 1'); } catch {}
-  try { await db.execute('ALTER TABLE players ADD COLUMN notify_push INTEGER DEFAULT 1'); } catch {}
+  // Migrations for pre-existing tables. One PRAGMA per table, then ALTER only the
+  // columns that are actually missing — instead of ~13 ALTERs that throw on every
+  // (serverless cold-start) boot once the DB is already migrated.
+  await ensureColumns(db, 'fine_types', {
+    sort_order: 'INTEGER DEFAULT 0',
+    is_open: 'INTEGER DEFAULT 0',
+    tier_threshold: 'INTEGER DEFAULT 0',
+    tier_amount: 'INTEGER DEFAULT 0',
+  });
+  await ensureColumns(db, 'seasons', {
+    medal_1st: 'INTEGER DEFAULT 0',
+    medal_2nd: 'INTEGER DEFAULT 0',
+    stableford_1st: 'INTEGER DEFAULT 0',
+    stableford_2nd: 'INTEGER DEFAULT 0',
+    team_1st: 'INTEGER DEFAULT 0',
+  });
+  await ensureColumns(db, 'rounds', {
+    tee_time: 'TEXT',
+    tee_time_2: 'TEXT',
+    closed: 'INTEGER DEFAULT 0',
+  });
+  await ensureColumns(db, 'players', {
+    notify_email: 'INTEGER DEFAULT 1',
+    notify_push: 'INTEGER DEFAULT 1',
+  });
 
   // Add missing Western Cape courses
   await db.execute(`INSERT OR IGNORE INTO golf_courses (id, name, location, par) VALUES

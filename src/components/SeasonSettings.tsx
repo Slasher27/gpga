@@ -1,7 +1,7 @@
 // @ts-nocheck — legacy JS patterns; migrate to strict TS in a follow-up pass.
 import { useState, useEffect } from 'react';
 import { Plus, Trash2, Save, X, UserPlus } from 'lucide-react';
-import * as DB from '../api.ts';
+import * as DB from '../api';
 import { TabBar, Card } from './common';
 
 const PrizeFields = ({ values, onChange, uncontrolled, prefix = '' }) => {
@@ -62,7 +62,7 @@ export default function SeasonSettings({ activeSeason, allSeasons, players, roun
       await DB.removeSeasonPlayer(activeSeason.id, playerId);
       setSeasonPlayers(await DB.getSeasonPlayers(activeSeason.id));
       showToast(`${playerName} removed from season`);
-    }, 'danger');
+    });
   };
 
   const handleSaveSettings = async (e) => {
@@ -110,7 +110,7 @@ export default function SeasonSettings({ activeSeason, allSeasons, players, roun
       await DB.updateSeason(activeSeason.id, { is_active: false });
       await onDataChanged();
       showToast(`${activeSeason.name} has ended`, 'success');
-    }, 'danger');
+    });
   };
 
   const handleOpenSeason = async () => {
@@ -218,6 +218,7 @@ export default function SeasonSettings({ activeSeason, allSeasons, players, roun
                       {sp.buy_in_paid ? 'Paid' : 'Due'}
                     </span>
                     <button onClick={() => handleRemoveFromSeason(sp.player_id, sp.name)}
+                      aria-label="Remove player from season"
                       className="p-2 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center">
                       <Trash2 size={14} />
                     </button>

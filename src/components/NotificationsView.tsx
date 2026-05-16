@@ -1,19 +1,10 @@
 // @ts-nocheck — legacy JS patterns; migrate to strict TS in a follow-up pass.
 import { useState, useEffect } from 'react';
 import { Bell } from 'lucide-react';
-import * as DB from '../api.ts';
-import { Card } from './common';
+import * as DB from '../api';
+import { Card, timeAgo } from './common';
 
-const timeAgo = (date) => {
-  const mins = Math.floor((Date.now() - new Date(date).getTime()) / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  if (days < 7) return `${days}d ago`;
-  return new Date(date).toLocaleDateString();
-};
+const timeAgoLong = (date) => timeAgo(date, true);
 
 export default function NotificationsView({ currentUser }) {
   const [notifications, setNotifications] = useState([]);
@@ -76,14 +67,14 @@ export default function NotificationsView({ currentUser }) {
               </div>
               <div className="divide-y divide-slate-50">
                 {unread.map(n => (
-                  <button key={n.id} onClick={() => handleMarkRead(n.id)}
+                  <button type="button" key={n.id} onClick={() => handleMarkRead(n.id)} aria-label="Mark notification as read"
                     className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors border-l-2 border-l-emerald-500">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-slate-800">{n.title}</p>
                         <p className="text-sm text-slate-500 mt-0.5">{n.body}</p>
                       </div>
-                      <span className="text-xs text-slate-400 flex-shrink-0 mt-0.5">{timeAgo(n.created_at)}</span>
+                      <span className="text-xs text-slate-400 flex-shrink-0 mt-0.5">{timeAgoLong(n.created_at)}</span>
                     </div>
                   </button>
                 ))}
@@ -105,7 +96,7 @@ export default function NotificationsView({ currentUser }) {
                         <p className="text-sm text-slate-600">{n.title}</p>
                         <p className="text-xs text-slate-400 mt-0.5">{n.body}</p>
                       </div>
-                      <span className="text-xs text-slate-400 flex-shrink-0 mt-0.5">{timeAgo(n.created_at)}</span>
+                      <span className="text-xs text-slate-400 flex-shrink-0 mt-0.5">{timeAgoLong(n.created_at)}</span>
                     </div>
                   </div>
                 ))}

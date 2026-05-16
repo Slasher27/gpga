@@ -1,7 +1,7 @@
 // @ts-nocheck — legacy JS patterns; migrate to strict TS in a follow-up pass.
 import { useState, useEffect } from 'react';
 import { Save, Camera, Mail, Bell } from 'lucide-react';
-import * as DB from '../api.ts';
+import * as DB from '../api';
 import { TabBar, Avatar, PlayerRoundsTable, FinesSummaryCards, StatsGrid, usePlayerStats, Card } from './common';
 
 export default function ProfileView({ currentUser, players, setPlayers, scores, rounds, activeSeason, showToast }) {
@@ -171,20 +171,24 @@ export default function ProfileView({ currentUser, players, setPlayers, scores, 
               <div className="space-y-4">
                 <p className="text-sm font-medium text-slate-700">Notification Preferences</p>
                 <div className="space-y-3 p-4 bg-slate-50 rounded-lg">
-                  <div className="flex items-center justify-between cursor-pointer" onClick={() => { const v = !notifyEmail; setNotifyEmail(v); toggleNotifyPref('notify_email', v); }}>
+                  <label className="flex items-center justify-between cursor-pointer">
                     <span className="flex items-center gap-2 text-sm text-slate-600"><Mail size={15} /> Email notifications</span>
-                    <div role="switch" aria-checked={notifyEmail}
-                      className={`w-10 h-6 rounded-full relative flex-shrink-0 transition-colors ${notifyEmail ? 'bg-emerald-500' : 'bg-slate-300'}`}>
-                      <div className={`w-5 h-5 bg-white rounded-full shadow absolute top-0.5 transition-all ${notifyEmail ? 'left-[18px]' : 'left-0.5'}`} />
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between cursor-pointer" onClick={() => { const v = !notifyPush; setNotifyPush(v); toggleNotifyPref('notify_push', v); }}>
+                    <span className="relative inline-block w-10 h-6 flex-shrink-0">
+                      <input type="checkbox" className="peer sr-only" checked={notifyEmail}
+                        onChange={() => { const v = !notifyEmail; setNotifyEmail(v); toggleNotifyPref('notify_email', v); }} />
+                      <span className={`block w-10 h-6 rounded-full transition-colors ${notifyEmail ? 'bg-emerald-500' : 'bg-slate-300'} peer-focus-visible:ring-2 peer-focus-visible:ring-emerald-400`} />
+                      <span className={`block w-5 h-5 bg-white rounded-full shadow absolute top-0.5 transition-all ${notifyEmail ? 'left-[18px]' : 'left-0.5'}`} />
+                    </span>
+                  </label>
+                  <label className="flex items-center justify-between cursor-pointer">
                     <span className="flex items-center gap-2 text-sm text-slate-600"><Bell size={15} /> Push notifications</span>
-                    <div role="switch" aria-checked={notifyPush}
-                      className={`w-10 h-6 rounded-full relative flex-shrink-0 transition-colors ${notifyPush ? 'bg-emerald-500' : 'bg-slate-300'}`}>
-                      <div className={`w-5 h-5 bg-white rounded-full shadow absolute top-0.5 transition-all ${notifyPush ? 'left-[18px]' : 'left-0.5'}`} />
-                    </div>
-                  </div>
+                    <span className="relative inline-block w-10 h-6 flex-shrink-0">
+                      <input type="checkbox" className="peer sr-only" checked={notifyPush}
+                        onChange={() => { const v = !notifyPush; setNotifyPush(v); toggleNotifyPref('notify_push', v); }} />
+                      <span className={`block w-10 h-6 rounded-full transition-colors ${notifyPush ? 'bg-emerald-500' : 'bg-slate-300'} peer-focus-visible:ring-2 peer-focus-visible:ring-emerald-400`} />
+                      <span className={`block w-5 h-5 bg-white rounded-full shadow absolute top-0.5 transition-all ${notifyPush ? 'left-[18px]' : 'left-0.5'}`} />
+                    </span>
+                  </label>
                 </div>
                 <p className="text-xs text-slate-400">Changes save automatically. In-app notifications are always on.</p>
               </div>

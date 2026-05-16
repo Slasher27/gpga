@@ -1,7 +1,7 @@
 // @ts-nocheck — legacy JS patterns; migrate to strict TS in a follow-up pass.
 import { useState, useEffect } from 'react';
 import { Save, Camera, ChevronDown } from 'lucide-react';
-import * as DB from '../api.ts';
+import * as DB from '../api';
 import { TabBar, Avatar, PlayerRoundsTable, FinesSummaryCards, StatsGrid, usePlayerStats, Card } from './common';
 
 const badgeStyles = {
@@ -30,9 +30,9 @@ export default function PlayerProfilePage({ players, setPlayers, scores, rounds,
     }
   }, [managingPlayerId, player?.id, activeSeason?.id]);
 
-  if (!player) return null;
+  const { playerScores, roundsPlayed, totalStrokes, totalStableford, avgScore } = usePlayerStats(player?.id ?? '', scores, rounds);
 
-  const { playerScores, roundsPlayed, totalStrokes, totalStableford, avgScore } = usePlayerStats(player.id, scores, rounds);
+  if (!player) return null;
 
   const handleSave = async (e) => {
     e.preventDefault();

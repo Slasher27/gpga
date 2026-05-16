@@ -64,16 +64,12 @@ export default function DatePicker({
       {isOpen && (
         <div
           className="fixed inset-0 z-[70] flex items-end justify-center sm:items-center sm:p-4"
-          onClick={() => setIsOpen(false)}
           role="dialog"
           aria-modal="true"
           aria-label="Select date"
         >
-          <div className="absolute inset-0 bg-slate-900/50" />
-          <div
-            className="relative w-full max-w-md sm:max-w-xs bg-white shadow-xl rounded-t-2xl sm:rounded-xl border border-slate-200 flex flex-col max-h-[100dvh] sm:max-h-[calc(100dvh-2rem)] overscroll-contain pb-[env(safe-area-inset-bottom)]"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <button type="button" aria-label="Close date picker" className="absolute inset-0 bg-slate-900/50" onClick={() => setIsOpen(false)} />
+          <div className="relative w-full max-w-md sm:max-w-xs bg-white shadow-xl rounded-t-2xl sm:rounded-xl border border-slate-200 flex flex-col max-h-[100dvh] sm:max-h-[calc(100dvh-2rem)] overscroll-contain pb-[env(safe-area-inset-bottom)]">
             {/* Header — month nav (fixed, doesn't scroll) */}
             <div className="flex items-center justify-between px-3 pt-3 pb-2 flex-shrink-0">
               <button

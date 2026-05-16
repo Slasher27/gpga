@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Trophy, Eye, EyeOff } from 'lucide-react';
-import * as DB from '../api.ts';
+import * as DB from '../api';
 
 export default function LoginPage({ onLogin }) {
   const [email, setEmail] = useState(() => localStorage.getItem('gpga_remembered_email') || '');
@@ -64,7 +64,7 @@ export default function LoginPage({ onLogin }) {
                 <label htmlFor="login-email" className="block text-sm font-medium text-slate-700 mb-2">Email Address</label>
                 <input id="login-email" name="login-email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)}
                   className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
-                  placeholder="your.email@example.com" required autoFocus />
+                  placeholder="your.email@example.com" required />
               </div>
               <div>
                 <label htmlFor="login-password" className="block text-sm font-medium text-slate-700 mb-2">Password</label>
