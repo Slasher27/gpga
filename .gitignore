@@ -42,5 +42,8 @@ dist-ssr
 # Generated declaration from the composite node tsconfig (vite.config.js)
 vite.config.d.ts
 
+# Local-only design/spec doc — keep on disk, never push
+TEAM-DRAW.md
+
 # Claude Code agent files
 .claude/
