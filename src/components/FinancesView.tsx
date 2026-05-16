@@ -383,7 +383,7 @@ export default function FinancesView({
 								{/* Open Fine form — only when not confirmed */}
 								{!isRoundConfirmed &&
 									(showOpenFine ? (
-										<div className='flex items-center gap-2 p-3 bg-slate-50 rounded-lg border border-slate-200'>
+										<div className='flex flex-col sm:flex-row sm:items-center gap-2 p-3 bg-slate-50 rounded-lg border border-slate-200'>
 											<label htmlFor='open-fine-name' className='sr-only'>
 												Fine name
 											</label>
@@ -393,43 +393,45 @@ export default function FinancesView({
 												value={openFineName}
 												onChange={(e) => setOpenFineName(e.target.value)}
 												placeholder='Fine name'
-												className='input input-bordered input-sm flex-1 min-h-[36px]'
+												className='input input-bordered input-sm w-full sm:flex-1 min-h-[40px]'
 												autoComplete='off'
 											/>
-											<label htmlFor='open-fine-amount' className='sr-only'>
-												Fine amount
-											</label>
-											<input
-												id='open-fine-amount'
-												name='open-fine-amount'
-												type='number'
-												value={openFineAmount}
-												onChange={(e) => setOpenFineAmount(e.target.value)}
-												placeholder='R'
-												min='1'
-												className='input input-bordered input-sm w-20 min-h-[36px]'
-												autoComplete='off'
-											/>
-											<button
-												type='button'
-												onClick={handleAddOpenFine}
-												disabled={!openFineName.trim() || !openFineAmount}
-												className='px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-30 min-h-[36px]'
-											>
-												Add
-											</button>
-											<button
-												type='button'
-												onClick={() => {
-													setShowOpenFine(false);
-													setOpenFineName('');
-													setOpenFineAmount('');
-												}}
-												className='p-2 rounded-lg text-slate-400 hover:bg-slate-200 min-h-[36px]'
-												aria-label='Cancel open fine'
-											>
-												<X size={16} />
-											</button>
+											<div className='flex items-center gap-2'>
+												<label htmlFor='open-fine-amount' className='sr-only'>
+													Fine amount
+												</label>
+												<input
+													id='open-fine-amount'
+													name='open-fine-amount'
+													type='number'
+													value={openFineAmount}
+													onChange={(e) => setOpenFineAmount(e.target.value)}
+													placeholder='R'
+													min='1'
+													className='input input-bordered input-sm w-20 min-h-[40px]'
+													autoComplete='off'
+												/>
+												<button
+													type='button'
+													onClick={handleAddOpenFine}
+													disabled={!openFineName.trim() || !openFineAmount}
+													className='flex-1 sm:flex-none px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-30 min-h-[40px]'
+												>
+													Add
+												</button>
+												<button
+													type='button'
+													onClick={() => {
+														setShowOpenFine(false);
+														setOpenFineName('');
+														setOpenFineAmount('');
+													}}
+													className='p-2 rounded-lg text-slate-400 hover:bg-slate-200 min-h-[40px] min-w-[40px] flex items-center justify-center flex-shrink-0'
+													aria-label='Cancel open fine'
+												>
+													<X size={16} />
+												</button>
+											</div>
 										</div>
 									) : (
 										<button

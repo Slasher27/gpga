@@ -10,7 +10,7 @@ type Phase = 'idle' | 'running' | 'done';
 const labelFor = (p: Partnership) => `Four-Ball ${p.fourball} · Team ${p.team}`;
 
 // Browser-only persistence of the most recent completed draw, so it survives
-// navigating away / refresh. Not a server save — cleared by Redraw replacing it.
+// navigating away / refresh. Not a server save — replaced by New Draw, wiped by Clear.
 const STORAGE_KEY = 'gpga_teamdraw_latest';
 
 function loadStored(seasonId: number, rosterIds: Set<string>): Partnership[] | null {
@@ -118,11 +118,21 @@ export default function TeamDrawPage({
     setPhase('running');
   };
 
-  const handleRedraw = () =>
+  const handleNewDraw = () => startDraw(auto);
+
+  const clearDraw = () => {
+    localStorage.removeItem(STORAGE_KEY);
+    setResult([]);
+    setRevealStep(0);
+    setGateOpen(true);
+    setPhase('idle');
+  };
+
+  const handleClear = () =>
     confirm(
-      'Redraw teams?',
-      'This reshuffles all 8 players into new partnerships.',
-      () => startDraw(auto)
+      'Clear the draw?',
+      'This removes the current teams and returns to the start.',
+      clearDraw
     );
 
   const tileFor = (g: number): TileState => {
@@ -241,13 +251,22 @@ export default function TeamDrawPage({
               </button>
             )}
             {phase === 'done' && (
-              <button
-                type="button"
-                onClick={handleRedraw}
-                className="bg-slate-100 text-slate-600 px-6 py-3 rounded-lg font-semibold hover:bg-slate-200 transition-colors min-h-[48px]"
-              >
-                Redraw
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={handleNewDraw}
+                  className="bg-emerald-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-emerald-700 transition-colors min-h-[48px]"
+                >
+                  New Draw
+                </button>
+                <button
+                  type="button"
+                  onClick={handleClear}
+                  className="bg-slate-100 text-slate-600 px-6 py-3 rounded-lg font-semibold hover:bg-slate-200 transition-colors min-h-[48px]"
+                >
+                  Clear
+                </button>
+              </>
             )}
           </div>
         </>
