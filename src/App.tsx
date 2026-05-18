@@ -57,6 +57,7 @@ export default function App() {
   const [currentUserId, setCurrentUserId] = useState('1');
   const [dbReady, setDbReady] = useState(false);
   const [activeSeason, setActiveSeason] = useState<Season | null>(null);
+  const [seasonPlayerIds, setSeasonPlayerIds] = useState<Set<string>>(new Set());
   const [allSeasons, setAllSeasons] = useState<Season[]>([]);
   const [golfCourses, setGolfCourses] = useState<GolfCourse[]>([]);
   const [managingPlayerId, setManagingPlayerId] = useState<string | null>(null);
@@ -124,18 +125,20 @@ export default function App() {
     try {
       const season = await DB.getActiveSeason();
       setActiveSeason(season);
-      const [seasonsData, playersData, roundsData, coursesData, scoresData, finesData] = await Promise.all([
+      const [seasonsData, playersData, roundsData, coursesData, scoresData, finesData, seasonPlayersData] = await Promise.all([
         DB.getAllSeasons(),
         DB.getAllPlayers(),
         season ? DB.getAllRounds(season.id) : DB.getAllRounds(),
         DB.getAllGolfCourses(),
         DB.getAllScores(),
         DB.getPlayerFinesByRound(),
+        season ? DB.getSeasonPlayers(season.id) : Promise.resolve([]),
       ]);
       setAllSeasons(seasonsData);
       setPlayers(playersData);
       setRounds(roundsData);
       setGolfCourses(coursesData);
+      setSeasonPlayerIds(new Set(seasonPlayersData.map(sp => sp.player_id)));
 
       setScores(mergeScoresAndFines(scoresData, finesData));
     } catch (error) {
@@ -179,9 +182,15 @@ export default function App() {
     return nums.length === 0 ? `Round ${rounds.length + 1}` : `Round ${Math.max(...nums) + 1}`;
   }, [rounds]);
 
+  // Only players enrolled in the active season appear in standings/fines.
+  const seasonPlayers = useMemo(
+    () => players.filter(p => seasonPlayerIds.has(p.id)),
+    [players, seasonPlayerIds],
+  );
+
   const leaderboardData = useMemo<LeaderboardEntry[]>(() => {
     const totalRoundsCreated = rounds.length;
-    return players.map((player): LeaderboardEntry => {
+    return seasonPlayers.map((player): LeaderboardEntry => {
       const pScores = scores[player.id] || {};
       let totalStrokes = 0, totalStableford = 0, totalFines = 0, roundsPlayed = 0, worstRound = 0, worstStableford = 999;
       rounds.forEach(r => {
@@ -206,7 +215,7 @@ export default function App() {
       if (b.netTotal === 0) return -1;
       return a.netTotal - b.netTotal;
     });
-  }, [players, scores, rounds]);
+  }, [seasonPlayers, scores, rounds]);
 
   // --- Handlers ---
 
@@ -222,10 +231,11 @@ export default function App() {
     const season = allSeasons.find(s => s.id === seasonId);
     if (!season) return;
     setActiveSeason(season);
-    const [roundsData, scoresData, finesData] = await Promise.all([
-      DB.getAllRounds(season.id), DB.getAllScores(), DB.getPlayerFinesByRound()
+    const [roundsData, scoresData, finesData, seasonPlayersData] = await Promise.all([
+      DB.getAllRounds(season.id), DB.getAllScores(), DB.getPlayerFinesByRound(), DB.getSeasonPlayers(season.id)
     ]);
     setRounds(roundsData);
+    setSeasonPlayerIds(new Set(seasonPlayersData.map(sp => sp.player_id)));
     setScores(mergeScoresAndFines(scoresData, finesData));
   };
 
@@ -352,8 +362,8 @@ export default function App() {
 
       <main className="p-4 md:p-8 md:ml-56 pt-16 pb-28 landscape:pb-20 md:pt-16 md:pb-8">
         <Suspense fallback={<DashboardSkeleton />}>
-          {view === 'dashboard' && <DashboardView activeSeason={activeSeason} leaderboardData={leaderboardData} rounds={rounds} scores={scores} players={players} golfCourses={golfCourses} />}
-          {view === 'fines' && <FinancesView leaderboardData={leaderboardData} rounds={rounds} scores={scores} players={players} activeSeason={activeSeason} isReadOnlySeason={isReadOnlySeason} currentUser={currentUser} showToast={showToast} onAddFineType={() => setIsAddFineTypeModalOpen(true)} onDeleteFineType={handleDeleteFineType} onFinesChanged={refreshFines} fineTypesVersion={fineTypesVersion} />}
+          {view === 'dashboard' && <DashboardView activeSeason={activeSeason} leaderboardData={leaderboardData} rounds={rounds} scores={scores} players={seasonPlayers} golfCourses={golfCourses} />}
+          {view === 'fines' && <FinancesView leaderboardData={leaderboardData} rounds={rounds} scores={scores} players={seasonPlayers} activeSeason={activeSeason} isReadOnlySeason={isReadOnlySeason} currentUser={currentUser} showToast={showToast} onAddFineType={() => setIsAddFineTypeModalOpen(true)} onDeleteFineType={handleDeleteFineType} onFinesChanged={refreshFines} fineTypesVersion={fineTypesVersion} />}
           {view === 'rounds' && <RoundsView rounds={rounds} scores={scores} setScores={setScores} players={players} activeSeason={activeSeason} isReadOnlySeason={isReadOnlySeason} showToast={showToast} onAddRound={() => setIsAddRoundModalOpen(true)} onEditRound={handleEditRound} onDeleteRound={handleDeleteRound} onCloseRound={handleCloseRound} />}
           {view === 'teamdraw' && isAdmin && <TeamDrawPage players={players} activeSeason={activeSeason} />}
           {view === 'admin' && isAdmin && !managingPlayerId && <PlayersView players={players} scores={scores} rounds={rounds} activeSeason={activeSeason} isReadOnlySeason={isReadOnlySeason} currentUser={currentUser} showToast={showToast} showConfirm={showConfirm} setPlayers={setPlayers} onAddPlayer={() => setIsAddPlayerModalOpen(true)} managingPlayerId={managingPlayerId} setManagingPlayerId={setManagingPlayerId} />}

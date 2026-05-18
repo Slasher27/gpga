@@ -1,8 +1,8 @@
 import { useState, useEffect, type FormEvent, type ChangeEvent, type Dispatch, type SetStateAction } from 'react';
-import { Save, Camera, ChevronDown } from 'lucide-react';
+import { Save, Camera, ChevronDown, Trash2 } from 'lucide-react';
 import * as DB from '../api';
 import type { Player, Season, ScoresMapFull, Round, Role, Status, PlayerUpdate, BuyInStatus, FinesSummary } from '../api';
-import { TabBar, Avatar, PlayerRoundsTable, FinesSummaryCards, StatsGrid, usePlayerStats, Card } from './common';
+import { TabBar, Avatar, PlayerRoundsTable, FinesSummaryCards, StatsGrid, usePlayerStats, Card, useConfirm } from './common';
 
 const badgeStyles: Record<string, string> = {
   neutral: 'badge badge-ghost badge-sm',
@@ -34,6 +34,7 @@ export default function PlayerProfilePage({ players, setPlayers, scores, rounds,
     total_fines: 0, paid_fines: 0, outstanding_fines: 0, confirmed_rounds: 0, total_rounds_with_fines: 0,
   });
   const [profileTab, setProfileTab] = useState('stats');
+  const { confirm, ConfirmDialogComponent } = useConfirm();
 
   useEffect(() => {
     if (player) {
@@ -59,6 +60,21 @@ export default function PlayerProfilePage({ players, setPlayers, scores, rounds,
     await DB.updatePlayer(player.id, updates);
     setPlayers(prev => prev.map(p => p.id === player.id ? { ...p, ...updates } : p));
     showToast(`${formData.name} updated successfully!`, 'success');
+  };
+
+  const canDelete = currentUser.role === 'master' && player.role !== 'master' && player.id !== currentUser.id;
+
+  const handleDeletePlayer = () => {
+    confirm(
+      `Delete ${player.name}?`,
+      `This permanently removes ${player.name} and all their scores and fines. This cannot be undone.`,
+      async () => {
+        await DB.deletePlayer(player.id);
+        setPlayers(prev => prev.filter(p => p.id !== player.id));
+        showToast(`${player.name} deleted`, 'success');
+        setManagingPlayerId(null);
+      }
+    );
   };
 
   const handleAvatarChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -267,10 +283,16 @@ export default function PlayerProfilePage({ players, setPlayers, scores, rounds,
               <button type="submit" className="w-full bg-emerald-600 text-white py-3 rounded-lg font-semibold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 min-h-[48px]">
                 <Save size={16} /> Save Changes
               </button>
+              {canDelete && (
+                <button type="button" onClick={handleDeletePlayer} className="w-full mt-2 bg-white text-red-600 border border-red-200 py-3 rounded-lg font-semibold hover:bg-red-50 transition-colors flex items-center justify-center gap-2 min-h-[48px]">
+                  <Trash2 size={16} /> Delete Player
+                </button>
+              )}
             </form>
           )}
         </div>
       </Card>
+      <ConfirmDialogComponent />
     </div>
   );
 }
