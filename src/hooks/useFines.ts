@@ -78,22 +78,24 @@ export function useFines({
     });
   }, [activeSeason, fineTypesVersion]);
 
-  // Load the selected player's fines for the selected round.
+  // Load the selected player's fines + confirmed state for the selected round
+  // (one effect, fetched in parallel; guarded against out-of-order resolves).
   useEffect(() => {
-    if (selectedPlayer && selectedRound) {
-      DB.getPlayerFinesForRound(selectedPlayer, selectedRound).then(setPlayerFines);
-    } else {
+    if (!selectedPlayer || !selectedRound) {
       setPlayerFines([]);
-    }
-  }, [selectedPlayer, selectedRound]);
-
-  // Load confirmed state for the selected player/round.
-  useEffect(() => {
-    if (selectedPlayer && selectedRound) {
-      DB.isPlayerRoundConfirmed(selectedPlayer, selectedRound).then(setIsRoundConfirmed);
-    } else {
       setIsRoundConfirmed(false);
+      return;
     }
+    let cancelled = false;
+    Promise.all([
+      DB.getPlayerFinesForRound(selectedPlayer, selectedRound),
+      DB.isPlayerRoundConfirmed(selectedPlayer, selectedRound),
+    ]).then(([fines, confirmed]) => {
+      if (cancelled) return;
+      setPlayerFines(fines);
+      setIsRoundConfirmed(confirmed);
+    });
+    return () => { cancelled = true; };
   }, [selectedPlayer, selectedRound]);
 
   // Load round-level fines data for the History tab.
@@ -118,12 +120,18 @@ export function useFines({
     }, 500);
   }, [activeSeason, selectedRound, onFinesChanged]);
 
+  // Cancel any pending debounced refresh if the hook unmounts.
+  useEffect(() => () => {
+    if (refreshTimer.current) clearTimeout(refreshTimer.current);
+  }, []);
+
   // ---- Mutations ----
 
   const addFine = useCallback(async (fineTypeId: number) => {
     if (!selectedPlayer || !selectedRound) return;
     const existing = playerFines.find((pf) => pf.fine_type_id === fineTypeId);
     const newQty = (existing?.quantity || 0) + 1;
+    const snapshot = playerFines;
     setPlayerFines((prev) => {
       const idx = prev.findIndex((pf) => pf.fine_type_id === fineTypeId);
       if (idx >= 0) {
@@ -141,19 +149,30 @@ export function useFines({
         name: ft?.name || ''
       }];
     });
-    await DB.setPlayerFine(selectedPlayer, selectedRound, fineTypeId, newQty);
-    refreshDerived();
-  }, [selectedPlayer, selectedRound, playerFines, fineTypes, refreshDerived]);
+    try {
+      await DB.setPlayerFine(selectedPlayer, selectedRound, fineTypeId, newQty);
+      refreshDerived();
+    } catch {
+      setPlayerFines(snapshot);
+      showToast?.('Could not save fine — not recorded', 'error');
+    }
+  }, [selectedPlayer, selectedRound, playerFines, fineTypes, refreshDerived, showToast]);
 
   const removeFine = useCallback(async (fineTypeId: number) => {
     if (!selectedPlayer || !selectedRound) return;
     const existing = playerFines.find((pf) => pf.fine_type_id === fineTypeId);
     if (!existing || existing.quantity <= 0) return;
     const newQty = existing.quantity - 1;
+    const snapshot = playerFines;
     setPlayerFines((prev) => prev.map((pf) => pf.fine_type_id === fineTypeId ? { ...pf, quantity: newQty } : pf).filter((pf) => pf.quantity > 0));
-    await DB.setPlayerFine(selectedPlayer, selectedRound, fineTypeId, newQty);
-    refreshDerived();
-  }, [selectedPlayer, selectedRound, playerFines, refreshDerived]);
+    try {
+      await DB.setPlayerFine(selectedPlayer, selectedRound, fineTypeId, newQty);
+      refreshDerived();
+    } catch {
+      setPlayerFines(snapshot);
+      showToast?.('Could not update fine — not recorded', 'error');
+    }
+  }, [selectedPlayer, selectedRound, playerFines, refreshDerived, showToast]);
 
   const addOpenFine = useCallback(async (name: string, amount: string | number) => {
     if (!name.trim() || !amount || !activeSeason || !selectedPlayer || !selectedRound) return;
@@ -187,9 +206,13 @@ export function useFines({
   const toggleRoundConfirmed = useCallback(async () => {
     if (!selectedPlayer || !selectedRound) return;
     const next = !isRoundConfirmed;
-    await DB.confirmPlayerRoundFines(selectedPlayer, selectedRound, next);
-    setIsRoundConfirmed(next);
-    showToast?.(next ? 'Fines confirmed!' : 'Fines reopened', next ? 'success' : 'info');
+    try {
+      await DB.confirmPlayerRoundFines(selectedPlayer, selectedRound, next);
+      setIsRoundConfirmed(next);
+      showToast?.(next ? 'Fines confirmed!' : 'Fines reopened', next ? 'success' : 'info');
+    } catch {
+      showToast?.('Could not update — try again when back online', 'error');
+    }
   }, [selectedPlayer, selectedRound, isRoundConfirmed, showToast]);
 
   const loadPlayerRoundFines = useCallback(async (playerId: string) => {
@@ -200,11 +223,15 @@ export function useFines({
   }, [activeSeason, playerRoundFinesCache]);
 
   const togglePlayerRoundPaid = useCallback(async (playerId: string, roundId: number, roundName: string, nextPaid: boolean) => {
-    await DB.markRoundFinesPaid(playerId, roundId, nextPaid);
-    const updated = await DB.getPlayerRoundFines(playerId, activeSeason?.id);
-    setPlayerRoundFinesCache((prev) => ({ ...prev, [playerId]: updated }));
-    DB.getPaymentSummary(activeSeason?.id).then(setPaymentSummaryData);
-    showToast?.(`${roundName} marked as ${nextPaid ? 'paid' : 'unpaid'}`, nextPaid ? 'success' : 'info');
+    try {
+      await DB.markRoundFinesPaid(playerId, roundId, nextPaid);
+      const updated = await DB.getPlayerRoundFines(playerId, activeSeason?.id);
+      setPlayerRoundFinesCache((prev) => ({ ...prev, [playerId]: updated }));
+      DB.getPaymentSummary(activeSeason?.id).then(setPaymentSummaryData);
+      showToast?.(`${roundName} marked as ${nextPaid ? 'paid' : 'unpaid'}`, nextPaid ? 'success' : 'info');
+    } catch {
+      showToast?.('Could not update payment — try again when back online', 'error');
+    }
   }, [activeSeason, showToast]);
 
   return {

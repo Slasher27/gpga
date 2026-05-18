@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Bell } from 'lucide-react';
 import * as DB from '../../api';
 import type { Notification } from '../../api';
 import { timeAgo } from './SharedUI';
+import { useDismiss } from './useDismiss';
 
 export default function NotificationPanel({
   playerId,
@@ -18,28 +19,27 @@ export default function NotificationPanel({
   const [unreadCount, setUnreadCount] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
 
-  // Check on mount + poll every 60s
+  // Check on mount + poll every 2 min (count only — cheap)
   useEffect(() => {
     if (!playerId || !seasonId) return;
-    const check = () => DB.checkNotifications(playerId, seasonId).then((d) => setUnreadCount(d.count)).catch(() => {});
+    let active = true;
+    const check = () => DB.checkNotifications(playerId, seasonId).then((d) => { if (active) setUnreadCount(d.count); }).catch(() => {});
     check();
-    const interval = setInterval(check, 60000);
-    return () => clearInterval(interval);
+    const interval = setInterval(check, 120000);
+    return () => { active = false; clearInterval(interval); };
   }, [playerId, seasonId]);
 
   // Load full list when opening
   useEffect(() => {
-    if (open && playerId) DB.getNotifications(playerId).then(setNotifications).catch(() => {});
+    if (!open || !playerId) return;
+    let active = true;
+    DB.getNotifications(playerId).then((n) => { if (active) setNotifications(n); }).catch(() => {});
+    return () => { active = false; };
   }, [open, playerId, unreadCount]);
 
-  // Close on outside click
-  useEffect(() => {
-    const close = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
-  }, []);
+  // Close on Escape or outside click
+  const close = useCallback(() => setOpen(false), []);
+  useDismiss(close, open, ref);
 
   const handleMarkRead = async (id: number) => {
     await DB.markNotificationRead(id);

@@ -24,7 +24,8 @@ interface RoundsViewProps {
 
 export default function RoundsView({ rounds, scores, setScores, players, isReadOnlySeason, isAdmin, showToast, onAddRound, onEditRound, onDeleteRound, onCloseRound }: RoundsViewProps) {
   // Auto-select latest round
-  const [selectedRound, setSelectedRound] = useState<number | undefined>(rounds[rounds.length - 1]?.id);
+  const latestRoundId = rounds[rounds.length - 1]?.id;
+  const [selectedRound, setSelectedRound] = useState<number | undefined>(latestRoundId);
   const [editScores, setEditScores] = useState<Record<string, ScoreEdit>>({});
   const [editingPlayers, setEditingPlayers] = useState<Record<string, boolean>>({});
   const [savingScores, setSavingScores] = useState(false);
@@ -34,10 +35,10 @@ export default function RoundsView({ rounds, scores, setScores, players, isReadO
     setEditingPlayers({});
   }, [selectedRound]);
 
-  // Auto-select latest when rounds change
+  // Auto-select latest when the newest round changes
   useEffect(() => {
-    if (rounds.length > 0) setSelectedRound(rounds[rounds.length - 1].id);
-  }, [rounds.length]);
+    if (latestRoundId != null) setSelectedRound(latestRoundId);
+  }, [latestRoundId]);
 
   const handleScoreChange = (pid: string, field: ScoreField, val: string) => {
     setEditScores(prev => ({
@@ -79,6 +80,8 @@ export default function RoundsView({ rounds, scores, setScores, players, isReadO
       setEditScores(prev => { const s = { ...prev }; delete s[playerId]; return s; });
       setEditingPlayers(prev => ({ ...prev, [playerId]: false }));
       showToast(`Saved scores for ${playerName}!`);
+    } catch {
+      showToast('Could not save score — check your connection', 'error');
     } finally {
       setSavingScores(false);
     }
@@ -92,34 +95,31 @@ export default function RoundsView({ rounds, scores, setScores, players, isReadO
     if (selectedRound == null) return;
     setSavingScores(true);
     try {
-      let savedCount = 0;
-      for (const p of players.filter(pl => pl.status === 'active')) {
-        if (!editingPlayers[p.id]) continue;
-        const vals = getPlayerValues(p.id);
-        const net = Number(vals.net) || 0;
-        const hc = Number(vals.hc) || 0;
-        const sf = Number(vals.sf) || 0;
-        if (net > 0) {
-          await DB.updateScore(p.id, selectedRound, net, hc, sf);
-          savedCount++;
-        }
-      }
+      // Collect everything to save once, then write in parallel — a sequential
+      // await-in-loop here means one network round-trip per player on mobile.
+      const toSave = players
+        .filter(pl => pl.status === 'active' && editingPlayers[pl.id])
+        .map(p => {
+          const vals = getPlayerValues(p.id);
+          return { id: p.id, net: Number(vals.net) || 0, hc: Number(vals.hc) || 0, sf: Number(vals.sf) || 0 };
+        })
+        .filter(s => s.net > 0);
+
+      await Promise.all(toSave.map(s => DB.updateScore(s.id, selectedRound, s.net, s.hc, s.sf)));
+
       setScores(prev => {
         const updated = { ...prev };
-        for (const p of players.filter(pl => pl.status === 'active')) {
-          if (!editingPlayers[p.id]) continue;
-          const vals = getPlayerValues(p.id);
-          const net = Number(vals.net) || 0;
-          if (net > 0) {
-            if (!updated[p.id]) updated[p.id] = {};
-            updated[p.id] = { ...updated[p.id], [selectedRound]: { ...updated[p.id][selectedRound], strokes: net, handicap: Number(vals.hc) || 0, stableford: Number(vals.sf) || 0 } };
-          }
+        for (const s of toSave) {
+          if (!updated[s.id]) updated[s.id] = {};
+          updated[s.id] = { ...updated[s.id], [selectedRound]: { ...updated[s.id][selectedRound], strokes: s.net, handicap: s.hc, stableford: s.sf } };
         }
         return updated;
       });
       setEditScores({});
       setEditingPlayers({});
-      showToast(`Saved scores for ${savedCount} player${savedCount !== 1 ? 's' : ''}!`);
+      showToast(`Saved scores for ${toSave.length} player${toSave.length !== 1 ? 's' : ''}!`);
+    } catch {
+      showToast('Could not save all scores — check your connection and retry', 'error');
     } finally {
       setSavingScores(false);
     }
@@ -166,7 +166,7 @@ export default function RoundsView({ rounds, scores, setScores, players, isReadO
                 <p className={`text-sm font-semibold ${isActive ? 'text-white' : 'text-slate-800'}`}>{r.name}</p>
                 <p className={`text-[10px] mt-0.5 truncate ${isActive ? 'text-emerald-100' : 'text-slate-400'}`}>{r.course_name}</p>
                 <div className="flex items-center gap-1.5 mt-1.5">
-                  <Calendar size={10} className={isActive ? 'text-emerald-200' : 'text-slate-300'} />
+                  <Calendar size={10} className={isActive ? 'text-emerald-200' : 'text-slate-500'} />
                   <span className={`text-[10px] ${isActive ? 'text-emerald-100' : 'text-slate-400'}`}>{r.date}</span>
                   {r.closed ? <Lock size={10} className={`ml-auto ${isActive ? 'text-emerald-200' : 'text-slate-400'}`} /> : hasScores && <span className={`ml-auto w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-200' : 'bg-emerald-400'}`} />}
                 </div>
@@ -256,7 +256,7 @@ export default function RoundsView({ rounds, scores, setScores, players, isReadO
                           value={vals.gross}
                           onChange={(e) => handleScoreChange(p.id, 'gross', e.target.value)}
                           disabled={!isEditing}
-                          className={`w-full text-center rounded-lg px-2 py-2 text-sm min-h-[40px] border ${isEditing ? 'border-emerald-300 bg-white' : 'border-slate-200 bg-slate-50 text-slate-500'}`}
+                          className={`w-full text-center rounded-lg px-2 py-2 text-sm min-h-[40px] border ${isEditing ? 'border-emerald-300 bg-white' : 'border-slate-200 bg-slate-50 text-slate-700'}`}
                           placeholder="85"
                         />
                       </div>
@@ -268,7 +268,7 @@ export default function RoundsView({ rounds, scores, setScores, players, isReadO
                           value={vals.hc}
                           onChange={(e) => handleScoreChange(p.id, 'handicap', e.target.value)}
                           disabled={!isEditing}
-                          className={`w-full text-center rounded-lg px-2 py-2 text-sm min-h-[40px] border ${isEditing ? 'border-emerald-300 bg-white' : 'border-slate-200 bg-slate-50 text-slate-500'}`}
+                          className={`w-full text-center rounded-lg px-2 py-2 text-sm min-h-[40px] border ${isEditing ? 'border-emerald-300 bg-white' : 'border-slate-200 bg-slate-50 text-slate-700'}`}
                           placeholder="12"
                         />
                       </div>
@@ -286,7 +286,7 @@ export default function RoundsView({ rounds, scores, setScores, players, isReadO
                           value={vals.sf}
                           onChange={(e) => handleScoreChange(p.id, 'stableford', e.target.value)}
                           disabled={!isEditing}
-                          className={`w-full text-center rounded-lg px-2 py-2 text-sm min-h-[40px] border ${isEditing ? 'border-emerald-300 bg-white' : 'border-slate-200 bg-slate-50 text-slate-500'}`}
+                          className={`w-full text-center rounded-lg px-2 py-2 text-sm min-h-[40px] border ${isEditing ? 'border-emerald-300 bg-white' : 'border-slate-200 bg-slate-50 text-slate-700'}`}
                           placeholder="36"
                         />
                       </div>

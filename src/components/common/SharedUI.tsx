@@ -47,7 +47,7 @@ export const TabBar = ({ tabs, active, onChange }: { tabs: TabDef[]; active: str
         className={`flex-1 min-w-[60px] px-3 py-3 text-sm font-medium text-center transition-colors whitespace-nowrap min-h-[44px] ${
           active === tab.id
             ? 'text-emerald-600 border-b-2 border-emerald-600'
-            : 'text-slate-500 hover:text-slate-700'
+            : 'text-slate-600 hover:text-slate-800'
         }`}
       >
         {tab.label}
@@ -82,12 +82,12 @@ export const PlayerRoundsTable = ({ rounds, playerScores }: { rounds: Round[]; p
     {rounds.length > 0 ? (
       <table className="w-full text-sm">
         <thead>
-          <tr className="text-left text-xs text-slate-500 uppercase border-b border-slate-100">
-            <th className="px-4 py-2 font-medium">Round</th>
-            <th className="px-4 py-2 font-medium">Course</th>
-            <th className="px-4 py-2 font-medium text-center">Net</th>
-            <th className="px-4 py-2 font-medium text-center">HC</th>
-            <th className="px-4 py-2 font-medium text-center">SF</th>
+          <tr className="text-left text-xs text-slate-600 uppercase border-b border-slate-100">
+            <th scope="col" className="px-4 py-2 font-medium">Round</th>
+            <th scope="col" className="px-4 py-2 font-medium">Course</th>
+            <th scope="col" className="px-4 py-2 font-medium text-center">Net</th>
+            <th scope="col" className="px-4 py-2 font-medium text-center">HC</th>
+            <th scope="col" className="px-4 py-2 font-medium text-center">SF</th>
           </tr>
         </thead>
         <tbody>

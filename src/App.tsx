@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, lazy, Suspense, type FormEvent } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense, type FormEvent } from 'react';
 import { TrendingUp, Banknote, Calendar, Users, Plus, Save, Shuffle, Settings } from 'lucide-react';
 import * as DB from './api';
 import { SEASON_ROUNDS } from './api';
@@ -96,10 +96,12 @@ export default function App() {
   const [toast, setToast] = useState<{ show: boolean; message: string; type: string }>({ show: false, message: '', type: 'success' });
   const { confirm: showConfirm, ConfirmDialogComponent } = useConfirm();
 
-  const showToast = (message: string, type = 'success') => {
+  const showToast = useCallback((message: string, type = 'success') => {
     setToast({ show: true, message, type });
     setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
-  };
+  }, []);
+
+  const [isOnline, setIsOnline] = useState(typeof navigator === 'undefined' ? true : navigator.onLine);
 
   // --- Init & Data Loading ---
 
@@ -146,6 +148,32 @@ export default function App() {
       console.error('Failed to load data:', error);
     }
   };
+
+  // Always call the latest loadData from stable event listeners.
+  const loadDataRef = useRef(loadData);
+  loadDataRef.current = loadData;
+
+  // Connectivity + a global safety net so a failed network mutation never
+  // fails silently (most handlers optimistically update then await).
+  useEffect(() => {
+    const goOnline = () => { setIsOnline(true); showToast('Back online — refreshing', 'info'); loadDataRef.current(); };
+    const goOffline = () => { setIsOnline(false); showToast('You are offline — changes may not save', 'error'); };
+    const onRejection = (e: PromiseRejectionEvent) => {
+      const msg = e.reason instanceof Error ? e.reason.message : '';
+      if (/network|connection|timed out|Failed to fetch/i.test(msg)) {
+        showToast('Action failed — check your connection', 'error');
+        e.preventDefault();
+      }
+    };
+    window.addEventListener('online', goOnline);
+    window.addEventListener('offline', goOffline);
+    window.addEventListener('unhandledrejection', onRejection);
+    return () => {
+      window.removeEventListener('online', goOnline);
+      window.removeEventListener('offline', goOffline);
+      window.removeEventListener('unhandledrejection', onRejection);
+    };
+  }, [showToast]);
 
   const currentUser = players.find(p => p.id === currentUserId) || players[0];
   const isReadOnlySeason = !!activeSeason && !activeSeason.is_active;
@@ -379,6 +407,11 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-100 font-sans overflow-x-hidden">
       <TopBar currentUser={currentUser} activeSeason={activeSeason} allSeasons={allSeasons} handleSeasonSwitch={handleSeasonSwitch} handleLogout={handleLogout} setNavView={setNavView} canInstall={canInstall} onInstall={handleInstall} />
+      {!isOnline && (
+        <div role="status" className="fixed top-14 left-1/2 -translate-x-1/2 z-40 mt-1 px-3 py-1 rounded-full bg-amber-100 text-amber-800 border border-amber-200 text-xs font-semibold shadow-sm">
+          Offline — changes may not save
+        </div>
+      )}
       <DesktopSidebar view={view} setNavView={setNavView} navItems={navItems} activeSeason={activeSeason} allSeasons={allSeasons} isAdmin={isAdmin} />
       <MobileBottomNav view={view} setNavView={setNavView} navItems={navItems} />
 
@@ -517,7 +550,7 @@ export default function App() {
       </Modal>
 
       {toast.show && (
-        <div className="toast toast-end z-50 top-[4.5rem] max-w-[calc(100vw-2rem)]">
+        <div role="status" aria-live="polite" className="toast toast-end z-50 top-[4.5rem] max-w-[calc(100vw-2rem)]">
           <div className={`alert ${toast.type === 'error' ? 'alert-error' : toast.type === 'info' ? 'alert-info' : 'alert-success'}`}>
             <span className="font-semibold">{toast.message}</span>
           </div>

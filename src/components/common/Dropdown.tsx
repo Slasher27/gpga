@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { ChevronDown } from 'lucide-react';
+import { useDismiss } from './useDismiss';
 
 export interface DropdownOption<T = string | number> {
   value: T;
@@ -22,13 +23,8 @@ export default function Dropdown<T extends string | number = string>({
   const ref = useRef<HTMLDivElement>(null);
   const selected = options.find((o) => o.value === value);
 
-  useEffect(() => {
-    const close = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
-  }, []);
+  const close = useCallback(() => setOpen(false), []);
+  useDismiss(close, open, ref);
 
   const handleToggle = () => {
     if (!open && ref.current) {

@@ -1,11 +1,30 @@
 /// <reference lib="webworker" />
-import { precacheAndRoute, cleanupOutdatedCaches } from 'workbox-precaching';
+import { precacheAndRoute, cleanupOutdatedCaches, createHandlerBoundToURL } from 'workbox-precaching';
+import { registerRoute, NavigationRoute } from 'workbox-routing';
+import { NetworkFirst } from 'workbox-strategies';
+import { ExpirationPlugin } from 'workbox-expiration';
 
 declare const self: ServiceWorkerGlobalScope;
 
 // __WB_MANIFEST is injected at build time with the hashed asset list.
 precacheAndRoute(self.__WB_MANIFEST);
 cleanupOutdatedCaches();
+
+// API reads: network-first so data is fresh online, but the last successful
+// response is served when the connection drops (read-only offline instead of
+// a blank app). Writes (non-GET) are not matched and fail normally.
+registerRoute(
+  ({ url, request }) => request.method === 'GET' && url.pathname.startsWith('/api/'),
+  new NetworkFirst({
+    cacheName: 'api-cache',
+    networkTimeoutSeconds: 5,
+    plugins: [new ExpirationPlugin({ maxEntries: 64, maxAgeSeconds: 24 * 60 * 60 })],
+  }),
+);
+
+// SPA app-shell: serve the precached index.html for navigations so a cold
+// launch still renders while offline.
+registerRoute(new NavigationRoute(createHandlerBoundToURL('index.html')));
 
 self.addEventListener('install', () => {
   self.skipWaiting();

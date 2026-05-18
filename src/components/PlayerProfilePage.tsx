@@ -38,16 +38,22 @@ export default function PlayerProfilePage({ players, setPlayers, scores, rounds,
   const [busy, setBusy] = useState(false); // shared: save / delete / buy-in toggle are mutually exclusive
   const { confirm, ConfirmDialogComponent } = useConfirm();
 
+  // Seed the edit form whenever the managed player (or their data) changes.
   useEffect(() => {
     if (!player) return;
     setFormData({ name: player.name, email: player.email, role: player.role, status: player.status, password: '' });
     setAvatarPreview(player.avatar);
-    if (!activeSeason?.id) return;
+  }, [player]);
+
+  // Load buy-in / fines summary for the selected player + season.
+  const playerId = player?.id;
+  useEffect(() => {
+    if (!playerId || !activeSeason?.id) return;
     let cancelled = false;
     setSummaryLoaded(false);
     Promise.all([
-      DB.getPlayerBuyInStatus(player.id, activeSeason.id),
-      DB.getPlayerFinesSummary(player.id, activeSeason.id),
+      DB.getPlayerBuyInStatus(playerId, activeSeason.id),
+      DB.getPlayerFinesSummary(playerId, activeSeason.id),
     ]).then(([buyIn, fines]) => {
       if (cancelled) return;
       setPlayerBuyIn(buyIn);
@@ -55,7 +61,7 @@ export default function PlayerProfilePage({ players, setPlayers, scores, rounds,
       setSummaryLoaded(true);
     });
     return () => { cancelled = true; };
-  }, [managingPlayerId, player?.id, activeSeason?.id]);
+  }, [playerId, activeSeason?.id]);
 
   const { playerScores, roundsPlayed, totalStrokes, totalStableford, avgScore } = usePlayerStats(player?.id ?? '', scores, rounds);
 

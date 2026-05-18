@@ -32,6 +32,7 @@ export default function FinancesView({
 }: FinancesViewProps) {
 	const isAdmin = currentUser.role === 'master' || currentUser.role === 'admin';
 	const mostRecentRound = rounds.length > 0 ? rounds[rounds.length - 1] : null;
+	const mostRecentRoundId = mostRecentRound?.id;
 
 	// --- UI state (data lives in useFines) ---
 	const [finesTab, setFinesTab] = useState(() =>
@@ -70,10 +71,11 @@ export default function FinancesView({
 		buyInStatuses,
 	} = fines;
 
+	// Default selection to the newest round whenever a new latest round appears
+	// (won't fight the user picking an older round — that doesn't change the id).
 	useEffect(() => {
-		if (mostRecentRound && selectedRound !== mostRecentRound.id)
-			setSelectedRound(mostRecentRound.id);
-	}, [rounds.length]);
+		if (mostRecentRoundId != null) setSelectedRound(mostRecentRoundId);
+	}, [mostRecentRoundId]);
 
 	useEffect(() => {
 		setExpandedPlayers({});

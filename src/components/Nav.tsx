@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Trophy, LogOut, Download, EllipsisVertical } from 'lucide-react';
-import { Avatar, Dropdown, NotificationPanel } from './common';
+import { Avatar, Dropdown, NotificationPanel, useDismiss } from './common';
 
 // Top bar — desktop: offset by sidebar width. Mobile: full width.
 export function TopBar({ currentUser, activeSeason, allSeasons, handleSeasonSwitch, handleLogout, setNavView, canInstall, onInstall }) {
@@ -77,6 +77,7 @@ export function MobileBottomNav({ view, setNavView, navItems }) {
   const moreActive = overflow.some(i => i.id === view);
 
   const go = (id) => { setNavView(id); setMoreOpen(false); };
+  useDismiss(useCallback(() => setMoreOpen(false), []), moreOpen);
 
   return (
     <div className="md:hidden">

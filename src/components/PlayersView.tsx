@@ -253,7 +253,7 @@ export default function PlayersView({ players, scores, rounds, activeSeason, isR
     };
     loadBuyInStatuses();
     return () => { cancelled = true; };
-  }, [activeSeason?.id]);
+  }, [activeSeason?.id, players.length]);
 
   const playersWithStats = useMemo(() => {
     const seasonRoundIds = new Set(rounds.map(r => r.id));

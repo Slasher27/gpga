@@ -271,7 +271,20 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   if (options?.headers) Object.assign(headers, options.headers as Record<string, string>);
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const res = await fetch(`${BASE}${url}`, { ...options, headers });
+  // Fail fast on a dead/patchy connection instead of hanging forever.
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}${url}`, { ...options, headers, signal: controller.signal });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new Error('Request timed out — check your connection');
+    }
+    throw new Error('Network unavailable — check your connection');
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (res.status === 401) {
     clearToken();

@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, Calendar, X } from 'lucide-react';
 import { formatDate as formatDisplay } from './SharedUI';
+import { useDismiss } from './useDismiss';
 
 export default function DatePicker({
   value,
@@ -34,6 +35,8 @@ export default function DatePicker({
     onChange(formatDate(date));
     setIsOpen(false);
   };
+
+  useDismiss(useCallback(() => setIsOpen(false), []), isOpen);
 
   const isToday = (date: Date | null) => !!date && date.toDateString() === new Date().toDateString();
   const isSelected = (date: Date | null) => !!value && !!date && formatDate(date) === value;

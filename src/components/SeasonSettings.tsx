@@ -64,7 +64,7 @@ export default function SeasonSettings({ activeSeason, players, rounds, showToas
       DB.getSeasonPlayers(activeSeason.id).then(setSeasonPlayers);
       setTab('edit');
     }
-  }, [activeSeason?.id]);
+  }, [activeSeason]);
 
   const enrolledIds = new Set(seasonPlayers.map(sp => sp.player_id));
   const availablePlayers = players.filter(p => !enrolledIds.has(p.id) && p.status === 'active');

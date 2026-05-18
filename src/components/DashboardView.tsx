@@ -63,14 +63,14 @@ const StandingsTable = ({ players, rounds, isCompletedSeason, metric }: {
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm min-w-[600px]">
-        <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
+        <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
           <tr>
-            <th className="px-3 py-3 text-left w-10 sticky left-0 bg-slate-50 z-10">#</th>
-            <th className="px-3 py-3 text-left sticky left-10 bg-slate-50 z-10 w-px whitespace-nowrap">Player</th>
-            {rounds.map((r, i) => <th key={r.id} className="px-1.5 py-3 text-center text-xs">R{i + 1}</th>)}
-            <th className="px-3 py-3 text-center bg-slate-100">Total</th>
-            <th className="px-3 py-3 text-center text-red-400">Drop</th>
-            <th className="px-3 py-3 text-center font-bold bg-emerald-50 text-emerald-700">Net</th>
+            <th scope="col" className="px-3 py-3 text-left w-10 sticky left-0 bg-slate-50 z-10">#</th>
+            <th scope="col" className="px-3 py-3 text-left sticky left-10 bg-slate-50 z-10 w-px whitespace-nowrap">Player</th>
+            {rounds.map((r, i) => <th scope="col" key={r.id} className="px-1.5 py-3 text-center text-xs">R{i + 1}</th>)}
+            <th scope="col" className="px-3 py-3 text-center bg-slate-100">Total</th>
+            <th scope="col" className="px-3 py-3 text-center text-red-600">Drop</th>
+            <th scope="col" className="px-3 py-3 text-center font-bold bg-emerald-50 text-emerald-700">Net</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-50">
@@ -293,12 +293,12 @@ export default function DashboardView({ activeSeason, leaderboardData, rounds, s
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm min-w-[500px]">
-                <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
+                <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
                   <tr>
-                    <th className="px-3 py-3 text-left w-10 sticky left-0 bg-slate-50 z-10">#</th>
-                    <th className="px-3 py-3 text-left sticky left-10 bg-slate-50 z-10 w-px whitespace-nowrap">Team</th>
-                    {rounds.map((r, i) => <th key={r.id} className="px-1.5 py-3 text-center text-xs">R{i+1}</th>)}
-                    <th className="px-3 py-3 text-center font-bold bg-emerald-50 text-emerald-700">Total</th>
+                    <th scope="col" className="px-3 py-3 text-left w-10 sticky left-0 bg-slate-50 z-10">#</th>
+                    <th scope="col" className="px-3 py-3 text-left sticky left-10 bg-slate-50 z-10 w-px whitespace-nowrap">Team</th>
+                    {rounds.map((r, i) => <th scope="col" key={r.id} className="px-1.5 py-3 text-center text-xs">R{i+1}</th>)}
+                    <th scope="col" className="px-3 py-3 text-center font-bold bg-emerald-50 text-emerald-700">Total</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
