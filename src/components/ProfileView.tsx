@@ -1,19 +1,31 @@
-// @ts-nocheck — legacy JS patterns; migrate to strict TS in a follow-up pass.
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type FormEvent, type ChangeEvent, type Dispatch, type SetStateAction } from 'react';
 import { Save, Camera, Mail, Bell } from 'lucide-react';
 import * as DB from '../api';
+import type { Player, Season, ScoresMapFull, Round, PlayerUpdate, BuyInStatus, FinesSummary } from '../api';
 import { TabBar, Avatar, PlayerRoundsTable, FinesSummaryCards, StatsGrid, usePlayerStats, Card } from './common';
 
-export default function ProfileView({ currentUser, players, setPlayers, scores, rounds, activeSeason, showToast }) {
+interface ProfileViewProps {
+  currentUser: Player;
+  players: Player[];
+  setPlayers: Dispatch<SetStateAction<Player[]>>;
+  scores: ScoresMapFull;
+  rounds: Round[];
+  activeSeason: Season | null;
+  showToast: (msg: string, type?: string) => void;
+}
+
+export default function ProfileView({ currentUser, setPlayers, scores, rounds, activeSeason, showToast }: ProfileViewProps) {
   const [profileTab, setProfileTab] = useState('stats');
-  const [profileBuyInStatus, setProfileBuyInStatus] = useState({ isPaid: false });
-  const [profileFinesSummary, setProfileFinesSummary] = useState({ total_fines: 0, paid_fines: 0, outstanding_fines: 0 });
+  const [profileBuyInStatus, setProfileBuyInStatus] = useState<BuyInStatus>({ isPaid: false, date: null });
+  const [profileFinesSummary, setProfileFinesSummary] = useState<FinesSummary>({
+    total_fines: 0, paid_fines: 0, outstanding_fines: 0, confirmed_rounds: 0, total_rounds_with_fines: 0,
+  });
   const [formData, setFormData] = useState({ name: currentUser.name, email: currentUser.email, password: '' });
   const [notifyEmail, setNotifyEmail] = useState(currentUser.notify_email !== 0);
   const [notifyPush, setNotifyPush] = useState(currentUser.notify_push !== 0);
 
-  const toggleNotifyPref = async (field, value) => {
-    const update = { [field]: value ? 1 : 0 };
+  const toggleNotifyPref = async (field: 'notify_email' | 'notify_push', value: boolean) => {
+    const update: PlayerUpdate = { [field]: value ? 1 : 0 };
     await DB.updatePlayer(currentUser.id, update);
     setPlayers(prev => prev.map(p => p.id === currentUser.id ? { ...p, ...update } : p));
     showToast(`${field === 'notify_email' ? 'Email' : 'Push'} notifications ${value ? 'enabled' : 'disabled'}`);
@@ -28,17 +40,17 @@ export default function ProfileView({ currentUser, players, setPlayers, scores, 
 
   const { playerScores, roundsPlayed, totalStrokes, totalStableford, avgScore } = usePlayerStats(currentUser.id, scores, rounds);
 
-  const handleSaveProfile = async (e) => {
+  const handleSaveProfile = async (e: FormEvent) => {
     e.preventDefault();
-    const updates = { name: formData.name, email: formData.email };
+    const updates: PlayerUpdate = { name: formData.name, email: formData.email };
     if (formData.password?.trim()) updates.password = formData.password;
     await DB.updatePlayer(currentUser.id, updates);
     setPlayers(prev => prev.map(p => p.id === currentUser.id ? { ...p, ...updates } : p));
     showToast('Profile updated!', 'success');
   };
 
-  const handleAvatarUpload = (e) => {
-    const file = e.target.files[0];
+  const handleAvatarUpload = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 500000) {
       showToast("File too large for browser storage. Please use a smaller image (<500kb).", "error");
@@ -46,8 +58,9 @@ export default function ProfileView({ currentUser, players, setPlayers, scores, 
     }
     const reader = new FileReader();
     reader.onloadend = async () => {
-      await DB.updatePlayer(currentUser.id, { avatar: reader.result });
-      setPlayers(prev => prev.map(p => p.id === currentUser.id ? { ...p, avatar: reader.result } : p));
+      const avatar = reader.result as string;
+      await DB.updatePlayer(currentUser.id, { avatar });
+      setPlayers(prev => prev.map(p => p.id === currentUser.id ? { ...p, avatar } : p));
     };
     reader.readAsDataURL(file);
   };

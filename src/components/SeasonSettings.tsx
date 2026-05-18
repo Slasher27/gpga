@@ -1,14 +1,21 @@
-// @ts-nocheck — legacy JS patterns; migrate to strict TS in a follow-up pass.
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type FormEvent, type ChangeEvent } from 'react';
 import { Plus, Trash2, Save, X, UserPlus } from 'lucide-react';
 import * as DB from '../api';
+import type { Season, Player, SeasonPlayer, SeasonUpdate, Round } from '../api';
 import { TabBar, Card } from './common';
 
-const PrizeFields = ({ values, onChange, uncontrolled, prefix = '' }) => {
-  const id = (field) => `${prefix}${field}`;
-  const bind = (field) => uncontrolled
+type FormValues = Record<string, string | number>;
+
+const PrizeFields = ({ values, onChange, uncontrolled, prefix = '' }: {
+  values: FormValues;
+  onChange?: (v: FormValues) => void;
+  uncontrolled?: boolean;
+  prefix?: string;
+}) => {
+  const id = (field: string) => `${prefix}${field}`;
+  const bind = (field: string) => uncontrolled
     ? { id: id(field), name: field, defaultValue: values[field] || '' }
-    : { id: id(field), name: field, value: values[field] || '', onChange: e => onChange({ ...values, [field]: e.target.value === '' ? '' : Number(e.target.value) }) };
+    : { id: id(field), name: field, value: values[field] || '', onChange: (e: ChangeEvent<HTMLInputElement>) => onChange?.({ ...values, [field]: e.target.value === '' ? '' : Number(e.target.value) }) };
   return (
     <div className="pt-3 border-t border-slate-200">
       <p className="text-sm font-semibold text-slate-700 mb-3">Prize Pool</p>
@@ -23,13 +30,23 @@ const PrizeFields = ({ values, onChange, uncontrolled, prefix = '' }) => {
   );
 };
 
-export default function SeasonSettings({ activeSeason, allSeasons, players, rounds, showToast, showConfirm, onDataChanged }) {
+interface SeasonSettingsProps {
+  activeSeason: Season | null;
+  allSeasons: Season[];
+  players: Player[];
+  rounds: Round[];
+  showToast: (msg: string, type?: string) => void;
+  showConfirm: (title: string, message: string, onConfirm: () => void) => void;
+  onDataChanged: () => Promise<void> | void;
+}
+
+export default function SeasonSettings({ activeSeason, players, rounds, showToast, showConfirm, onDataChanged }: SeasonSettingsProps) {
   const [tab, setTab] = useState(activeSeason ? 'edit' : 'create');
-  const [seasonPlayers, setSeasonPlayers] = useState([]);
+  const [seasonPlayers, setSeasonPlayers] = useState<SeasonPlayer[]>([]);
   const [isCreating, setIsCreating] = useState(false);
 
-  // Edit form state
-  const [editForm, setEditForm] = useState({});
+  // Edit form state (dynamic key/value form)
+  const [editForm, setEditForm] = useState<FormValues>({});
 
   useEffect(() => {
     if (activeSeason) {
@@ -51,13 +68,15 @@ export default function SeasonSettings({ activeSeason, allSeasons, players, roun
   const enrolledIds = new Set(seasonPlayers.map(sp => sp.player_id));
   const availablePlayers = players.filter(p => !enrolledIds.has(p.id) && p.status === 'active');
 
-  const handleAddToSeason = async (playerId) => {
+  const handleAddToSeason = async (playerId: string) => {
+    if (!activeSeason) return;
     await DB.addSeasonPlayer(activeSeason.id, playerId);
     setSeasonPlayers(await DB.getSeasonPlayers(activeSeason.id));
     showToast('Player added to season');
   };
 
-  const handleRemoveFromSeason = async (playerId, playerName) => {
+  const handleRemoveFromSeason = async (playerId: string, playerName: string) => {
+    if (!activeSeason) return;
     showConfirm(`Remove ${playerName}?`, 'This will remove them from the season roster. Their scores and fines will remain.', async () => {
       await DB.removeSeasonPlayer(activeSeason.id, playerId);
       setSeasonPlayers(await DB.getSeasonPlayers(activeSeason.id));
@@ -65,10 +84,11 @@ export default function SeasonSettings({ activeSeason, allSeasons, players, roun
     });
   };
 
-  const handleSaveSettings = async (e) => {
+  const handleSaveSettings = async (e: FormEvent) => {
     e.preventDefault();
-    await DB.updateSeason(activeSeason.id, {
-      name: editForm.name,
+    if (!activeSeason) return;
+    const updates: SeasonUpdate = {
+      name: String(editForm.name ?? ''),
       year: Number(editForm.year) || 0,
       buy_in_amount: Number(editForm.buy_in_amount) || 0,
       medal_1st: Number(editForm.medal_1st) || 0,
@@ -76,17 +96,18 @@ export default function SeasonSettings({ activeSeason, allSeasons, players, roun
       stableford_1st: Number(editForm.stableford_1st) || 0,
       stableford_2nd: Number(editForm.stableford_2nd) || 0,
       team_1st: Number(editForm.team_1st) || 0,
-    });
+    };
+    await DB.updateSeason(activeSeason.id, updates);
     await onDataChanged();
     showToast('Season settings saved');
   };
 
-  const handleCreateSeason = async (e) => {
+  const handleCreateSeason = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsCreating(true);
     try {
-      const fd = new FormData(e.target);
-      await DB.createSeason(Number(fd.get('year')), fd.get('name'), Number(fd.get('buy_in_amount')), {
+      const fd = new FormData(e.currentTarget);
+      await DB.createSeason(Number(fd.get('year')), String(fd.get('name') ?? ''), Number(fd.get('buy_in_amount')), {
         medal_1st: Number(fd.get('medal_1st')) || 0,
         medal_2nd: Number(fd.get('medal_2nd')) || 0,
         stableford_1st: Number(fd.get('stableford_1st')) || 0,
@@ -102,24 +123,27 @@ export default function SeasonSettings({ activeSeason, allSeasons, players, roun
   };
 
   const handleEndSeason = () => {
+    if (!activeSeason) return;
+    const season = activeSeason;
     const roundCount = rounds?.length || 0;
     const warning = roundCount < 9
       ? `The season has only completed ${roundCount} of 9 rounds. Are you sure you want to end it early?\n\nScores, fines, and standings will be locked. This cannot be undone.`
       : 'Scores, fines, and standings will be locked. You can still view the data but cannot make changes. This cannot be undone.';
-    showConfirm(`End ${activeSeason.name}?`, warning, async () => {
-      await DB.updateSeason(activeSeason.id, { is_active: false });
+    showConfirm(`End ${season.name}?`, warning, async () => {
+      await DB.updateSeason(season.id, { is_active: false });
       await onDataChanged();
-      showToast(`${activeSeason.name} has ended`, 'success');
+      showToast(`${season.name} has ended`, 'success');
     });
   };
 
   const handleOpenSeason = async () => {
+    if (!activeSeason) return;
     await DB.updateSeason(activeSeason.id, { is_active: true });
     await onDataChanged();
     showToast(`${activeSeason.name} is now active`, 'success');
   };
 
-  const tabs = [];
+  const tabs: { id: string; label: string }[] = [];
   if (activeSeason) tabs.push({ id: 'edit', label: 'Settings' }, { id: 'players', label: `Players (${seasonPlayers.length})` });
   tabs.push({ id: 'create', label: '+ New Season' });
 

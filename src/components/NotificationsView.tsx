@@ -1,13 +1,13 @@
-// @ts-nocheck — legacy JS patterns; migrate to strict TS in a follow-up pass.
 import { useState, useEffect } from 'react';
 import { Bell } from 'lucide-react';
 import * as DB from '../api';
+import type { Notification, Player } from '../api';
 import { Card, timeAgo } from './common';
 
-const timeAgoLong = (date) => timeAgo(date, true);
+const timeAgoLong = (date: string) => timeAgo(date, true);
 
-export default function NotificationsView({ currentUser }) {
-  const [notifications, setNotifications] = useState([]);
+export default function NotificationsView({ currentUser }: { currentUser: Player }) {
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -16,7 +16,7 @@ export default function NotificationsView({ currentUser }) {
     }
   }, [currentUser?.id]);
 
-  const handleMarkRead = async (id) => {
+  const handleMarkRead = async (id: number) => {
     await DB.markNotificationRead(id);
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: 1 } : n));
   };

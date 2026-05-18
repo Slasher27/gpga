@@ -1,11 +1,11 @@
-// @ts-nocheck — legacy JS patterns; migrate to strict TS in a follow-up pass.
 import { useState, useEffect, useMemo } from 'react';
 import { Trophy, MapPin, Calendar, Clock } from 'lucide-react';
 import { TabBar, Card, Avatar } from './common';
 import * as DB from '../api';
 import { SEASON_ROUNDS } from '../api';
+import type { Season, Round, Player, GolfCourse, Team, LeaderboardEntry, ScoresMapFull } from '../api';
 
-const RankBadge = ({ idx, dq }) => (
+const RankBadge = ({ idx, dq }: { idx: number; dq?: boolean }) => (
   <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold flex-shrink-0 ${
     dq ? 'bg-slate-100 text-slate-400' :
     idx === 0 ? 'bg-emerald-500 text-white' :
@@ -14,7 +14,7 @@ const RankBadge = ({ idx, dq }) => (
   }`}>{dq ? '-' : idx + 1}</span>
 );
 
-const PlayerCell = ({ player, isWinner }) => (
+const PlayerCell = ({ player, isWinner }: { player: LeaderboardEntry; isWinner?: boolean }) => (
   <div className="flex items-center gap-2 min-w-0">
     <span className={`truncate ${player.isDisqualified ? 'text-slate-400 line-through' : 'font-medium text-slate-800'}`}>
       {player.name}
@@ -24,9 +24,18 @@ const PlayerCell = ({ player, isWinner }) => (
   </div>
 );
 
-export default function DashboardView({ activeSeason, leaderboardData, rounds, scores, players, golfCourses }) {
+interface DashboardViewProps {
+  activeSeason: Season | null;
+  leaderboardData: LeaderboardEntry[];
+  rounds: Round[];
+  scores: ScoresMapFull;
+  players: Player[];
+  golfCourses: GolfCourse[];
+}
+
+export default function DashboardView({ activeSeason, leaderboardData, rounds, scores, players, golfCourses }: DashboardViewProps) {
   const [leaderboardTab, setLeaderboardTab] = useState('medal');
-  const [teamsData, setTeamsData] = useState([]);
+  const [teamsData, setTeamsData] = useState<Team[]>([]);
 
   useEffect(() => {
     if (activeSeason) DB.getTeams(activeSeason.id).then(setTeamsData);
@@ -37,7 +46,7 @@ export default function DashboardView({ activeSeason, leaderboardData, rounds, s
     return teamsData.map(team => {
       const p1 = scores[team.player1_id] || {}, p2 = scores[team.player2_id] || {};
       let total = 0;
-      const roundTotals = {};
+      const roundTotals: Record<number, number> = {};
       rounds.forEach(r => {
         const combined = (p1[r.id]?.stableford || 0) + (p2[r.id]?.stableford || 0);
         roundTotals[r.id] = combined;
@@ -58,7 +67,7 @@ export default function DashboardView({ activeSeason, leaderboardData, rounds, s
 
   const finesSorted = useMemo(() => [...leaderboardData].sort((a, b) => b.totalFines - a.totalFines), [leaderboardData]);
   const totalFinesPot = leaderboardData.reduce((acc, p) => acc + p.totalFines, 0);
-  const isCompletedSeason = activeSeason && !activeSeason.is_active;
+  const isCompletedSeason = !!activeSeason && !activeSeason.is_active;
   const medalLeader = leaderboardData[0];
   const sfLeader = stablefordSorted[0];
 
@@ -86,7 +95,7 @@ export default function DashboardView({ activeSeason, leaderboardData, rounds, s
       </div>
 
       {/* Purse strip */}
-      {prizeTotal > 0 && (
+      {activeSeason && prizeTotal > 0 && (
         <div className="flex items-center gap-3 text-sm">
           <Trophy size={16} className="text-emerald-500 flex-shrink-0" />
           <span className="font-bold text-slate-800">R{prizeTotal.toLocaleString()}</span>

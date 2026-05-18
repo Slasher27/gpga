@@ -1,14 +1,27 @@
-// @ts-nocheck — legacy JS patterns; migrate to strict TS in a follow-up pass.
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, type KeyboardEvent } from 'react';
 import { Plus, Trash2, ChevronDown, Edit, Save, X } from 'lucide-react';
-import * as DB from '../api';
+import type { Player, Round, Season, LeaderboardEntry, ScoresMapFull, FineType } from '../api';
 import { TabBar, Card } from './common';
-import { useFines, calcFineTotal } from '../hooks/useFines';
+import { useFines, calcFineTotal, type EditableFineType } from '../hooks/useFines';
+
+interface FinancesViewProps {
+	leaderboardData: LeaderboardEntry[];
+	rounds: Round[];
+	scores: ScoresMapFull;
+	players: Player[];
+	activeSeason: Season | null;
+	isReadOnlySeason: boolean;
+	currentUser: Player;
+	showToast: (msg: string, type?: string) => void;
+	onAddFineType: () => void;
+	onDeleteFineType: (id: number, name: string) => void;
+	onFinesChanged: () => void;
+	fineTypesVersion?: number;
+}
 
 export default function FinancesView({
 	leaderboardData,
 	rounds,
-	scores,
 	players,
 	activeSeason,
 	isReadOnlySeason,
@@ -18,7 +31,7 @@ export default function FinancesView({
 	onDeleteFineType,
 	onFinesChanged,
 	fineTypesVersion = 0,
-}) {
+}: FinancesViewProps) {
 	const isAdmin = currentUser.role === 'master' || currentUser.role === 'admin';
 	const sortedByFines = useMemo(
 		() => [...leaderboardData].sort((a, b) => b.totalFines - a.totalFines),
@@ -30,14 +43,14 @@ export default function FinancesView({
 	const [finesTab, setFinesTab] = useState(() =>
 		isAdmin ? 'assign' : 'history',
 	);
-	const [selectedRound, setSelectedRound] = useState(
+	const [selectedRound, setSelectedRound] = useState<number | null>(
 		mostRecentRound?.id || null,
 	);
-	const [selectedPlayer, setSelectedPlayer] = useState(null);
+	const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
 	const [roundViewPlayerFilter, setRoundViewPlayerFilter] = useState('all');
-	const [expandedRoundViewPlayers, setExpandedRoundViewPlayers] = useState({});
-	const [expandedPlayers, setExpandedPlayers] = useState({});
-	const [editingFineType, setEditingFineType] = useState(null);
+	const [expandedRoundViewPlayers, setExpandedRoundViewPlayers] = useState<Record<string, boolean>>({});
+	const [expandedPlayers, setExpandedPlayers] = useState<Record<string, boolean>>({});
+	const [editingFineType, setEditingFineType] = useState<EditableFineType | null>(null);
 	const [showOpenFine, setShowOpenFine] = useState(false);
 	const [openFineName, setOpenFineName] = useState('');
 	const [openFineAmount, setOpenFineAmount] = useState('');
@@ -84,7 +97,7 @@ export default function FinancesView({
 	};
 
 	// Enter/Space activation for non-button interactive disclosure rows.
-	const onKeyActivate = (fn) => (e) => {
+	const onKeyActivate = (fn: () => void) => (e: KeyboardEvent) => {
 		if (e.key === 'Enter' || e.key === ' ') {
 			e.preventDefault();
 			fn();
@@ -112,7 +125,7 @@ export default function FinancesView({
 	);
 
 	// --- Tabs ---
-	const tabs = [];
+	const tabs: { id: string; label: string }[] = [];
 	if (!isReadOnlySeason && isAdmin)
 		tabs.push(
 			{ id: 'assign', label: 'Start Fines' },
@@ -508,7 +521,7 @@ export default function FinancesView({
 															type='number'
 															value={editingFineType.sort_order}
 															onChange={(e) =>
-																setEditingFineType((prev) => ({
+																setEditingFineType((prev) => prev && ({
 																	...prev,
 																	sort_order: Number(e.target.value),
 																}))
@@ -524,7 +537,7 @@ export default function FinancesView({
 															aria-label='Fine name'
 															value={editingFineType.name}
 															onChange={(e) =>
-																setEditingFineType((prev) => ({
+																setEditingFineType((prev) => prev && ({
 																	...prev,
 																	name: e.target.value,
 																}))
@@ -539,7 +552,7 @@ export default function FinancesView({
 															type='number'
 															value={editingFineType.amount}
 															onChange={(e) =>
-																setEditingFineType((prev) => ({
+																setEditingFineType((prev) => prev && ({
 																	...prev,
 																	amount: Number(e.target.value),
 																}))
@@ -554,7 +567,7 @@ export default function FinancesView({
 															aria-label='Fine description'
 															value={editingFineType.description || ''}
 															onChange={(e) =>
-																setEditingFineType((prev) => ({
+																setEditingFineType((prev) => prev && ({
 																	...prev,
 																	description: e.target.value,
 																}))
@@ -574,7 +587,7 @@ export default function FinancesView({
 																type='number'
 																value={editingFineType.tier_threshold || 0}
 																onChange={(e) =>
-																	setEditingFineType((prev) => ({
+																	setEditingFineType((prev) => prev && ({
 																		...prev,
 																		tier_threshold: Number(e.target.value),
 																	}))
@@ -594,7 +607,7 @@ export default function FinancesView({
 																type='number'
 																value={editingFineType.tier_amount || 0}
 																onChange={(e) =>
-																	setEditingFineType((prev) => ({
+																	setEditingFineType((prev) => prev && ({
 																		...prev,
 																		tier_amount: Number(e.target.value),
 																	}))
@@ -743,8 +756,10 @@ export default function FinancesView({
 											No fines recorded for this round
 										</div>
 									);
-								const playerSummary = {},
-									playerFineDetails = {};
+								type SummaryRow = { player_id: string; player_name: string; total_fines: number; total_amount: number };
+								type FineDetail = { name: string; quantity: number; amount: number; total: number };
+								const playerSummary: Record<string, SummaryRow> = {},
+									playerFineDetails: Record<string, FineDetail[]> = {};
 								roundFinesData.forEach((f) => {
 									if (!playerSummary[f.player_id]) {
 										playerSummary[f.player_id] = {

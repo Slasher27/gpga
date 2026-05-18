@@ -31,6 +31,17 @@ type BuyInCache = Record<string, { isPaid: boolean | number; date: string | null
 type PlayerRoundFinesCache = Record<string, PlayerRoundFineRow[]>;
 type ShowToast = (msg: string, type?: string) => void;
 
+// The fields the inline Fine Sheet editor can change (subset of FineType).
+export interface EditableFineType {
+  id: number;
+  name: string;
+  amount: number;
+  sort_order: number;
+  description: string;
+  tier_threshold: number;
+  tier_amount: number;
+}
+
 interface UseFinesArgs {
   activeSeason: Season | null;
   selectedPlayer: string | null;
@@ -156,7 +167,7 @@ export function useFines({
     showToast?.(`Open fine "${name.trim()}" added`);
   }, [activeSeason, selectedPlayer, selectedRound, refreshDerived, showToast]);
 
-  const saveFineType = useCallback(async (edited: FineType) => {
+  const saveFineType = useCallback(async (edited: EditableFineType) => {
     if (!edited) return;
     await DB.updateFineType(edited.id, {
       name: edited.name,

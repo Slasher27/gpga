@@ -69,6 +69,27 @@ export interface Score {
 
 export type ScoresMap = Record<string, Record<number, Score>>;
 
+// The app merges per-round fines into the scores map (App.mergeScoresAndFines),
+// so cells carry an optional `fines` and fields may be absent.
+export type ScoreCell = { strokes?: number; handicap?: number; stableford?: number; fines?: number };
+export type ScoresMapFull = Record<string, Record<number, ScoreCell>>;
+
+// A leaderboard row = a player plus the standings computed in App.
+export interface LeaderboardEntry extends Player {
+  totalStrokes: number;
+  totalStableford: number;
+  netTotal: number;
+  netStableford: number;
+  worstRound: number;
+  worstStableford: number;
+  totalFines: number;
+  roundsPlayed: number;
+  roundsMissed: number;
+  isDisqualified: boolean;
+  canDropWorstRound: boolean;
+  pScores: Record<number, ScoreCell>;
+}
+
 export interface GolfCourse {
   id: number;
   name: string;

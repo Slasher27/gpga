@@ -1,14 +1,24 @@
-// @ts-nocheck — legacy JS patterns; migrate to strict TS in a follow-up pass.
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, type Dispatch, type SetStateAction } from 'react';
 import { Plus, Save, Edit, Trash2, ChevronDown } from 'lucide-react';
 import * as DB from '../api';
+import type { Player, Team, Season, Round, ScoresMapFull } from '../api';
 import { NoPlayersEmptyState, Avatar, Card } from './common';
 
-const TeamManagementSection = ({ teams, setTeams, isAddingTeam, setIsAddingTeam, players, activeSeason, showToast }) => {
+type BuyInCache = Record<string, { isPaid: boolean; date: string | null }>;
+
+const TeamManagementSection = ({ teams, setTeams, isAddingTeam, setIsAddingTeam, players, activeSeason, showToast }: {
+  teams: Team[];
+  setTeams: Dispatch<SetStateAction<Team[]>>;
+  isAddingTeam: boolean;
+  setIsAddingTeam: Dispatch<SetStateAction<boolean>>;
+  players: Player[];
+  activeSeason: Season | null;
+  showToast: (msg: string, type?: string) => void;
+}) => {
   const [newTeamName, setNewTeamName] = useState('');
   const [newPlayer1, setNewPlayer1] = useState('');
   const [newPlayer2, setNewPlayer2] = useState('');
-  const [editingTeam, setEditingTeam] = useState(null);
+  const [editingTeam, setEditingTeam] = useState<Team | null>(null);
 
   const assignedPlayerIds = teams.flatMap(t => [t.player1_id, t.player2_id]);
   const availablePlayers = players.filter(p => p.status === 'active' && !assignedPlayerIds.includes(p.id));
@@ -25,7 +35,8 @@ const TeamManagementSection = ({ teams, setTeams, isAddingTeam, setIsAddingTeam,
     showToast('Team created!', 'success');
   };
 
-  const handleDeleteTeam = async (id) => {
+  const handleDeleteTeam = async (id: number) => {
+    if (!activeSeason) return;
     await DB.deleteTeam(id);
     const updated = await DB.getTeams(activeSeason.id);
     setTeams(updated);
@@ -33,7 +44,7 @@ const TeamManagementSection = ({ teams, setTeams, isAddingTeam, setIsAddingTeam,
   };
 
   const handleUpdateTeam = async () => {
-    if (!editingTeam) return;
+    if (!editingTeam || !activeSeason) return;
     await DB.updateTeam(editingTeam.id, {
       name: editingTeam.name,
       player1_id: editingTeam.player1_id,
@@ -179,14 +190,29 @@ const TeamManagementSection = ({ teams, setTeams, isAddingTeam, setIsAddingTeam,
   );
 };
 
-export default function PlayersView({ players, scores, rounds, activeSeason, isReadOnlySeason, currentUser, showToast, showConfirm, setPlayers, onAddPlayer, managingPlayerId, setManagingPlayerId }) {
+interface PlayersViewProps {
+  players: Player[];
+  scores: ScoresMapFull;
+  rounds: Round[];
+  activeSeason: Season | null;
+  isReadOnlySeason: boolean;
+  currentUser: Player;
+  showToast: (msg: string, type?: string) => void;
+  showConfirm: (title: string, message: string, onConfirm: () => void) => void;
+  setPlayers: Dispatch<SetStateAction<Player[]>>;
+  onAddPlayer: () => void;
+  managingPlayerId: string | null;
+  setManagingPlayerId: Dispatch<SetStateAction<string | null>>;
+}
+
+export default function PlayersView({ players, scores, rounds, activeSeason, isReadOnlySeason, currentUser, showToast, onAddPlayer, setManagingPlayerId }: PlayersViewProps) {
   const [adminTab, setAdminTab] = useState('players');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState('name');
-  const [teamsList, setTeamsList] = useState([]);
+  const [teamsList, setTeamsList] = useState<Team[]>([]);
   const [isAddingTeam, setIsAddingTeam] = useState(false);
-  const [buyInStatusCache, setBuyInStatusCache] = useState({});
+  const [buyInStatusCache, setBuyInStatusCache] = useState<BuyInCache>({});
   const [buyInLoaded, setBuyInLoaded] = useState(false);
 
   useEffect(() => {
@@ -200,7 +226,7 @@ export default function PlayersView({ players, scores, rounds, activeSeason, isR
       if (!activeSeason?.id || players.length === 0) return;
       const sp = await DB.getSeasonPlayers(activeSeason.id);
       if (cancelled) return;
-      const cache = {};
+      const cache: BuyInCache = {};
       for (const p of sp) cache[p.player_id] = { isPaid: p.buy_in_paid, date: p.buy_in_date };
       setBuyInStatusCache(cache);
       setBuyInLoaded(true);
@@ -218,9 +244,10 @@ export default function PlayersView({ players, scores, rounds, activeSeason, isR
       let totalStrokes = 0;
       for (const [roundId, s] of Object.entries(playerScores)) {
         if (!seasonRoundIds.has(Number(roundId))) continue;
-        if (s.strokes > 0) {
+        const strokes = s.strokes ?? 0;
+        if (strokes > 0) {
           roundsPlayed++;
-          totalStrokes += s.strokes;
+          totalStrokes += strokes;
         }
         totalFines += s.fines || 0;
       }

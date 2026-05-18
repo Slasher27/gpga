@@ -1,8 +1,11 @@
-// @ts-nocheck — legacy JS patterns; migrate to strict TS in a follow-up pass.
-import { useState, useEffect, useMemo, lazy, Suspense } from 'react';
+import { useState, useEffect, useMemo, lazy, Suspense, type FormEvent } from 'react';
 import { TrendingUp, Banknote, Calendar, Users, Plus, Save, Shuffle } from 'lucide-react';
 import * as DB from './api';
 import { SEASON_ROUNDS } from './api';
+import type {
+  Player, Round, Season, GolfCourse, ScoresMapFull, FinesByRound,
+  LeaderboardEntry, AuthedPlayer, Role, Status,
+} from './api';
 import { DashboardSkeleton, useConfirm, Modal, DatePicker, CourseSelector } from './components/common';
 import LoginPage from './components/LoginPage';
 import { setupPush } from './pushSetup';
@@ -21,43 +24,51 @@ const TeamDrawPage = lazy(() => import('./components/TeamDraw/TeamDrawPage'));
 
 // SEASON_ROUNDS imported from ./api — the worst round is only dropped once the
 // full season exists and the player completed all of it (never mid-season).
-const mergeScoresAndFines = (scoresData, finesData) => {
-  const merged = { ...scoresData };
-  Object.keys(finesData).forEach(pid => {
+const mergeScoresAndFines = (scoresData: ScoresMapFull, finesData: FinesByRound): ScoresMapFull => {
+  const merged: ScoresMapFull = { ...scoresData };
+  for (const pid of Object.keys(finesData)) {
     if (!merged[pid]) merged[pid] = {};
-    Object.keys(finesData[pid]).forEach(rid => {
-      if (!merged[pid][rid]) merged[pid][rid] = { strokes: 0, fines: 0 };
-      merged[pid][rid].fines = finesData[pid][rid];
-    });
-  });
+    for (const rid of Object.keys(finesData[pid])) {
+      const r = Number(rid);
+      if (!merged[pid][r]) merged[pid][r] = { strokes: 0, fines: 0 };
+      merged[pid][r].fines = finesData[pid][r];
+    }
+  }
   return merged;
 };
 
-// Capture PWA install prompt
-let deferredPrompt = null;
-window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; });
+// Capture PWA install prompt (BeforeInstallPromptEvent isn't in the DOM lib).
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => void;
+  userChoice: Promise<{ outcome: string }>;
+}
+let deferredPrompt: BeforeInstallPromptEvent | null = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e as BeforeInstallPromptEvent;
+});
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [view, setView] = useState(() => localStorage.getItem('gpga_current_view') || 'dashboard');
-  const [players, setPlayers] = useState([]);
-  const [rounds, setRounds] = useState([]);
-  const [scores, setScores] = useState({});
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [rounds, setRounds] = useState<Round[]>([]);
+  const [scores, setScores] = useState<ScoresMapFull>({});
   const [currentUserId, setCurrentUserId] = useState('1');
   const [dbReady, setDbReady] = useState(false);
-  const [activeSeason, setActiveSeason] = useState(null);
-  const [allSeasons, setAllSeasons] = useState([]);
-  const [golfCourses, setGolfCourses] = useState([]);
-  const [managingPlayerId, setManagingPlayerId] = useState(null);
+  const [activeSeason, setActiveSeason] = useState<Season | null>(null);
+  const [allSeasons, setAllSeasons] = useState<Season[]>([]);
+  const [golfCourses, setGolfCourses] = useState<GolfCourse[]>([]);
+  const [managingPlayerId, setManagingPlayerId] = useState<string | null>(null);
 
   // Modal states
   const [isAddPlayerModalOpen, setIsAddPlayerModalOpen] = useState(false);
   const [isAddRoundModalOpen, setIsAddRoundModalOpen] = useState(false);
   const [isEditRoundModalOpen, setIsEditRoundModalOpen] = useState(false);
-  const [editingRound, setEditingRound] = useState(null);
+  const [editingRound, setEditingRound] = useState<Round | null>(null);
   const [isAddFineTypeModalOpen, setIsAddFineTypeModalOpen] = useState(false);
   const [fineTypesVersion, setFineTypesVersion] = useState(0);
-  const [selectedCourse, setSelectedCourse] = useState(null);
+  const [selectedCourse, setSelectedCourse] = useState<GolfCourse | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDate, setSelectedDate] = useState('');
   const [canInstall, setCanInstall] = useState(false);
@@ -80,10 +91,10 @@ export default function App() {
   };
 
   // Toast + confirm
-  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+  const [toast, setToast] = useState<{ show: boolean; message: string; type: string }>({ show: false, message: '', type: 'success' });
   const { confirm: showConfirm, ConfirmDialogComponent } = useConfirm();
 
-  const showToast = (message, type = 'success') => {
+  const showToast = (message: string, type = 'success') => {
     setToast({ show: true, message, type });
     setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
   };
@@ -133,7 +144,7 @@ export default function App() {
   };
 
   const currentUser = players.find(p => p.id === currentUserId) || players[0];
-  const isReadOnlySeason = activeSeason && !activeSeason.is_active;
+  const isReadOnlySeason = !!activeSeason && !activeSeason.is_active;
   const isAdmin = currentUser?.role === 'master' || currentUser?.role === 'admin';
   const isMaster = currentUser?.role === 'master';
 
@@ -168,9 +179,9 @@ export default function App() {
     return nums.length === 0 ? `Round ${rounds.length + 1}` : `Round ${Math.max(...nums) + 1}`;
   }, [rounds]);
 
-  const leaderboardData = useMemo(() => {
+  const leaderboardData = useMemo<LeaderboardEntry[]>(() => {
     const totalRoundsCreated = rounds.length;
-    return players.map(player => {
+    return players.map((player): LeaderboardEntry => {
       const pScores = scores[player.id] || {};
       let totalStrokes = 0, totalStableford = 0, totalFines = 0, roundsPlayed = 0, worstRound = 0, worstStableford = 999;
       rounds.forEach(r => {
@@ -199,12 +210,15 @@ export default function App() {
 
   // --- Handlers ---
 
-  const handleLogin = async (user) => { setIsAuthenticated(true); setCurrentUserId(user.id); await loadData(); setupPush(user.id); };
+  // FormData fields are string | File | null — coerce to a trimmed string.
+  const fstr = (fd: FormData, key: string) => String(fd.get(key) ?? '');
+
+  const handleLogin = async (user: AuthedPlayer) => { setIsAuthenticated(true); setCurrentUserId(user.id); await loadData(); setupPush(user.id); };
   const handleLogout = () => { DB.logout(); setIsAuthenticated(false); setCurrentUserId('1'); setView('dashboard'); };
 
-  const setNavView = (id) => { setView(id); localStorage.setItem('gpga_current_view', id); };
+  const setNavView = (id: string) => { setView(id); localStorage.setItem('gpga_current_view', id); };
 
-  const handleSeasonSwitch = async (seasonId) => {
+  const handleSeasonSwitch = async (seasonId: number) => {
     const season = allSeasons.find(s => s.id === seasonId);
     if (!season) return;
     setActiveSeason(season);
@@ -215,46 +229,59 @@ export default function App() {
     setScores(mergeScoresAndFines(scoresData, finesData));
   };
 
-  const handleAddPlayer = async (e) => {
+  const handleAddPlayer = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const fd = new FormData(e.target);
-    const newPlayer = { id: Date.now().toString(), name: fd.get('name'), email: fd.get('email'), role: fd.get('role') || 'player', status: 'active', avatar: null };
+    const fd = new FormData(e.currentTarget);
+    const newPlayer: Player = {
+      id: Date.now().toString(),
+      name: fstr(fd, 'name'),
+      email: fstr(fd, 'email'),
+      role: (fstr(fd, 'role') || 'player') as Role,
+      status: 'active' as Status,
+      avatar: null,
+    };
     // Send the entered password to the server; keep it out of client state.
-    await DB.addPlayer({ ...newPlayer, password: fd.get('password') });
+    await DB.addPlayer({ ...newPlayer, password: fstr(fd, 'password') });
     setPlayers(prev => [...prev, newPlayer].sort((a, b) => a.name.localeCompare(b.name)));
     setIsAddPlayerModalOpen(false);
     showToast(`Player ${newPlayer.name} added successfully!`);
   };
 
-  const handleAddRound = async (e) => {
+  const handleAddRound = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!activeSeason) { showToast('No active season found.', 'error'); return; }
     if (!selectedCourse) { showToast('Please select a golf course', 'error'); return; }
-    const fd = new FormData(e.target);
-    const newRound = { name: fd.get('name'), date: fd.get('date'), courseId: selectedCourse.id, courseName: selectedCourse.name, teeTime: fd.get('tee_time') || null, teeTime2: fd.get('tee_time_2') || null };
+    const fd = new FormData(e.currentTarget);
+    const teeTime = fstr(fd, 'tee_time') || undefined;
+    const teeTime2 = fstr(fd, 'tee_time_2') || undefined;
+    const newRound = { name: fstr(fd, 'name'), date: fstr(fd, 'date'), courseId: selectedCourse.id, courseName: selectedCourse.name, teeTime, teeTime2 };
     const result = await DB.addRound(newRound, activeSeason.id);
-    setRounds(prev => [...prev, { id: result.id, season_id: activeSeason.id, name: newRound.name, date: newRound.date, course_id: newRound.courseId, course_name: newRound.courseName, tee_time: newRound.teeTime, tee_time_2: newRound.teeTime2 }]);
+    setRounds(prev => [...prev, { id: result.id, season_id: activeSeason.id, name: newRound.name, date: newRound.date, course_id: newRound.courseId, course_name: newRound.courseName, tee_time: teeTime ?? null, tee_time_2: teeTime2 ?? null }]);
     setIsAddRoundModalOpen(false); setSelectedCourse(null); setSearchTerm(''); setSelectedDate('');
     showToast(`Round "${newRound.name}" created successfully!`);
   };
 
-  const handleEditRound = (round) => {
+  const handleEditRound = (round: Round) => {
     setEditingRound(round);
     setSelectedCourse(golfCourses.find(c => c.id === round.course_id) || null);
     setIsEditRoundModalOpen(true);
   };
 
-  const handleUpdateRoundSubmit = async (e) => {
+  const handleUpdateRoundSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const fd = new FormData(e.target);
-    const updates = { name: fd.get('name'), date: fd.get('date'), courseId: selectedCourse?.id, courseName: selectedCourse?.name, teeTime: fd.get('tee_time') || null, teeTime2: fd.get('tee_time_2') || null };
-    await DB.updateRound(editingRound.id, updates);
-    setRounds(prev => prev.map(r => r.id === editingRound.id ? { ...r, name: updates.name || r.name, date: updates.date || r.date, course_id: updates.courseId || r.course_id, course_name: updates.courseName || r.course_name, tee_time: updates.teeTime, tee_time_2: updates.teeTime2 } : r));
+    if (!editingRound) return;
+    const roundId = editingRound.id;
+    const fd = new FormData(e.currentTarget);
+    const teeTime = fstr(fd, 'tee_time') || null;
+    const teeTime2 = fstr(fd, 'tee_time_2') || null;
+    const updates = { name: fstr(fd, 'name'), date: fstr(fd, 'date'), courseId: selectedCourse?.id, courseName: selectedCourse?.name, teeTime, teeTime2 };
+    await DB.updateRound(roundId, updates);
+    setRounds(prev => prev.map(r => r.id === roundId ? { ...r, name: updates.name || r.name, date: updates.date || r.date, course_id: updates.courseId || r.course_id, course_name: updates.courseName || r.course_name, tee_time: teeTime, tee_time_2: teeTime2 } : r));
     setIsEditRoundModalOpen(false); setSelectedCourse(null); setSearchTerm(''); setEditingRound(null);
-    showToast(`Round "${fd.get('name')}" updated successfully!`);
+    showToast(`Round "${updates.name}" updated successfully!`);
   };
 
-  const handleDeleteRound = (id, name) => {
+  const handleDeleteRound = (id: number, name: string) => {
     showConfirm(`Delete ${name}?`, `This will also delete all scores for this round and cannot be undone.`, async () => {
       await DB.deleteRound(id);
       setRounds(prev => prev.filter(r => r.id !== id));
@@ -262,7 +289,7 @@ export default function App() {
     });
   };
 
-  const handleCloseRound = (id, name) => {
+  const handleCloseRound = (id: number, name: string) => {
     showConfirm(`Close ${name}?`, `This will lock scores and send results to all players. This cannot be undone.`, async () => {
       await DB.closeRound(id);
       setRounds(prev => prev.map(r => r.id === id ? { ...r, closed: 1 } : r));
@@ -270,26 +297,26 @@ export default function App() {
     });
   };
 
-  const handleAddFineType = async (e) => {
+  const handleAddFineType = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!activeSeason) { showToast('No active season found.', 'error'); return; }
-    const fd = new FormData(e.target);
+    const fd = new FormData(e.currentTarget);
     await DB.addFineType(
       activeSeason.id,
-      fd.get('name'),
-      parseInt(fd.get('amount')),
-      fd.get('description'),
-      parseInt(fd.get('sort_order')) || 0,
+      fstr(fd, 'name'),
+      parseInt(fstr(fd, 'amount')),
+      fstr(fd, 'description'),
+      parseInt(fstr(fd, 'sort_order')) || 0,
       false,
-      parseInt(fd.get('tier_threshold')) || 0,
-      parseInt(fd.get('tier_amount')) || 0
+      parseInt(fstr(fd, 'tier_threshold')) || 0,
+      parseInt(fstr(fd, 'tier_amount')) || 0
     );
     setIsAddFineTypeModalOpen(false);
     setFineTypesVersion(v => v + 1);
     refreshFines?.();
   };
 
-  const handleDeleteFineType = (id, name) => {
+  const handleDeleteFineType = (id: number, name: string) => {
     showConfirm(`Delete Fine Type "${name}"?`, `This will permanently delete this fine type. Any existing fines of this type will remain.`, async () => {
       await DB.deleteFineType(id);
       setFineTypesVersion(v => v + 1);
@@ -413,7 +440,7 @@ export default function App() {
               </div>
             </div>
             <CourseSelector courses={golfCourses} selected={selectedCourse} onSelect={setSelectedCourse} searchTerm={searchTerm} onSearchChange={setSearchTerm} />
-            <input type="hidden" name="course" value={selectedCourse?.name || editingRound.course} required />
+            <input type="hidden" name="course" value={selectedCourse?.name || editingRound.course_name} required />
             <button className="w-full bg-emerald-600 text-white py-3 rounded-lg font-semibold hover:bg-emerald-700 flex items-center justify-center gap-2"><Save size={18} /> Update Round</button>
           </form>
         )}

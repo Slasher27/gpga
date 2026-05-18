@@ -1,22 +1,38 @@
-// @ts-nocheck — legacy JS patterns; migrate to strict TS in a follow-up pass.
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type FormEvent, type ChangeEvent, type Dispatch, type SetStateAction } from 'react';
 import { Save, Camera, ChevronDown } from 'lucide-react';
 import * as DB from '../api';
+import type { Player, Season, ScoresMapFull, Round, Role, Status, PlayerUpdate, BuyInStatus, FinesSummary } from '../api';
 import { TabBar, Avatar, PlayerRoundsTable, FinesSummaryCards, StatsGrid, usePlayerStats, Card } from './common';
 
-const badgeStyles = {
+const badgeStyles: Record<string, string> = {
   neutral: 'badge badge-ghost badge-sm',
   success: 'badge badge-success badge-sm',
   danger: 'badge badge-error badge-sm',
   warning: 'badge badge-ghost badge-sm',
 };
 
-export default function PlayerProfilePage({ players, setPlayers, scores, rounds, activeSeason, currentUser, managingPlayerId, setManagingPlayerId, showToast }) {
+type EditForm = { name: string; email: string; role: Role; status: Status; password: string };
+
+interface PlayerProfilePageProps {
+  players: Player[];
+  setPlayers: Dispatch<SetStateAction<Player[]>>;
+  scores: ScoresMapFull;
+  rounds: Round[];
+  activeSeason: Season | null;
+  currentUser: Player;
+  managingPlayerId: string | null;
+  setManagingPlayerId: Dispatch<SetStateAction<string | null>>;
+  showToast: (msg: string, type?: string) => void;
+}
+
+export default function PlayerProfilePage({ players, setPlayers, scores, rounds, activeSeason, currentUser, managingPlayerId, setManagingPlayerId, showToast }: PlayerProfilePageProps) {
   const player = players.find(p => p.id === managingPlayerId);
-  const [formData, setFormData] = useState({});
-  const [avatarPreview, setAvatarPreview] = useState(null);
-  const [playerBuyIn, setPlayerBuyIn] = useState({ isPaid: false, date: null });
-  const [playerFinesSummary, setPlayerFinesSummary] = useState({ total_fines: 0, paid_fines: 0, outstanding_fines: 0 });
+  const [formData, setFormData] = useState<Partial<EditForm>>({});
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [playerBuyIn, setPlayerBuyIn] = useState<BuyInStatus>({ isPaid: false, date: null });
+  const [playerFinesSummary, setPlayerFinesSummary] = useState<FinesSummary>({
+    total_fines: 0, paid_fines: 0, outstanding_fines: 0, confirmed_rounds: 0, total_rounds_with_fines: 0,
+  });
   const [profileTab, setProfileTab] = useState('stats');
 
   useEffect(() => {
@@ -34,9 +50,9 @@ export default function PlayerProfilePage({ players, setPlayers, scores, rounds,
 
   if (!player) return null;
 
-  const handleSave = async (e) => {
+  const handleSave = async (e: FormEvent) => {
     e.preventDefault();
-    const updates = { name: formData.name, email: formData.email, status: formData.status };
+    const updates: PlayerUpdate = { name: formData.name, email: formData.email, status: formData.status };
     if (currentUser.role === 'master' && player.role !== 'master') updates.role = formData.role;
     if (formData.password?.trim()) updates.password = formData.password;
     if (avatarPreview !== player.avatar) updates.avatar = avatarPreview;
@@ -45,12 +61,12 @@ export default function PlayerProfilePage({ players, setPlayers, scores, rounds,
     showToast(`${formData.name} updated successfully!`, 'success');
   };
 
-  const handleAvatarChange = (e) => {
-    const file = e.target.files[0];
+  const handleAvatarChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 500000) { showToast('Image too large. Max 500KB.', 'error'); return; }
     const reader = new FileReader();
-    reader.onloadend = () => setAvatarPreview(reader.result);
+    reader.onloadend = () => setAvatarPreview(reader.result as string);
     reader.readAsDataURL(file);
   };
 
@@ -225,7 +241,7 @@ export default function PlayerProfilePage({ players, setPlayers, scores, rounds,
                         id="pp-role"
                         name="playerRole"
                         value={formData.role || 'player'}
-                        onChange={e => setFormData(prev => ({ ...prev, role: e.target.value }))}
+                        onChange={e => setFormData(prev => ({ ...prev, role: e.target.value as Role }))}
                         className="select select-bordered w-full min-h-[44px]"
                       >
                         <option value="player">Player</option>
@@ -239,7 +255,7 @@ export default function PlayerProfilePage({ players, setPlayers, scores, rounds,
                       id="pp-status"
                       name="playerStatus"
                       value={formData.status || 'active'}
-                      onChange={e => setFormData(prev => ({ ...prev, status: e.target.value }))}
+                      onChange={e => setFormData(prev => ({ ...prev, status: e.target.value as Status }))}
                       className="select select-bordered w-full min-h-[44px]"
                     >
                       <option value="active">Active</option>

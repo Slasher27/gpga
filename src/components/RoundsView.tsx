@@ -1,13 +1,31 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type Dispatch, type SetStateAction } from 'react';
 import { Plus, Save, Edit, Trash2, MapPin, Calendar, Lock, CheckCircle } from 'lucide-react';
 import * as DB from '../api';
+import type { Round, Player, Season, ScoresMapFull } from '../api';
 import { Card } from './common';
 
-export default function RoundsView({ rounds, scores, setScores, players, activeSeason, isReadOnlySeason, showToast, onAddRound, onEditRound, onDeleteRound, onCloseRound }) {
+type ScoreField = 'gross' | 'handicap' | 'stableford';
+type ScoreEdit = Partial<Record<ScoreField, number | string>>;
+
+interface RoundsViewProps {
+  rounds: Round[];
+  scores: ScoresMapFull;
+  setScores: Dispatch<SetStateAction<ScoresMapFull>>;
+  players: Player[];
+  activeSeason: Season | null;
+  isReadOnlySeason: boolean;
+  showToast: (msg: string, type?: string) => void;
+  onAddRound: () => void;
+  onEditRound: (round: Round) => void;
+  onDeleteRound: (id: number, name: string) => void;
+  onCloseRound: (id: number, name: string) => void;
+}
+
+export default function RoundsView({ rounds, scores, setScores, players, isReadOnlySeason, showToast, onAddRound, onEditRound, onDeleteRound, onCloseRound }: RoundsViewProps) {
   // Auto-select latest round
-  const [selectedRound, setSelectedRound] = useState(rounds[rounds.length - 1]?.id);
-  const [editScores, setEditScores] = useState({});
-  const [editingPlayers, setEditingPlayers] = useState({});
+  const [selectedRound, setSelectedRound] = useState<number | undefined>(rounds[rounds.length - 1]?.id);
+  const [editScores, setEditScores] = useState<Record<string, ScoreEdit>>({});
+  const [editingPlayers, setEditingPlayers] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     setEditScores({});
@@ -19,15 +37,15 @@ export default function RoundsView({ rounds, scores, setScores, players, activeS
     if (rounds.length > 0) setSelectedRound(rounds[rounds.length - 1].id);
   }, [rounds.length]);
 
-  const handleScoreChange = (pid, field, val) => {
+  const handleScoreChange = (pid: string, field: ScoreField, val: string) => {
     setEditScores(prev => ({
       ...prev,
       [pid]: { ...(prev[pid] || {}), [field]: val === '' ? '' : parseInt(val) }
     }));
   };
 
-  const getPlayerValues = (playerId) => {
-    const current = scores[playerId]?.[selectedRound] || { strokes: 0, handicap: 0, stableford: 0 };
+  const getPlayerValues = (playerId: string) => {
+    const current = (selectedRound != null ? scores[playerId]?.[selectedRound] : undefined) || { strokes: 0, handicap: 0, stableford: 0 };
     const edited = editScores[playerId] || {};
     const gross = edited.gross !== undefined ? edited.gross : ((current.strokes || 0) + (current.handicap || 0)) || '';
     const hc = edited.handicap !== undefined ? edited.handicap : current.handicap || '';
@@ -38,7 +56,8 @@ export default function RoundsView({ rounds, scores, setScores, players, activeS
     return { gross, hc, sf, net };
   };
 
-  const savePlayerScore = async (playerId, playerName) => {
+  const savePlayerScore = async (playerId: string, playerName: string) => {
+    if (selectedRound == null) return;
     const vals = getPlayerValues(playerId);
     const net = Number(vals.net) || 0;
     const hc = Number(vals.hc) || 0;
@@ -59,10 +78,11 @@ export default function RoundsView({ rounds, scores, setScores, players, activeS
   };
 
   const editAllPlayers = () => {
-    setEditingPlayers(players.filter(p => p.status === 'active').reduce((acc, p) => { acc[p.id] = true; return acc; }, {}));
+    setEditingPlayers(players.filter(p => p.status === 'active').reduce((acc: Record<string, boolean>, p) => { acc[p.id] = true; return acc; }, {}));
   };
 
   const saveAllPlayers = async () => {
+    if (selectedRound == null) return;
     let savedCount = 0;
     for (const p of players.filter(pl => pl.status === 'active')) {
       if (!editingPlayers[p.id]) continue;
@@ -121,7 +141,7 @@ export default function RoundsView({ rounds, scores, setScores, players, activeS
         <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
           {rounds.map(r => {
             const isActive = selectedRound === r.id;
-            const hasScores = players.some(p => scores[p.id]?.[r.id]?.strokes > 0);
+            const hasScores = players.some(p => (scores[p.id]?.[r.id]?.strokes ?? 0) > 0);
             return (
               <button key={r.id} onClick={() => setSelectedRound(r.id)}
                 className={`flex-shrink-0 rounded-lg text-left transition-all min-w-[140px] p-3 ${
