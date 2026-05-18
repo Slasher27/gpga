@@ -26,6 +26,12 @@ export function formatDate(date: string): string {
   return `${MONTHS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
 }
 
+// --- EmptyRow ---
+// Compact, consistent inline empty/placeholder used inside cards & lists.
+export function EmptyRow({ children }: { children: string }) {
+  return <div className="p-8 text-center text-slate-400 text-sm">{children}</div>;
+}
+
 // --- TabBar ---
 export interface TabDef {
   id: string;

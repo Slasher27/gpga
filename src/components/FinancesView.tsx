@@ -1,11 +1,10 @@
-import { useState, useEffect, useMemo, type KeyboardEvent } from 'react';
+import { useState, useEffect, type KeyboardEvent } from 'react';
 import { Plus, Trash2, ChevronDown, Edit, Save, X } from 'lucide-react';
-import type { Player, Round, Season, LeaderboardEntry, ScoresMapFull, FineType } from '../api';
-import { TabBar, Card } from './common';
+import type { Player, Round, Season, ScoresMapFull, FineType } from '../api';
+import { TabBar, Card, EmptyRow, formatDate } from './common';
 import { useFines, calcFineTotal, type EditableFineType } from '../hooks/useFines';
 
 interface FinancesViewProps {
-	leaderboardData: LeaderboardEntry[];
 	rounds: Round[];
 	scores: ScoresMapFull;
 	players: Player[];
@@ -20,7 +19,6 @@ interface FinancesViewProps {
 }
 
 export default function FinancesView({
-	leaderboardData,
 	rounds,
 	players,
 	activeSeason,
@@ -33,10 +31,6 @@ export default function FinancesView({
 	fineTypesVersion = 0,
 }: FinancesViewProps) {
 	const isAdmin = currentUser.role === 'master' || currentUser.role === 'admin';
-	const sortedByFines = useMemo(
-		() => [...leaderboardData].sort((a, b) => b.totalFines - a.totalFines),
-		[leaderboardData],
-	);
 	const mostRecentRound = rounds.length > 0 ? rounds[rounds.length - 1] : null;
 
 	// --- UI state (data lives in useFines) ---
@@ -170,36 +164,6 @@ export default function FinancesView({
 				</div>
 			</div>
 
-			{/* Fines Leaderboard (compact) */}
-			<Card>
-				<div className='p-3 border-b border-slate-100'>
-					<p className='text-xs font-semibold text-slate-500 uppercase'>
-						Fines Leaderboard
-					</p>
-				</div>
-				<div className='divide-y divide-slate-50'>
-					{sortedByFines.slice(0, 8).map((player, idx) => (
-						<div key={player.id} className='flex items-center gap-3 px-3 py-2'>
-							<span
-								className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${
-									idx === 0
-										? 'bg-emerald-500 text-white'
-										: 'bg-slate-100 text-slate-600'
-								}`}
-							>
-								{idx + 1}
-							</span>
-							<span className='flex-1 text-sm text-slate-800 truncate'>
-								{player.name}
-							</span>
-							<span className='text-sm font-bold text-red-600 flex-shrink-0'>
-								R{player.totalFines.toLocaleString()}
-							</span>
-						</div>
-					))}
-				</div>
-			</Card>
-
 			{/* --- Tabs --- */}
 			<TabBar tabs={tabs} active={finesTab} onChange={setFinesTab} />
 
@@ -317,7 +281,7 @@ export default function FinancesView({
 														type='button'
 														onClick={() => fines.removeFine(ft.id)}
 														disabled={qty === 0}
-														className='w-9 h-9 flex items-center justify-center rounded-lg bg-red-100 text-red-600 hover:bg-red-200 disabled:opacity-30 transition-colors font-bold min-h-[36px]'
+														className='w-11 h-11 flex items-center justify-center rounded-lg bg-red-100 text-red-600 hover:bg-red-200 disabled:opacity-30 transition-colors font-bold min-h-[44px]'
 													>
 														-
 													</button>
@@ -327,7 +291,7 @@ export default function FinancesView({
 													<button
 														type='button'
 														onClick={() => fines.addFine(ft.id)}
-														className='w-9 h-9 flex items-center justify-center rounded-lg bg-emerald-100 text-emerald-600 hover:bg-emerald-200 transition-colors font-bold min-h-[36px]'
+														className='w-11 h-11 flex items-center justify-center rounded-lg bg-emerald-100 text-emerald-600 hover:bg-emerald-200 transition-colors font-bold min-h-[44px]'
 													>
 														+
 													</button>
@@ -371,7 +335,7 @@ export default function FinancesView({
 													<button
 														type='button'
 														onClick={() => fines.removeFine(ft.id)}
-														className='w-9 h-9 flex items-center justify-center rounded-lg bg-red-100 text-red-600 hover:bg-red-200 transition-colors font-bold min-h-[36px]'
+														className='w-11 h-11 flex items-center justify-center rounded-lg bg-red-100 text-red-600 hover:bg-red-200 transition-colors font-bold min-h-[44px]'
 													>
 														-
 													</button>
@@ -381,7 +345,7 @@ export default function FinancesView({
 													<button
 														type='button'
 														onClick={() => fines.addFine(ft.id)}
-														className='w-9 h-9 flex items-center justify-center rounded-lg bg-emerald-100 text-emerald-600 hover:bg-emerald-200 transition-colors font-bold min-h-[36px]'
+														className='w-11 h-11 flex items-center justify-center rounded-lg bg-emerald-100 text-emerald-600 hover:bg-emerald-200 transition-colors font-bold min-h-[44px]'
 													>
 														+
 													</button>
@@ -477,9 +441,7 @@ export default function FinancesView({
 								</div>
 							</>
 						) : (
-							<p className='text-sm text-slate-400 text-center py-8'>
-								Select a round and player to start fines
-							</p>
+							<EmptyRow>Select a round and player to start fines</EmptyRow>
 						)}
 					</div>
 				</Card>
@@ -503,9 +465,7 @@ export default function FinancesView({
 					<Card>
 						<div className='divide-y divide-slate-50'>
 							{fineTypes.filter((ft) => !ft.is_open).length === 0 ? (
-								<div className='p-8 text-center text-slate-400 text-sm'>
-									No fines on the sheet yet
-								</div>
+								<EmptyRow>No fines on the sheet yet</EmptyRow>
 							) : (
 								fineTypes
 									.filter((ft) => !ft.is_open)
@@ -721,7 +681,7 @@ export default function FinancesView({
 									<option value=''>Select Round</option>
 									{rounds.map((r) => (
 										<option key={r.id} value={r.id}>
-											{r.name} ({r.date})
+											{r.name} ({formatDate(r.date)})
 										</option>
 									))}
 								</select>
@@ -752,11 +712,9 @@ export default function FinancesView({
 							(() => {
 								if (roundFinesData.length === 0)
 									return (
-										<div className='border border-slate-200 rounded-lg p-8 text-center text-slate-400'>
-											No fines recorded for this round
-										</div>
+										<EmptyRow>No fines recorded for this round</EmptyRow>
 									);
-								type SummaryRow = { player_id: string; player_name: string; total_fines: number; total_amount: number };
+								type SummaryRow = { player_id: string; player_name: string; total_amount: number };
 								type FineDetail = { name: string; quantity: number; amount: number; total: number };
 								const playerSummary: Record<string, SummaryRow> = {},
 									playerFineDetails: Record<string, FineDetail[]> = {};
@@ -765,7 +723,6 @@ export default function FinancesView({
 										playerSummary[f.player_id] = {
 											player_id: f.player_id,
 											player_name: f.player_name,
-											total_fines: 0,
 											total_amount: 0,
 										};
 										playerFineDetails[f.player_id] = [];
@@ -776,7 +733,6 @@ export default function FinancesView({
 										f.tier_threshold,
 										f.tier_amount,
 									);
-									playerSummary[f.player_id].total_fines += Number(f.quantity);
 									playerSummary[f.player_id].total_amount += total;
 									playerFineDetails[f.player_id].push({
 										name: f.name,
@@ -792,9 +748,7 @@ export default function FinancesView({
 									);
 								if (arr.length === 0)
 									return (
-										<div className='border border-slate-200 rounded-lg p-8 text-center text-slate-400'>
-											No fines for selected player
-										</div>
+										<EmptyRow>No fines for selected player</EmptyRow>
 									);
 								arr.sort((a, b) => b.total_amount - a.total_amount);
 
@@ -840,9 +794,6 @@ export default function FinancesView({
 																	<p className='font-semibold text-slate-800 text-sm truncate'>
 																		{s.player_name}
 																	</p>
-																	<p className='text-xs text-slate-500'>
-																		{s.total_fines} fines
-																	</p>
 																</div>
 															</div>
 															<p className='font-bold text-red-600 text-sm'>
@@ -879,9 +830,7 @@ export default function FinancesView({
 								);
 							})()
 						) : (
-							<div className='border border-slate-200 rounded-lg p-8 text-center text-slate-400'>
-								Select a round to view fines
-							</div>
+							<EmptyRow>Select a round to view fines</EmptyRow>
 						)}
 					</div>
 				</Card>
@@ -898,9 +847,7 @@ export default function FinancesView({
 					</div>
 					<div className='divide-y divide-slate-100'>
 						{paymentSummaryData.length === 0 ? (
-							<div className='p-8 text-center text-slate-400'>
-								No payment data for this season
-							</div>
+							<EmptyRow>No payment data for this season</EmptyRow>
 						) : (
 							paymentSummaryData.map((summary, idx) => {
 								const playerRounds =

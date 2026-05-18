@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Trophy, MapPin, Calendar, Clock } from 'lucide-react';
-import { TabBar, Card, Avatar, formatDate } from './common';
+import { TabBar, Card, Avatar, formatDate, EmptyRow } from './common';
 import * as DB from '../api';
 import { SEASON_ROUNDS } from '../api';
 import type { Season, Round, Player, GolfCourse, Team, LeaderboardEntry, ScoresMapFull } from '../api';
@@ -22,10 +22,6 @@ const PlayerCell = ({ player, isWinner }: { player: LeaderboardEntry; isWinner?:
     {isWinner && <span className="text-xs bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold flex-shrink-0">WINNER</span>}
     {player.isDisqualified && <span className="text-xs bg-red-100 text-red-500 px-1.5 py-0.5 rounded font-bold flex-shrink-0">DQ</span>}
   </div>
-);
-
-const EmptyRow = ({ children }: { children: string }) => (
-  <div className="p-8 text-center text-slate-400 text-sm">{children}</div>
 );
 
 const LeaderCard = ({ title, player, value, unit, totalRounds }: {
