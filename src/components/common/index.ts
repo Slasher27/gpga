@@ -8,7 +8,7 @@ export {
   NoFinesEmptyState,
   NoSearchResultsEmptyState
 } from './EmptyState';
-export { TabBar, Avatar, PlayerRoundsTable, FinesSummaryCards, StatsGrid, CourseSelector, usePlayerStats, timeAgo } from './SharedUI';
+export { TabBar, Avatar, PlayerRoundsTable, FinesSummaryCards, StatsGrid, CourseSelector, usePlayerStats, timeAgo, formatDate } from './SharedUI';
 export { default as Modal } from './Modal';
 export { default as DatePicker } from './DatePicker';
 export { default as Card } from './Card';

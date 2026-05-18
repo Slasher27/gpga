@@ -14,6 +14,7 @@ interface RoundsViewProps {
   players: Player[];
   activeSeason: Season | null;
   isReadOnlySeason: boolean;
+  isAdmin: boolean;
   showToast: (msg: string, type?: string) => void;
   onAddRound: () => void;
   onEditRound: (round: Round) => void;
@@ -21,7 +22,7 @@ interface RoundsViewProps {
   onCloseRound: (id: number, name: string) => void;
 }
 
-export default function RoundsView({ rounds, scores, setScores, players, isReadOnlySeason, showToast, onAddRound, onEditRound, onDeleteRound, onCloseRound }: RoundsViewProps) {
+export default function RoundsView({ rounds, scores, setScores, players, isReadOnlySeason, isAdmin, showToast, onAddRound, onEditRound, onDeleteRound, onCloseRound }: RoundsViewProps) {
   // Auto-select latest round
   const [selectedRound, setSelectedRound] = useState<number | undefined>(rounds[rounds.length - 1]?.id);
   const [editScores, setEditScores] = useState<Record<string, ScoreEdit>>({});
@@ -115,13 +116,15 @@ export default function RoundsView({ rounds, scores, setScores, players, isReadO
 
   const isAnyPlayerEditing = Object.values(editingPlayers).some(v => v);
   const currentRound = rounds.find(r => r.id === selectedRound);
+  // Players get a read-only Rounds view; management UI is admin + active season only.
+  const canManage = isAdmin && !isReadOnlySeason;
 
   return (
     <div className="space-y-4 animate-in fade-in duration-300">
       {/* Header */}
       <div className="flex items-center justify-between h-10">
         <h2 className="text-xl font-bold text-slate-800">Rounds</h2>
-        {!isReadOnlySeason && (
+        {canManage && (
           <button onClick={onAddRound} className="bg-emerald-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-emerald-700 transition-colors flex items-center gap-2 text-sm min-h-[44px]">
             <Plus size={16} /> Add Round
           </button>
@@ -174,7 +177,7 @@ export default function RoundsView({ rounds, scores, setScores, players, isReadO
               <Calendar size={14} className="flex-shrink-0 text-slate-400" />
               <span>{currentRound.date}</span>
             </div>
-            {!isReadOnlySeason && (
+            {canManage && (
               <div className="flex items-center gap-2">
                 {!currentRound.closed && (
                   <>
@@ -202,7 +205,7 @@ export default function RoundsView({ rounds, scores, setScores, players, isReadO
           <Card>
             <div className="flex items-center justify-between p-4 border-b border-slate-100">
               <h3 className="font-semibold text-slate-800 text-sm">Scores — {currentRound.name}</h3>
-              {!isReadOnlySeason && !currentRound.closed && (
+              {canManage && !currentRound.closed && (
                 !isAnyPlayerEditing ? (
                   <button onClick={editAllPlayers} className="bg-emerald-600 text-white px-3 py-2 rounded-lg text-xs font-semibold hover:bg-emerald-700 flex items-center gap-1.5 min-h-[36px]">
                     <Edit size={13} /> Edit All
@@ -225,7 +228,7 @@ export default function RoundsView({ rounds, scores, setScores, players, isReadO
                   <div key={p.id} className={`p-3 ${isEdited ? 'bg-emerald-50/50' : ''}`}>
                     <div className="flex items-center justify-between mb-2">
                       <span className="font-medium text-slate-800 text-sm">{p.name}</span>
-                      {!isReadOnlySeason && !currentRound.closed && (
+                      {canManage && !currentRound.closed && (
                         !isEditing ? (
                           <button onClick={() => setEditingPlayers(prev => ({ ...prev, [p.id]: true }))} className="text-xs text-emerald-600 font-semibold min-h-[32px] px-2">Edit</button>
                         ) : (

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ChevronLeft, ChevronRight, Calendar, X } from 'lucide-react';
+import { formatDate as formatDisplay } from './SharedUI';
 
 export default function DatePicker({
   value,
@@ -17,11 +18,6 @@ export default function DatePicker({
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
   };
 
-  const formatDisplayDate = (date: string): string => {
-    const d = new Date(date);
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
-  };
 
   const getDaysInMonth = (date: Date): (Date | null)[] => {
     const year = date.getFullYear();
@@ -56,7 +52,7 @@ export default function DatePicker({
         className="w-full flex items-center justify-between gap-2 rounded-lg border-[1.5px] border-slate-300 bg-white px-3 py-2.5 text-sm text-left hover:border-slate-400 focus:border-emerald-500 focus:outline-none transition-colors min-h-[44px]"
       >
         <span className={value ? 'text-slate-800' : 'text-slate-400'}>
-          {value ? formatDisplayDate(value) : placeholder}
+          {value ? formatDisplay(value) : placeholder}
         </span>
         <Calendar size={18} className="text-slate-400 flex-shrink-0" />
       </button>

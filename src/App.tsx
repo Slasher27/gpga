@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, lazy, Suspense, type FormEvent } from 'react';
-import { TrendingUp, Banknote, Calendar, Users, Plus, Save, Shuffle } from 'lucide-react';
+import { TrendingUp, Banknote, Calendar, Users, Plus, Save, Shuffle, Settings } from 'lucide-react';
 import * as DB from './api';
 import { SEASON_ROUNDS } from './api';
 import type {
@@ -345,9 +345,10 @@ export default function App() {
   const navItems = [
     { id: 'dashboard', icon: <TrendingUp size={20} />, label: 'Dashboard' },
     { id: 'fines', icon: <Banknote size={20} />, label: 'Finances' },
-    ...(isAdmin ? [{ id: 'rounds', icon: <Calendar size={20} />, label: 'Rounds' }] : []),
+    { id: 'rounds', icon: <Calendar size={20} />, label: 'Rounds' },
     ...(isAdmin ? [{ id: 'teamdraw', icon: <Shuffle size={20} />, label: 'Team Draw' }] : []),
     ...(isAdmin ? [{ id: 'admin', icon: <Users size={20} />, label: 'Players' }] : []),
+    ...(isAdmin ? [{ id: 'settings', icon: <Settings size={20} />, label: 'Season Settings' }] : []),
   ];
 
   const navProps = { view, setNavView, navItems, currentUser, activeSeason, allSeasons, handleSeasonSwitch, handleLogout, isAdmin };
@@ -360,11 +361,11 @@ export default function App() {
       <DesktopSidebar view={view} setNavView={setNavView} navItems={navItems} activeSeason={activeSeason} allSeasons={allSeasons} isAdmin={isAdmin} />
       <MobileBottomNav view={view} setNavView={setNavView} navItems={navItems} />
 
-      <main className="p-4 md:p-8 md:ml-56 pt-16 pb-28 landscape:pb-20 md:pt-16 md:pb-8">
+      <main className="px-4 md:px-6 lg:px-8 pt-16 pb-28 landscape:pb-20 md:pb-8 md:ml-16 lg:ml-56">
         <Suspense fallback={<DashboardSkeleton />}>
           {view === 'dashboard' && <DashboardView activeSeason={activeSeason} leaderboardData={leaderboardData} rounds={rounds} scores={scores} players={seasonPlayers} golfCourses={golfCourses} />}
           {view === 'fines' && <FinancesView leaderboardData={leaderboardData} rounds={rounds} scores={scores} players={seasonPlayers} activeSeason={activeSeason} isReadOnlySeason={isReadOnlySeason} currentUser={currentUser} showToast={showToast} onAddFineType={() => setIsAddFineTypeModalOpen(true)} onDeleteFineType={handleDeleteFineType} onFinesChanged={refreshFines} fineTypesVersion={fineTypesVersion} />}
-          {view === 'rounds' && <RoundsView rounds={rounds} scores={scores} setScores={setScores} players={players} activeSeason={activeSeason} isReadOnlySeason={isReadOnlySeason} showToast={showToast} onAddRound={() => setIsAddRoundModalOpen(true)} onEditRound={handleEditRound} onDeleteRound={handleDeleteRound} onCloseRound={handleCloseRound} />}
+          {view === 'rounds' && <RoundsView rounds={rounds} scores={scores} setScores={setScores} players={players} activeSeason={activeSeason} isReadOnlySeason={isReadOnlySeason} isAdmin={isAdmin} showToast={showToast} onAddRound={() => setIsAddRoundModalOpen(true)} onEditRound={handleEditRound} onDeleteRound={handleDeleteRound} onCloseRound={handleCloseRound} />}
           {view === 'teamdraw' && isAdmin && <TeamDrawPage players={players} activeSeason={activeSeason} />}
           {view === 'admin' && isAdmin && !managingPlayerId && <PlayersView players={players} scores={scores} rounds={rounds} activeSeason={activeSeason} isReadOnlySeason={isReadOnlySeason} currentUser={currentUser} showToast={showToast} showConfirm={showConfirm} setPlayers={setPlayers} onAddPlayer={() => setIsAddPlayerModalOpen(true)} managingPlayerId={managingPlayerId} setManagingPlayerId={setManagingPlayerId} />}
           {view === 'admin' && isAdmin && managingPlayerId && <PlayerProfilePage players={players} setPlayers={setPlayers} scores={scores} rounds={rounds} activeSeason={activeSeason} currentUser={currentUser} managingPlayerId={managingPlayerId} setManagingPlayerId={setManagingPlayerId} showToast={showToast} />}

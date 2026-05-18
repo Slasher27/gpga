@@ -16,6 +16,16 @@ export function timeAgo(date: string, long = false): string {
   return `${days}d${long ? ' ago' : ''}`;
 }
 
+// --- formatDate ---
+// Friendly date used app-wide, e.g. "May 24, 2026". Shared by DatePicker
+// and Dashboard so the format stays consistent in one place.
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+export function formatDate(date: string): string {
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return date;
+  return `${MONTHS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+}
+
 // --- TabBar ---
 export interface TabDef {
   id: string;

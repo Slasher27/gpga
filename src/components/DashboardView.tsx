@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Trophy, MapPin, Calendar, Clock } from 'lucide-react';
-import { TabBar, Card, Avatar } from './common';
+import { TabBar, Card, Avatar, formatDate } from './common';
 import * as DB from '../api';
 import { SEASON_ROUNDS } from '../api';
 import type { Season, Round, Player, GolfCourse, Team, LeaderboardEntry, ScoresMapFull } from '../api';
@@ -23,6 +23,76 @@ const PlayerCell = ({ player, isWinner }: { player: LeaderboardEntry; isWinner?:
     {player.isDisqualified && <span className="text-xs bg-red-100 text-red-500 px-1.5 py-0.5 rounded font-bold flex-shrink-0">DQ</span>}
   </div>
 );
+
+const EmptyRow = ({ children }: { children: string }) => (
+  <div className="p-8 text-center text-slate-400 text-sm">{children}</div>
+);
+
+const LeaderCard = ({ title, player, value, unit, totalRounds }: {
+  title: string;
+  player?: LeaderboardEntry;
+  value: number;
+  unit: string;
+  totalRounds: number;
+}) => (
+  <Card className="p-5 flex flex-col items-center text-center">
+    <p className="text-xs text-slate-400 uppercase font-bold tracking-wide mb-4">{title}</p>
+    {player && player.roundsPlayed > 0 ? (
+      <>
+        <div className="rounded-full ring-2 ring-emerald-200 mb-3">
+          <Avatar src={player.avatar} name={player.name} size="lg" />
+        </div>
+        <p className="text-base font-bold text-slate-800">{player.name}</p>
+        <p className="text-xl font-bold text-emerald-600 mt-1">{value} <span className="text-sm font-normal text-slate-400">{unit}</span></p>
+        <p className="text-xs text-slate-400 mt-1">{player.roundsPlayed} of {totalRounds} rounds</p>
+      </>
+    ) : (
+      <p className="text-sm text-slate-400 mt-2">Awaiting scores</p>
+    )}
+  </Card>
+);
+
+// Medal & Stableford share one table. # and Player stay pinned (sticky) while
+// the round columns scroll horizontally on narrow screens.
+const StandingsTable = ({ players, rounds, isCompletedSeason, metric }: {
+  players: LeaderboardEntry[];
+  rounds: Round[];
+  isCompletedSeason: boolean;
+  metric: 'medal' | 'stableford';
+}) => {
+  const cell = (p: LeaderboardEntry, rid: number) => metric === 'medal' ? p.pScores[rid]?.strokes : p.pScores[rid]?.stableford;
+  const total = (p: LeaderboardEntry) => metric === 'medal' ? p.totalStrokes : p.totalStableford;
+  const drop = (p: LeaderboardEntry) => metric === 'medal' ? p.worstRound : p.worstStableford;
+  const net = (p: LeaderboardEntry) => metric === 'medal' ? p.netTotal : p.netStableford;
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm min-w-[600px]">
+        <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
+          <tr>
+            <th className="px-3 py-3 text-left w-10 sticky left-0 bg-slate-50 z-10">#</th>
+            <th className="px-3 py-3 text-left sticky left-10 bg-slate-50 z-10 w-px whitespace-nowrap">Player</th>
+            {rounds.map((r, i) => <th key={r.id} className="px-1.5 py-3 text-center text-xs">R{i + 1}</th>)}
+            <th className="px-3 py-3 text-center bg-slate-100">Total</th>
+            <th className="px-3 py-3 text-center text-red-400">Drop</th>
+            <th className="px-3 py-3 text-center font-bold bg-emerald-50 text-emerald-700">Net</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-50">
+          {players.map((player, idx) => (
+            <tr key={player.id} className={`${player.isDisqualified ? 'opacity-50' : idx === 0 ? 'bg-emerald-50/30' : 'hover:bg-slate-50'}`}>
+              <td className="px-3 py-3 sticky left-0 bg-white z-10"><RankBadge idx={idx} dq={player.isDisqualified} /></td>
+              <td className="px-3 py-3 sticky left-10 bg-white z-10 w-px whitespace-nowrap"><PlayerCell player={player} isWinner={isCompletedSeason && idx === 0 && !player.isDisqualified} /></td>
+              {rounds.map(r => <td key={r.id} className="px-1.5 py-3 text-center text-slate-600 text-xs">{cell(player, r.id) || <span className="text-slate-300">-</span>}</td>)}
+              <td className="px-3 py-3 text-center font-semibold bg-slate-50">{total(player) || '-'}</td>
+              <td className="px-3 py-3 text-center text-red-400 text-xs">{player.canDropWorstRound ? `-${drop(player)}` : '-'}</td>
+              <td className="px-3 py-3 text-center font-bold text-emerald-700 bg-emerald-50">{net(player) || '-'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+};
 
 interface DashboardViewProps {
   activeSeason: Season | null;
@@ -71,10 +141,24 @@ export default function DashboardView({ activeSeason, leaderboardData, rounds, s
   const medalLeader = leaderboardData[0];
   const sfLeader = stablefordSorted[0];
 
-  // Next round = first future round, or last round if all are past
-  const today = new Date().toISOString().split('T')[0];
-  const nextRound = rounds.find(r => r.date >= today) || rounds[rounds.length - 1];
-  const daysUntilNext = nextRound && nextRound.date >= today ? Math.ceil((new Date(nextRound.date).getTime() - new Date(today).getTime()) / 86400000) : -1;
+  // The spotlight card walks a round through its lifecycle, driven only by
+  // the round date + `closed` flag: Next → Today's → Awaiting Results → Last.
+  const spotlight = useMemo(() => {
+    const today = new Date().toISOString().split('T')[0];
+    const byDateAsc = (a: Round, b: Round) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+    const upcoming = rounds.filter(r => !r.closed && r.date >= today).sort(byDateAsc);
+    if (upcoming.length) {
+      const round = upcoming[0];
+      if (round.date === today) return { state: 'today' as const, round };
+      const days = Math.ceil((new Date(round.date).getTime() - new Date(today).getTime()) / 86400000);
+      return { state: 'next' as const, round, days };
+    }
+    const awaiting = rounds.filter(r => !r.closed && r.date < today).sort(byDateAsc).pop();
+    if (awaiting) return { state: 'awaiting' as const, round: awaiting };
+    const lastClosed = rounds.filter(r => r.closed).sort(byDateAsc).pop();
+    if (lastClosed) return { state: 'last' as const, round: lastClosed };
+    return { state: 'none' as const };
+  }, [rounds]);
 
   // Prize total
   const prizeTotal = (activeSeason?.medal_1st || 0) + (activeSeason?.medal_2nd || 0) + (activeSeason?.stableford_1st || 0) + (activeSeason?.stableford_2nd || 0) + (activeSeason?.team_1st || 0);
@@ -112,86 +196,64 @@ export default function DashboardView({ activeSeason, leaderboardData, rounds, s
 
       {/* Dashboard Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {/* Next Round */}
-        <div className="bg-white border border-slate-200 rounded-xl p-5 border-l-4 border-l-emerald-500">
+        {/* Spotlight round — lifecycle: Next → Today's → Awaiting Results → Last */}
+        <Card className="p-5 border-l-4 border-l-emerald-500">
           <div className="flex items-center justify-between mb-3">
-            <p className="text-xs text-slate-400 uppercase font-bold tracking-wide">{nextRound && nextRound.date >= today ? 'Next Round' : nextRound ? 'Latest Round' : 'Next Round'}</p>
-            {daysUntilNext >= 0 && (
-              daysUntilNext > 0
-                ? <span className="text-xs bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-full font-bold">{daysUntilNext} days</span>
-                : <span className="text-xs bg-emerald-500 text-white px-2.5 py-1 rounded-full font-bold">Today</span>
+            <p className="text-xs text-slate-400 uppercase font-bold tracking-wide">
+              {spotlight.state === 'today' ? "Today's Round"
+                : spotlight.state === 'awaiting' ? 'Awaiting Results'
+                : spotlight.state === 'last' ? 'Last Round'
+                : 'Next Round'}
+            </p>
+            {spotlight.state === 'next' && (
+              <span className="text-xs bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-full font-bold">
+                {spotlight.days} {spotlight.days === 1 ? 'day' : 'days'}
+              </span>
+            )}
+            {spotlight.state === 'today' && (
+              <span className="text-xs bg-emerald-500 text-white px-2.5 py-1 rounded-full font-bold">Today</span>
+            )}
+            {spotlight.state === 'awaiting' && (
+              <span className="text-xs bg-slate-100 text-slate-500 px-2.5 py-1 rounded-full font-bold">Not finalised</span>
+            )}
+            {spotlight.state === 'last' && (
+              <span className="text-xs bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full font-bold">Completed</span>
             )}
           </div>
-          {nextRound ? (
+          {spotlight.state !== 'none' ? (
             <>
               {/* Course placeholder */}
               <div className="bg-gradient-to-br from-emerald-50 to-slate-100 rounded-lg p-4 mb-3 flex items-center justify-between">
                 <div>
-                  <p className="text-base font-bold text-slate-800">{nextRound.course_name}</p>
-                  <p className="text-sm text-slate-500 mt-0.5">18 holes · Par {golfCourses?.find(c => c.id === nextRound.course_id)?.par || 72}</p>
+                  <p className="text-base font-bold text-slate-800">{spotlight.round.course_name}</p>
+                  <p className="text-sm text-slate-500 mt-0.5">18 holes · Par {golfCourses?.find(c => c.id === spotlight.round.course_id)?.par || 72}</p>
                 </div>
                 <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
                   <MapPin size={18} className="text-emerald-600" />
                 </div>
               </div>
-              <p className="text-sm font-semibold text-slate-700">{nextRound.name}</p>
+              <p className="text-sm font-semibold text-slate-700">{spotlight.round.name}</p>
               <div className="flex items-center gap-4 mt-2 text-sm text-slate-500">
                 <div className="flex items-center gap-1.5">
                   <Calendar size={14} className="text-slate-400" />
-                  <span>{nextRound.date}</span>
+                  <span>{formatDate(spotlight.round.date)}</span>
                 </div>
-                {(nextRound.tee_time || nextRound.tee_time_2) && (
+                {(spotlight.round.tee_time || spotlight.round.tee_time_2) && (
                   <div className="flex items-center gap-1.5">
                     <Clock size={14} className="text-slate-400" />
-                    <span>{[nextRound.tee_time, nextRound.tee_time_2].filter(Boolean).join(' & ')}</span>
+                    <span>{[spotlight.round.tee_time, spotlight.round.tee_time_2].filter(Boolean).join(' & ')}</span>
                   </div>
                 )}
               </div>
             </>
           ) : (
-            <p className="text-sm text-slate-400 mt-1">Not scheduled</p>
+            <p className="text-sm text-slate-400 mt-1">No rounds scheduled</p>
           )}
-        </div>
+        </Card>
 
-        {/* Medal Leader */}
-        <div className="bg-white border border-slate-200 rounded-xl p-5 flex flex-col items-center text-center">
-          <p className="text-xs text-slate-400 uppercase font-bold tracking-wide mb-4">Medal Leader</p>
-          {medalLeader && medalLeader.roundsPlayed > 0 ? (
-            <>
-              <div className="w-16 h-16 rounded-full overflow-hidden ring-2 ring-emerald-200 mb-3 flex-shrink-0">
-                {medalLeader.avatar
-                  ? <img src={medalLeader.avatar} alt="" className="w-full h-full object-cover" />
-                  : <div className="w-full h-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-bold text-lg">{medalLeader.name.split(' ').map(n => n[0]).slice(0,2).join('')}</div>
-                }
-              </div>
-              <p className="text-base font-bold text-slate-800">{medalLeader.name}</p>
-              <p className="text-xl font-bold text-emerald-600 mt-1">{medalLeader.netTotal} <span className="text-sm font-normal text-slate-400">net</span></p>
-              <p className="text-xs text-slate-400 mt-1">{medalLeader.roundsPlayed} of {rounds.length} rounds</p>
-            </>
-          ) : (
-            <p className="text-sm text-slate-400 mt-2">Awaiting scores</p>
-          )}
-        </div>
+        <LeaderCard title="Medal Leader" player={medalLeader} value={medalLeader?.netTotal ?? 0} unit="net" totalRounds={rounds.length} />
 
-        {/* Stableford Leader */}
-        <div className="bg-white border border-slate-200 rounded-xl p-5 flex flex-col items-center text-center">
-          <p className="text-xs text-slate-400 uppercase font-bold tracking-wide mb-4">Stableford Leader</p>
-          {sfLeader && sfLeader.roundsPlayed > 0 ? (
-            <>
-              <div className="w-16 h-16 rounded-full overflow-hidden ring-2 ring-emerald-200 mb-3 flex-shrink-0">
-                {sfLeader.avatar
-                  ? <img src={sfLeader.avatar} alt="" className="w-full h-full object-cover" />
-                  : <div className="w-full h-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-bold text-lg">{sfLeader.name.split(' ').map(n => n[0]).slice(0,2).join('')}</div>
-                }
-              </div>
-              <p className="text-base font-bold text-slate-800">{sfLeader.name}</p>
-              <p className="text-xl font-bold text-emerald-600 mt-1">{sfLeader.netStableford} <span className="text-sm font-normal text-slate-400">pts</span></p>
-              <p className="text-xs text-slate-400 mt-1">{sfLeader.roundsPlayed} of {rounds.length} rounds</p>
-            </>
-          ) : (
-            <p className="text-sm text-slate-400 mt-2">Awaiting scores</p>
-          )}
-        </div>
+        <LeaderCard title="Stableford Leader" player={sfLeader} value={sfLeader?.netStableford ?? 0} unit="pts" totalRounds={rounds.length} />
 
       </div>
 
@@ -209,34 +271,9 @@ export default function DashboardView({ activeSeason, leaderboardData, rounds, s
       {leaderboardTab === 'medal' && (
         <Card>
           {rounds.length === 0 ? (
-            <div className="p-8 text-center text-slate-400 text-sm">No rounds played yet</div>
+            <EmptyRow>No rounds played yet</EmptyRow>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[600px]">
-                <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
-                  <tr>
-                    <th className="px-3 py-3 text-left w-10">#</th>
-                    <th className="px-3 py-3 text-left">Player</th>
-                    {rounds.map((r, i) => <th key={r.id} className="px-1.5 py-3 text-center text-xs">R{i+1}</th>)}
-                    <th className="px-3 py-3 text-center bg-slate-100">Total</th>
-                    <th className="px-3 py-3 text-center text-red-400">Drop</th>
-                    <th className="px-3 py-3 text-center font-bold bg-emerald-50 text-emerald-700">Net</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {leaderboardData.map((player, idx) => (
-                    <tr key={player.id} className={`${player.isDisqualified ? 'opacity-50' : idx === 0 ? 'bg-emerald-50/30' : 'hover:bg-slate-50'}`}>
-                      <td className="px-3 py-3"><RankBadge idx={idx} dq={player.isDisqualified} /></td>
-                      <td className="px-3 py-3"><PlayerCell player={player} isWinner={isCompletedSeason && idx === 0 && !player.isDisqualified} /></td>
-                      {rounds.map(r => <td key={r.id} className="px-1.5 py-3 text-center text-slate-600 text-xs">{player.pScores[r.id]?.strokes || <span className="text-slate-300">-</span>}</td>)}
-                      <td className="px-3 py-3 text-center font-semibold bg-slate-50">{player.totalStrokes || '-'}</td>
-                      <td className="px-3 py-3 text-center text-red-400 text-xs">{player.canDropWorstRound ? `-${player.worstRound}` : '-'}</td>
-                      <td className="px-3 py-3 text-center font-bold text-emerald-700 bg-emerald-50">{player.netTotal || '-'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <StandingsTable players={leaderboardData} rounds={rounds} isCompletedSeason={isCompletedSeason} metric="medal" />
           )}
         </Card>
       )}
@@ -245,34 +282,9 @@ export default function DashboardView({ activeSeason, leaderboardData, rounds, s
       {leaderboardTab === 'stableford' && (
         <Card>
           {rounds.length === 0 ? (
-            <div className="p-8 text-center text-slate-400 text-sm">No rounds played yet</div>
+            <EmptyRow>No rounds played yet</EmptyRow>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[600px]">
-                <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
-                  <tr>
-                    <th className="px-3 py-3 text-left w-10">#</th>
-                    <th className="px-3 py-3 text-left">Player</th>
-                    {rounds.map((r, i) => <th key={r.id} className="px-1.5 py-3 text-center text-xs">R{i+1}</th>)}
-                    <th className="px-3 py-3 text-center bg-slate-100">Total</th>
-                    <th className="px-3 py-3 text-center text-red-400">Drop</th>
-                    <th className="px-3 py-3 text-center font-bold bg-emerald-50 text-emerald-700">Net</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {stablefordSorted.map((player, idx) => (
-                    <tr key={player.id} className={`${player.isDisqualified ? 'opacity-50' : idx === 0 ? 'bg-emerald-50/30' : 'hover:bg-slate-50'}`}>
-                      <td className="px-3 py-3"><RankBadge idx={idx} dq={player.isDisqualified} /></td>
-                      <td className="px-3 py-3"><PlayerCell player={player} isWinner={isCompletedSeason && idx === 0 && !player.isDisqualified} /></td>
-                      {rounds.map(r => <td key={r.id} className="px-1.5 py-3 text-center text-slate-600 text-xs">{player.pScores[r.id]?.stableford || <span className="text-slate-300">-</span>}</td>)}
-                      <td className="px-3 py-3 text-center font-semibold bg-slate-50">{player.totalStableford || '-'}</td>
-                      <td className="px-3 py-3 text-center text-red-400 text-xs">{player.canDropWorstRound ? `-${player.worstStableford}` : '-'}</td>
-                      <td className="px-3 py-3 text-center font-bold text-emerald-700 bg-emerald-50">{player.netStableford || '-'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <StandingsTable players={stablefordSorted} rounds={rounds} isCompletedSeason={isCompletedSeason} metric="stableford" />
           )}
         </Card>
       )}
@@ -281,14 +293,14 @@ export default function DashboardView({ activeSeason, leaderboardData, rounds, s
       {leaderboardTab === 'teams' && (
         <Card>
           {teamLeaderboard.length === 0 ? (
-            <div className="p-8 text-center text-slate-400 text-sm">No teams set up for this season</div>
+            <EmptyRow>No teams set up for this season</EmptyRow>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm min-w-[500px]">
                 <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
                   <tr>
-                    <th className="px-3 py-3 text-left w-10">#</th>
-                    <th className="px-3 py-3 text-left">Team</th>
+                    <th className="px-3 py-3 text-left w-10 sticky left-0 bg-slate-50 z-10">#</th>
+                    <th className="px-3 py-3 text-left sticky left-10 bg-slate-50 z-10 w-px whitespace-nowrap">Team</th>
                     {rounds.map((r, i) => <th key={r.id} className="px-1.5 py-3 text-center text-xs">R{i+1}</th>)}
                     <th className="px-3 py-3 text-center font-bold bg-emerald-50 text-emerald-700">Total</th>
                   </tr>
@@ -296,8 +308,8 @@ export default function DashboardView({ activeSeason, leaderboardData, rounds, s
                 <tbody className="divide-y divide-slate-50">
                   {teamLeaderboard.map((team, idx) => (
                     <tr key={team.id} className={idx === 0 ? 'bg-emerald-50/30' : 'hover:bg-slate-50'}>
-                      <td className="px-3 py-3"><RankBadge idx={idx} /></td>
-                      <td className="px-3 py-3">
+                      <td className="px-3 py-3 sticky left-0 bg-white z-10"><RankBadge idx={idx} /></td>
+                      <td className="px-3 py-3 sticky left-10 bg-white z-10 w-px whitespace-nowrap">
                         <p className="font-medium text-slate-800 flex items-center gap-1.5">
                           {team.name}
                           {isCompletedSeason && idx === 0 && <span className="text-xs bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold">WINNER</span>}
@@ -348,7 +360,7 @@ export default function DashboardView({ activeSeason, leaderboardData, rounds, s
             </div>
             <div className="divide-y divide-slate-50">
               {finesSorted.length === 0 ? (
-                <div className="p-6 text-center text-slate-400 text-sm">No fines recorded</div>
+                <EmptyRow>No fines recorded</EmptyRow>
               ) : finesSorted.map((player, idx) => (
                 <div key={player.id} className="flex items-center gap-3 p-3">
                   <RankBadge idx={idx} />
