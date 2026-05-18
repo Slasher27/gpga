@@ -3,6 +3,10 @@
 const BASE = '/api';
 const TOKEN_KEY = 'gpga_token';
 
+// A season is 9 rounds; best 8 count for individual comps (medal & stableford).
+// Shared so the rule lives in one place (App leaderboard, Dashboard progress).
+export const SEASON_ROUNDS = 9;
+
 // ============================================================================
 // Types
 // ============================================================================

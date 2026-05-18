@@ -2,6 +2,7 @@
 import { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { TrendingUp, Banknote, Calendar, Users, Plus, Save, Shuffle } from 'lucide-react';
 import * as DB from './api';
+import { SEASON_ROUNDS } from './api';
 import { DashboardSkeleton, useConfirm, Modal, DatePicker, CourseSelector } from './components/common';
 import LoginPage from './components/LoginPage';
 import { setupPush } from './pushSetup';
@@ -18,11 +19,8 @@ const SeasonSettings = lazy(() => import('./components/SeasonSettings'));
 const NotificationsView = lazy(() => import('./components/NotificationsView'));
 const TeamDrawPage = lazy(() => import('./components/TeamDraw/TeamDrawPage'));
 
-// A season is 9 rounds; the best 8 count for individual comps (medal & stableford).
-// The worst round is only dropped once the full season exists and the player
-// completed all 9 — never mid-season (that would inflate standings).
-const SEASON_ROUNDS = 9;
-
+// SEASON_ROUNDS imported from ./api — the worst round is only dropped once the
+// full season exists and the player completed all of it (never mid-season).
 const mergeScoresAndFines = (scoresData, finesData) => {
   const merged = { ...scoresData };
   Object.keys(finesData).forEach(pid => {
@@ -220,8 +218,9 @@ export default function App() {
   const handleAddPlayer = async (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
-    const newPlayer = { id: Date.now().toString(), name: fd.get('name'), email: fd.get('email'), role: 'player', status: 'active', avatar: null };
-    await DB.addPlayer(newPlayer);
+    const newPlayer = { id: Date.now().toString(), name: fd.get('name'), email: fd.get('email'), role: fd.get('role') || 'player', status: 'active', avatar: null };
+    // Send the entered password to the server; keep it out of client state.
+    await DB.addPlayer({ ...newPlayer, password: fd.get('password') });
     setPlayers(prev => [...prev, newPlayer].sort((a, b) => a.name.localeCompare(b.name)));
     setIsAddPlayerModalOpen(false);
     showToast(`Player ${newPlayer.name} added successfully!`);

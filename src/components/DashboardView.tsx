@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Trophy, MapPin, Calendar, Clock } from 'lucide-react';
 import { TabBar, Card, Avatar } from './common';
 import * as DB from '../api';
+import { SEASON_ROUNDS } from '../api';
 
 const RankBadge = ({ idx, dq }) => (
   <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold flex-shrink-0 ${
@@ -79,9 +80,9 @@ export default function DashboardView({ activeSeason, leaderboardData, rounds, s
       {/* Season Progress */}
       <div className="flex items-center gap-3">
         <div className="flex-1 bg-slate-200 rounded-full h-1.5 overflow-hidden">
-          <div className="bg-emerald-500 h-full rounded-full transition-all" style={{ width: `${(rounds.length / 9) * 100}%` }} />
+          <div className="bg-emerald-500 h-full rounded-full transition-all" style={{ width: `${Math.min(100, (rounds.length / SEASON_ROUNDS) * 100)}%` }} />
         </div>
-        <span className="text-xs text-slate-500 flex-shrink-0">Round {rounds.length} of 9</span>
+        <span className="text-xs text-slate-500 flex-shrink-0">Round {rounds.length} of {SEASON_ROUNDS}</span>
       </div>
 
       {/* Purse strip */}

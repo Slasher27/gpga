@@ -12,12 +12,18 @@ export const LoadingSkeleton: React.FC<LoadingSkeletonProps> = ({
   className = ''
 }) => {
   const skeletons = Array.from({ length: count });
+  // Compute the random bar widths once per `count`, not on every render —
+  // re-rolling each render causes visual jitter and breaks render purity.
+  const textWidths = React.useMemo(
+    () => Array.from({ length: count }, () => Math.random() * 40 + 60),
+    [count]
+  );
 
   if (type === 'text') {
     return (
       <div className={`space-y-2 ${className}`}>
-        {skeletons.map((_, i) => (
-          <div key={i} className="h-4 bg-slate-200 rounded animate-pulse" style={{ width: `${Math.random() * 40 + 60}%` }} />
+        {textWidths.map((w, i) => (
+          <div key={i} className="h-4 bg-slate-200 rounded animate-pulse" style={{ width: `${w}%` }} />
         ))}
       </div>
     );
