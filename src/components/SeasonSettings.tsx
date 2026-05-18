@@ -2,7 +2,7 @@ import { useState, useEffect, type FormEvent, type ChangeEvent } from 'react';
 import { Plus, Trash2, Save, X, UserPlus } from 'lucide-react';
 import * as DB from '../api';
 import type { Season, Player, SeasonPlayer, SeasonUpdate, Round } from '../api';
-import { TabBar, Card } from './common';
+import { TabBar, Card, SubmitButton } from './common';
 
 type FormValues = Record<string, string | number>;
 
@@ -44,6 +44,7 @@ export default function SeasonSettings({ activeSeason, players, rounds, showToas
   const [tab, setTab] = useState(activeSeason ? 'edit' : 'create');
   const [seasonPlayers, setSeasonPlayers] = useState<SeasonPlayer[]>([]);
   const [isCreating, setIsCreating] = useState(false);
+  const [busy, setBusy] = useState(false); // save / end / reopen — mutually exclusive
 
   // Edit form state (dynamic key/value form)
   const [editForm, setEditForm] = useState<FormValues>({});
@@ -97,9 +98,14 @@ export default function SeasonSettings({ activeSeason, players, rounds, showToas
       stableford_2nd: Number(editForm.stableford_2nd) || 0,
       team_1st: Number(editForm.team_1st) || 0,
     };
-    await DB.updateSeason(activeSeason.id, updates);
-    await onDataChanged();
-    showToast('Season settings saved');
+    setBusy(true);
+    try {
+      await DB.updateSeason(activeSeason.id, updates);
+      await onDataChanged();
+      showToast('Season settings saved');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const handleCreateSeason = async (e: FormEvent<HTMLFormElement>) => {
@@ -130,17 +136,27 @@ export default function SeasonSettings({ activeSeason, players, rounds, showToas
       ? `The season has only completed ${roundCount} of 9 rounds. Are you sure you want to end it early?\n\nScores, fines, and standings will be locked. This cannot be undone.`
       : 'Scores, fines, and standings will be locked. You can still view the data but cannot make changes. This cannot be undone.';
     showConfirm(`End ${season.name}?`, warning, async () => {
-      await DB.updateSeason(season.id, { is_active: false });
-      await onDataChanged();
-      showToast(`${season.name} has ended`, 'success');
+      setBusy(true);
+      try {
+        await DB.updateSeason(season.id, { is_active: false });
+        await onDataChanged();
+        showToast(`${season.name} has ended`, 'success');
+      } finally {
+        setBusy(false);
+      }
     });
   };
 
   const handleOpenSeason = async () => {
     if (!activeSeason) return;
-    await DB.updateSeason(activeSeason.id, { is_active: true });
-    await onDataChanged();
-    showToast(`${activeSeason.name} is now active`, 'success');
+    setBusy(true);
+    try {
+      await DB.updateSeason(activeSeason.id, { is_active: true });
+      await onDataChanged();
+      showToast(`${activeSeason.name} is now active`, 'success');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const tabs: { id: string; label: string }[] = [];
@@ -170,13 +186,13 @@ export default function SeasonSettings({ activeSeason, players, rounds, showToas
               </p>
             </div>
             {activeSeason.is_active ? (
-              <button onClick={handleEndSeason} className="px-4 py-2 rounded-lg text-sm font-semibold bg-red-600 text-white hover:bg-red-700 transition-colors min-h-[40px]">
+              <SubmitButton type="button" pending={busy} pendingLabel="Ending…" onClick={handleEndSeason} className="px-4 py-2 rounded-lg text-sm font-semibold bg-red-600 text-white hover:bg-red-700 transition-colors min-h-[40px] disabled:opacity-60">
                 End Season
-              </button>
+              </SubmitButton>
             ) : (
-              <button onClick={handleOpenSeason} className="px-4 py-2 rounded-lg text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors min-h-[40px]">
+              <SubmitButton type="button" pending={busy} pendingLabel="Reopening…" onClick={handleOpenSeason} className="px-4 py-2 rounded-lg text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors min-h-[40px] disabled:opacity-60">
                 Reopen Season
-              </button>
+              </SubmitButton>
             )}
           </div>
 
@@ -194,9 +210,9 @@ export default function SeasonSettings({ activeSeason, players, rounds, showToas
 
               <PrizeFields values={editForm} onChange={setEditForm} prefix="edit-" />
 
-              <button type="submit" className="w-full bg-emerald-600 text-white py-3 rounded-lg font-semibold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 min-h-[48px]">
+              <SubmitButton type="submit" pending={busy} pendingLabel="Saving…" className="w-full bg-emerald-600 text-white py-3 rounded-lg font-semibold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 min-h-[48px] disabled:opacity-60">
                 <Save size={16} /> Save Settings
-              </button>
+              </SubmitButton>
             </form>
           </Card>
         </div>
@@ -273,10 +289,10 @@ export default function SeasonSettings({ activeSeason, players, rounds, showToas
               Creating a new season will deactivate the current one.
             </div>
 
-            <button type="submit" disabled={isCreating}
-              className="w-full bg-emerald-600 text-white py-3 rounded-lg font-semibold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 min-h-[48px] disabled:opacity-50">
-              <Plus size={16} /> {isCreating ? 'Creating...' : 'Create Season'}
-            </button>
+            <SubmitButton type="submit" pending={isCreating} pendingLabel="Creating…"
+              className="w-full bg-emerald-600 text-white py-3 rounded-lg font-semibold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 min-h-[48px] disabled:opacity-60">
+              <Plus size={16} /> Create Season
+            </SubmitButton>
           </form>
         </Card>
       )}

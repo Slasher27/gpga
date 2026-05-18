@@ -1,7 +1,7 @@
 import { useState, useEffect, type KeyboardEvent } from 'react';
 import { Plus, Trash2, ChevronDown, Edit, Save, X } from 'lucide-react';
 import type { Player, Round, Season, ScoresMapFull, FineType } from '../api';
-import { TabBar, Card, EmptyRow, formatDate } from './common';
+import { TabBar, Card, EmptyRow, formatDate, SubmitButton } from './common';
 import { useFines, calcFineTotal, type EditableFineType } from '../hooks/useFines';
 
 interface FinancesViewProps {
@@ -48,6 +48,8 @@ export default function FinancesView({
 	const [showOpenFine, setShowOpenFine] = useState(false);
 	const [openFineName, setOpenFineName] = useState('');
 	const [openFineAmount, setOpenFineAmount] = useState('');
+	const [confirmBusy, setConfirmBusy] = useState(false);
+	const [paidBusyKey, setPaidBusyKey] = useState<string | null>(null);
 
 	// --- Data layer ---
 	const fines = useFines({
@@ -422,17 +424,26 @@ export default function FinancesView({
 
 								{/* Confirm / Reopen */}
 								<div className='pt-3 border-t border-slate-100 flex items-center gap-3'>
-									<button
+									<SubmitButton
 										type='button'
-										onClick={fines.toggleRoundConfirmed}
-										className={`px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors min-h-[44px] ${
+										pending={confirmBusy}
+										pendingLabel={isRoundConfirmed ? 'Reopening…' : 'Confirming…'}
+										onClick={async () => {
+											setConfirmBusy(true);
+											try {
+												await fines.toggleRoundConfirmed();
+											} finally {
+												setConfirmBusy(false);
+											}
+										}}
+										className={`px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors min-h-[44px] disabled:opacity-60 ${
 											isRoundConfirmed
 												? 'bg-slate-500 text-white hover:bg-slate-600'
 												: 'bg-emerald-600 text-white hover:bg-emerald-700'
 										}`}
 									>
 										{isRoundConfirmed ? 'Reopen' : 'Confirm'}
-									</button>
+									</SubmitButton>
 									{isRoundConfirmed && (
 										<span className='text-xs text-slate-500 font-medium'>
 											Confirmed
@@ -960,25 +971,32 @@ export default function FinancesView({
 																	R{round.total_amount.toLocaleString()}
 																</span>
 																{isAdmin ? (
-																	<button
+																	<SubmitButton
 																		type='button'
-																		onClick={(e) => {
+																		pending={paidBusyKey === `${summary.player_id}-${round.round_id}`}
+																		onClick={async (e) => {
 																			e.stopPropagation();
-																			fines.togglePlayerRoundPaid(
-																				summary.player_id,
-																				round.round_id,
-																				round.round_name,
-																				!round.paid,
-																			);
+																			const key = `${summary.player_id}-${round.round_id}`;
+																			setPaidBusyKey(key);
+																			try {
+																				await fines.togglePlayerRoundPaid(
+																					summary.player_id,
+																					round.round_id,
+																					round.round_name,
+																					!round.paid,
+																				);
+																			} finally {
+																				setPaidBusyKey(null);
+																			}
 																		}}
-																		className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+																		className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-60 ${
 																			round.paid
 																				? 'bg-emerald-600 text-white hover:bg-emerald-700'
 																				: 'bg-red-600 text-white hover:bg-red-700'
 																		}`}
 																	>
 																		{round.paid ? 'Paid' : 'Mark Paid'}
-																	</button>
+																	</SubmitButton>
 																) : (
 																	<span
 																		className={`px-3 py-1.5 rounded-lg text-xs font-medium ${round.paid ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}

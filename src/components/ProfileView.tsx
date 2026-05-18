@@ -2,7 +2,7 @@ import { useState, useEffect, type FormEvent, type ChangeEvent, type Dispatch, t
 import { Save, Camera, Mail, Bell } from 'lucide-react';
 import * as DB from '../api';
 import type { Player, Season, ScoresMapFull, Round, PlayerUpdate, BuyInStatus, FinesSummary } from '../api';
-import { TabBar, Avatar, PlayerRoundsTable, FinesSummaryCards, StatsGrid, usePlayerStats, Card } from './common';
+import { TabBar, Avatar, PlayerRoundsTable, FinesSummaryCards, StatsGrid, usePlayerStats, Card, SubmitButton } from './common';
 
 interface ProfileViewProps {
   currentUser: Player;
@@ -16,10 +16,12 @@ interface ProfileViewProps {
 
 export default function ProfileView({ currentUser, setPlayers, scores, rounds, activeSeason, showToast }: ProfileViewProps) {
   const [profileTab, setProfileTab] = useState('stats');
+  const [savingProfile, setSavingProfile] = useState(false);
   const [profileBuyInStatus, setProfileBuyInStatus] = useState<BuyInStatus>({ isPaid: false, date: null });
   const [profileFinesSummary, setProfileFinesSummary] = useState<FinesSummary>({
     total_fines: 0, paid_fines: 0, outstanding_fines: 0, confirmed_rounds: 0, total_rounds_with_fines: 0,
   });
+  const [summaryLoaded, setSummaryLoaded] = useState(false);
   const [formData, setFormData] = useState({ name: currentUser.name, email: currentUser.email, password: '' });
   const [notifyEmail, setNotifyEmail] = useState(currentUser.notify_email !== 0);
   const [notifyPush, setNotifyPush] = useState(currentUser.notify_push !== 0);
@@ -32,10 +34,19 @@ export default function ProfileView({ currentUser, setPlayers, scores, rounds, a
   };
 
   useEffect(() => {
-    if (currentUser?.id && activeSeason?.id) {
-      DB.getPlayerBuyInStatus(currentUser.id, activeSeason.id).then(setProfileBuyInStatus);
-      DB.getPlayerFinesSummary(currentUser.id, activeSeason.id).then(setProfileFinesSummary);
-    }
+    if (!currentUser?.id || !activeSeason?.id) return;
+    let cancelled = false;
+    setSummaryLoaded(false);
+    Promise.all([
+      DB.getPlayerBuyInStatus(currentUser.id, activeSeason.id),
+      DB.getPlayerFinesSummary(currentUser.id, activeSeason.id),
+    ]).then(([buyIn, fines]) => {
+      if (cancelled) return;
+      setProfileBuyInStatus(buyIn);
+      setProfileFinesSummary(fines);
+      setSummaryLoaded(true);
+    });
+    return () => { cancelled = true; };
   }, [activeSeason?.id, currentUser?.id]);
 
   const { playerScores, roundsPlayed, totalStrokes, totalStableford, avgScore } = usePlayerStats(currentUser.id, scores, rounds);
@@ -44,9 +55,14 @@ export default function ProfileView({ currentUser, setPlayers, scores, rounds, a
     e.preventDefault();
     const updates: PlayerUpdate = { name: formData.name, email: formData.email };
     if (formData.password?.trim()) updates.password = formData.password;
-    await DB.updatePlayer(currentUser.id, updates);
-    setPlayers(prev => prev.map(p => p.id === currentUser.id ? { ...p, ...updates } : p));
-    showToast('Profile updated!', 'success');
+    setSavingProfile(true);
+    try {
+      await DB.updatePlayer(currentUser.id, updates);
+      setPlayers(prev => prev.map(p => p.id === currentUser.id ? { ...p, ...updates } : p));
+      showToast('Profile updated!', 'success');
+    } finally {
+      setSavingProfile(false);
+    }
   };
 
   const handleAvatarUpload = (e: ChangeEvent<HTMLInputElement>) => {
@@ -96,8 +112,8 @@ export default function ProfileView({ currentUser, setPlayers, scores, rounds, a
               <p className="text-sm text-slate-500 truncate">{currentUser.email}</p>
               <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-semibold capitalize">{currentUser.role}</span>
-                <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${profileBuyInStatus.isPaid ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'}`}>
-                  Buy-In: {profileBuyInStatus.isPaid ? 'Paid' : 'Due'}
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${!summaryLoaded ? 'bg-slate-100 text-slate-400' : profileBuyInStatus.isPaid ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'}`}>
+                  Buy-In: {!summaryLoaded ? '…' : profileBuyInStatus.isPaid ? 'Paid' : 'Due'}
                 </span>
               </div>
             </div>
@@ -107,7 +123,7 @@ export default function ProfileView({ currentUser, setPlayers, scores, rounds, a
             <span className="bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full font-medium">{roundsPlayed}/{rounds.length} Rounds</span>
             <span className="bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full font-medium">Avg {avgScore || '-'}</span>
             <span className="bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full font-medium">SF {totalStableford || '-'}</span>
-            <span className="bg-red-50 text-red-600 px-2.5 py-1 rounded-full font-medium">Fines R{profileFinesSummary.total_fines.toLocaleString()}</span>
+            <span className={`px-2.5 py-1 rounded-full font-medium ${!summaryLoaded ? 'bg-slate-100 text-slate-400' : 'bg-red-50 text-red-600'}`}>Fines {!summaryLoaded ? '…' : `R${profileFinesSummary.total_fines.toLocaleString()}`}</span>
           </div>
         </div>
 
@@ -136,8 +152,8 @@ export default function ProfileView({ currentUser, setPlayers, scores, rounds, a
                   <p className="text-sm font-semibold text-slate-800">Season Buy-In</p>
                   <p className="text-xs text-slate-500">R{activeSeason?.buy_in_amount?.toLocaleString() || '2,500'}</p>
                 </div>
-                <span className={`px-3 py-1 rounded-full text-xs font-bold ${profileBuyInStatus.isPaid ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'}`}>
-                  {profileBuyInStatus.isPaid ? 'Paid' : 'Outstanding'}
+                <span className={`px-3 py-1 rounded-full text-xs font-bold ${!summaryLoaded ? 'bg-slate-100 text-slate-400' : profileBuyInStatus.isPaid ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'}`}>
+                  {!summaryLoaded ? '…' : profileBuyInStatus.isPaid ? 'Paid' : 'Outstanding'}
                 </span>
               </div>
             </div>
@@ -175,9 +191,9 @@ export default function ProfileView({ currentUser, setPlayers, scores, rounds, a
                   <label htmlFor="profile-password" className="text-sm font-medium text-slate-700 mb-1 block">New Password</label>
                   <input id="profile-password" name="password" type="password" placeholder="Leave blank to keep current" value={formData.password} onChange={e => setFormData(prev => ({ ...prev, password: e.target.value }))} className="input input-bordered w-full min-h-[44px]" />
                 </div>
-                <button type="submit" className="w-full bg-emerald-600 text-white py-3 rounded-lg font-semibold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 min-h-[48px]">
+                <SubmitButton type="submit" pending={savingProfile} pendingLabel="Saving…" className="w-full bg-emerald-600 text-white py-3 rounded-lg font-semibold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 min-h-[48px] disabled:opacity-60">
                   <Save size={16} /> Save Changes
-                </button>
+                </SubmitButton>
               </form>
 
               {/* Right column — Notification preferences (auto-save) */}

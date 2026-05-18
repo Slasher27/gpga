@@ -6,7 +6,7 @@ import type {
   Player, Round, Season, GolfCourse, ScoresMapFull, FinesByRound,
   LeaderboardEntry, AuthedPlayer, Role, Status,
 } from './api';
-import { DashboardSkeleton, useConfirm, Modal, DatePicker, CourseSelector } from './components/common';
+import { DashboardSkeleton, useConfirm, Modal, DatePicker, CourseSelector, SubmitButton } from './components/common';
 import LoginPage from './components/LoginPage';
 import { setupPush } from './pushSetup';
 import { TopBar, DesktopSidebar, MobileBottomNav } from './components/Nav';
@@ -68,6 +68,7 @@ export default function App() {
   const [isEditRoundModalOpen, setIsEditRoundModalOpen] = useState(false);
   const [editingRound, setEditingRound] = useState<Round | null>(null);
   const [isAddFineTypeModalOpen, setIsAddFineTypeModalOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false); // shared: one modal open at a time
   const [fineTypesVersion, setFineTypesVersion] = useState(0);
   const [selectedCourse, setSelectedCourse] = useState<GolfCourse | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -250,11 +251,16 @@ export default function App() {
       status: 'active' as Status,
       avatar: null,
     };
-    // Send the entered password to the server; keep it out of client state.
-    await DB.addPlayer({ ...newPlayer, password: fstr(fd, 'password') });
-    setPlayers(prev => [...prev, newPlayer].sort((a, b) => a.name.localeCompare(b.name)));
-    setIsAddPlayerModalOpen(false);
-    showToast(`Player ${newPlayer.name} added successfully!`);
+    setSubmitting(true);
+    try {
+      // Send the entered password to the server; keep it out of client state.
+      await DB.addPlayer({ ...newPlayer, password: fstr(fd, 'password') });
+      setPlayers(prev => [...prev, newPlayer].sort((a, b) => a.name.localeCompare(b.name)));
+      setIsAddPlayerModalOpen(false);
+      showToast(`Player ${newPlayer.name} added successfully!`);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleAddRound = async (e: FormEvent<HTMLFormElement>) => {
@@ -265,10 +271,15 @@ export default function App() {
     const teeTime = fstr(fd, 'tee_time') || undefined;
     const teeTime2 = fstr(fd, 'tee_time_2') || undefined;
     const newRound = { name: fstr(fd, 'name'), date: fstr(fd, 'date'), courseId: selectedCourse.id, courseName: selectedCourse.name, teeTime, teeTime2 };
-    const result = await DB.addRound(newRound, activeSeason.id);
-    setRounds(prev => [...prev, { id: result.id, season_id: activeSeason.id, name: newRound.name, date: newRound.date, course_id: newRound.courseId, course_name: newRound.courseName, tee_time: teeTime ?? null, tee_time_2: teeTime2 ?? null }]);
-    setIsAddRoundModalOpen(false); setSelectedCourse(null); setSearchTerm(''); setSelectedDate('');
-    showToast(`Round "${newRound.name}" created successfully!`);
+    setSubmitting(true);
+    try {
+      const result = await DB.addRound(newRound, activeSeason.id);
+      setRounds(prev => [...prev, { id: result.id, season_id: activeSeason.id, name: newRound.name, date: newRound.date, course_id: newRound.courseId, course_name: newRound.courseName, tee_time: teeTime ?? null, tee_time_2: teeTime2 ?? null }]);
+      setIsAddRoundModalOpen(false); setSelectedCourse(null); setSearchTerm(''); setSelectedDate('');
+      showToast(`Round "${newRound.name}" created successfully!`);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleEditRound = (round: Round) => {
@@ -285,10 +296,15 @@ export default function App() {
     const teeTime = fstr(fd, 'tee_time') || null;
     const teeTime2 = fstr(fd, 'tee_time_2') || null;
     const updates = { name: fstr(fd, 'name'), date: fstr(fd, 'date'), courseId: selectedCourse?.id, courseName: selectedCourse?.name, teeTime, teeTime2 };
-    await DB.updateRound(roundId, updates);
-    setRounds(prev => prev.map(r => r.id === roundId ? { ...r, name: updates.name || r.name, date: updates.date || r.date, course_id: updates.courseId || r.course_id, course_name: updates.courseName || r.course_name, tee_time: teeTime, tee_time_2: teeTime2 } : r));
-    setIsEditRoundModalOpen(false); setSelectedCourse(null); setSearchTerm(''); setEditingRound(null);
-    showToast(`Round "${updates.name}" updated successfully!`);
+    setSubmitting(true);
+    try {
+      await DB.updateRound(roundId, updates);
+      setRounds(prev => prev.map(r => r.id === roundId ? { ...r, name: updates.name || r.name, date: updates.date || r.date, course_id: updates.courseId || r.course_id, course_name: updates.courseName || r.course_name, tee_time: teeTime, tee_time_2: teeTime2 } : r));
+      setIsEditRoundModalOpen(false); setSelectedCourse(null); setSearchTerm(''); setEditingRound(null);
+      showToast(`Round "${updates.name}" updated successfully!`);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleDeleteRound = (id: number, name: string) => {
@@ -311,19 +327,24 @@ export default function App() {
     e.preventDefault();
     if (!activeSeason) { showToast('No active season found.', 'error'); return; }
     const fd = new FormData(e.currentTarget);
-    await DB.addFineType(
-      activeSeason.id,
-      fstr(fd, 'name'),
-      parseInt(fstr(fd, 'amount')),
-      fstr(fd, 'description'),
-      parseInt(fstr(fd, 'sort_order')) || 0,
-      false,
-      parseInt(fstr(fd, 'tier_threshold')) || 0,
-      parseInt(fstr(fd, 'tier_amount')) || 0
-    );
-    setIsAddFineTypeModalOpen(false);
-    setFineTypesVersion(v => v + 1);
-    refreshFines?.();
+    setSubmitting(true);
+    try {
+      await DB.addFineType(
+        activeSeason.id,
+        fstr(fd, 'name'),
+        parseInt(fstr(fd, 'amount')),
+        fstr(fd, 'description'),
+        parseInt(fstr(fd, 'sort_order')) || 0,
+        false,
+        parseInt(fstr(fd, 'tier_threshold')) || 0,
+        parseInt(fstr(fd, 'tier_amount')) || 0
+      );
+      setIsAddFineTypeModalOpen(false);
+      setFineTypesVersion(v => v + 1);
+      refreshFines?.();
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleDeleteFineType = (id: number, name: string) => {
@@ -398,7 +419,7 @@ export default function App() {
               <option value="admin">Admin</option>
             </select>
           </div>
-          <button className="w-full bg-emerald-600 text-white py-3 rounded-lg font-semibold hover:bg-emerald-700 flex items-center justify-center gap-2"><Plus size={18} /> Create Player</button>
+          <SubmitButton type="submit" pending={submitting} pendingLabel="Creating…" className="w-full bg-emerald-600 text-white py-3 rounded-lg font-semibold hover:bg-emerald-700 flex items-center justify-center gap-2 disabled:opacity-60"><Plus size={18} /> Create Player</SubmitButton>
         </form>
       </Modal>
 
@@ -425,7 +446,7 @@ export default function App() {
           </div>
           <CourseSelector courses={golfCourses} selected={selectedCourse} onSelect={setSelectedCourse} searchTerm={searchTerm} onSearchChange={setSearchTerm} />
           <input type="hidden" name="course" value={selectedCourse?.name || ''} required />
-          <button type="submit" className="w-full bg-emerald-600 text-white py-3 rounded-lg font-semibold hover:bg-emerald-700 flex items-center justify-center gap-2" disabled={!selectedCourse}><Plus size={18} /> Create Round</button>
+          <SubmitButton type="submit" pending={submitting} pendingLabel="Creating…" disabled={!selectedCourse} className="w-full bg-emerald-600 text-white py-3 rounded-lg font-semibold hover:bg-emerald-700 flex items-center justify-center gap-2 disabled:opacity-60"><Plus size={18} /> Create Round</SubmitButton>
         </form>
       </Modal>
 
@@ -452,7 +473,7 @@ export default function App() {
             </div>
             <CourseSelector courses={golfCourses} selected={selectedCourse} onSelect={setSelectedCourse} searchTerm={searchTerm} onSearchChange={setSearchTerm} />
             <input type="hidden" name="course" value={selectedCourse?.name || editingRound.course_name} required />
-            <button className="w-full bg-emerald-600 text-white py-3 rounded-lg font-semibold hover:bg-emerald-700 flex items-center justify-center gap-2"><Save size={18} /> Update Round</button>
+            <SubmitButton type="submit" pending={submitting} pendingLabel="Updating…" className="w-full bg-emerald-600 text-white py-3 rounded-lg font-semibold hover:bg-emerald-700 flex items-center justify-center gap-2 disabled:opacity-60"><Save size={18} /> Update Round</SubmitButton>
           </form>
         )}
       </Modal>
@@ -491,13 +512,13 @@ export default function App() {
               </div>
             </div>
           </div>
-          <button className="w-full bg-emerald-600 text-white py-3 rounded-lg font-bold hover:bg-emerald-700">Create Fine Type</button>
+          <SubmitButton type="submit" pending={submitting} pendingLabel="Creating…" className="w-full bg-emerald-600 text-white py-3 rounded-lg font-bold hover:bg-emerald-700 disabled:opacity-60">Create Fine Type</SubmitButton>
         </form>
       </Modal>
 
       {toast.show && (
-        <div className="toast toast-top toast-end z-50">
-          <div className={`alert ${toast.type === 'success' ? 'alert-success' : 'alert-error'}`}>
+        <div className="toast toast-end z-50 top-[4.5rem] max-w-[calc(100vw-2rem)]">
+          <div className={`alert ${toast.type === 'error' ? 'alert-error' : toast.type === 'info' ? 'alert-info' : 'alert-success'}`}>
             <span className="font-semibold">{toast.message}</span>
           </div>
         </div>

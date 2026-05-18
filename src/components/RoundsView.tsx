@@ -2,7 +2,7 @@ import { useState, useEffect, type Dispatch, type SetStateAction } from 'react';
 import { Plus, Save, Edit, Trash2, MapPin, Calendar, Lock, CheckCircle } from 'lucide-react';
 import * as DB from '../api';
 import type { Round, Player, Season, ScoresMapFull } from '../api';
-import { Card } from './common';
+import { Card, SubmitButton } from './common';
 
 type ScoreField = 'gross' | 'handicap' | 'stableford';
 type ScoreEdit = Partial<Record<ScoreField, number | string>>;
@@ -27,6 +27,7 @@ export default function RoundsView({ rounds, scores, setScores, players, isReadO
   const [selectedRound, setSelectedRound] = useState<number | undefined>(rounds[rounds.length - 1]?.id);
   const [editScores, setEditScores] = useState<Record<string, ScoreEdit>>({});
   const [editingPlayers, setEditingPlayers] = useState<Record<string, boolean>>({});
+  const [savingScores, setSavingScores] = useState(false);
 
   useEffect(() => {
     setEditScores({});
@@ -66,16 +67,21 @@ export default function RoundsView({ rounds, scores, setScores, players, isReadO
 
     if (net <= 0) { showToast('Enter a gross score first', 'error'); return; }
 
-    await DB.updateScore(playerId, selectedRound, net, hc, sf);
-    setScores(prev => {
-      const updated = { ...prev };
-      if (!updated[playerId]) updated[playerId] = {};
-      updated[playerId] = { ...updated[playerId], [selectedRound]: { ...updated[playerId][selectedRound], strokes: net, handicap: hc, stableford: sf } };
-      return updated;
-    });
-    setEditScores(prev => { const s = { ...prev }; delete s[playerId]; return s; });
-    setEditingPlayers(prev => ({ ...prev, [playerId]: false }));
-    showToast(`Saved scores for ${playerName}!`);
+    setSavingScores(true);
+    try {
+      await DB.updateScore(playerId, selectedRound, net, hc, sf);
+      setScores(prev => {
+        const updated = { ...prev };
+        if (!updated[playerId]) updated[playerId] = {};
+        updated[playerId] = { ...updated[playerId], [selectedRound]: { ...updated[playerId][selectedRound], strokes: net, handicap: hc, stableford: sf } };
+        return updated;
+      });
+      setEditScores(prev => { const s = { ...prev }; delete s[playerId]; return s; });
+      setEditingPlayers(prev => ({ ...prev, [playerId]: false }));
+      showToast(`Saved scores for ${playerName}!`);
+    } finally {
+      setSavingScores(false);
+    }
   };
 
   const editAllPlayers = () => {
@@ -84,34 +90,39 @@ export default function RoundsView({ rounds, scores, setScores, players, isReadO
 
   const saveAllPlayers = async () => {
     if (selectedRound == null) return;
-    let savedCount = 0;
-    for (const p of players.filter(pl => pl.status === 'active')) {
-      if (!editingPlayers[p.id]) continue;
-      const vals = getPlayerValues(p.id);
-      const net = Number(vals.net) || 0;
-      const hc = Number(vals.hc) || 0;
-      const sf = Number(vals.sf) || 0;
-      if (net > 0) {
-        await DB.updateScore(p.id, selectedRound, net, hc, sf);
-        savedCount++;
-      }
-    }
-    setScores(prev => {
-      const updated = { ...prev };
+    setSavingScores(true);
+    try {
+      let savedCount = 0;
       for (const p of players.filter(pl => pl.status === 'active')) {
         if (!editingPlayers[p.id]) continue;
         const vals = getPlayerValues(p.id);
         const net = Number(vals.net) || 0;
+        const hc = Number(vals.hc) || 0;
+        const sf = Number(vals.sf) || 0;
         if (net > 0) {
-          if (!updated[p.id]) updated[p.id] = {};
-          updated[p.id] = { ...updated[p.id], [selectedRound]: { ...updated[p.id][selectedRound], strokes: net, handicap: Number(vals.hc) || 0, stableford: Number(vals.sf) || 0 } };
+          await DB.updateScore(p.id, selectedRound, net, hc, sf);
+          savedCount++;
         }
       }
-      return updated;
-    });
-    setEditScores({});
-    setEditingPlayers({});
-    showToast(`Saved scores for ${savedCount} player${savedCount !== 1 ? 's' : ''}!`);
+      setScores(prev => {
+        const updated = { ...prev };
+        for (const p of players.filter(pl => pl.status === 'active')) {
+          if (!editingPlayers[p.id]) continue;
+          const vals = getPlayerValues(p.id);
+          const net = Number(vals.net) || 0;
+          if (net > 0) {
+            if (!updated[p.id]) updated[p.id] = {};
+            updated[p.id] = { ...updated[p.id], [selectedRound]: { ...updated[p.id][selectedRound], strokes: net, handicap: Number(vals.hc) || 0, stableford: Number(vals.sf) || 0 } };
+          }
+        }
+        return updated;
+      });
+      setEditScores({});
+      setEditingPlayers({});
+      showToast(`Saved scores for ${savedCount} player${savedCount !== 1 ? 's' : ''}!`);
+    } finally {
+      setSavingScores(false);
+    }
   };
 
   const isAnyPlayerEditing = Object.values(editingPlayers).some(v => v);
@@ -211,9 +222,9 @@ export default function RoundsView({ rounds, scores, setScores, players, isReadO
                     <Edit size={13} /> Edit All
                   </button>
                 ) : (
-                  <button onClick={saveAllPlayers} className="bg-emerald-600 text-white px-3 py-2 rounded-lg text-xs font-semibold hover:bg-emerald-700 flex items-center gap-1.5 min-h-[36px]">
+                  <SubmitButton type="button" pending={savingScores} pendingLabel="Saving…" onClick={saveAllPlayers} className="bg-emerald-600 text-white px-3 py-2 rounded-lg text-xs font-semibold hover:bg-emerald-700 flex items-center gap-1.5 min-h-[36px] disabled:opacity-60">
                     <Save size={13} /> Save All
-                  </button>
+                  </SubmitButton>
                 )
               )}
             </div>
@@ -232,7 +243,7 @@ export default function RoundsView({ rounds, scores, setScores, players, isReadO
                         !isEditing ? (
                           <button onClick={() => setEditingPlayers(prev => ({ ...prev, [p.id]: true }))} className="text-xs text-emerald-600 font-semibold min-h-[32px] px-2">Edit</button>
                         ) : (
-                          <button onClick={() => savePlayerScore(p.id, p.name)} className="text-xs text-emerald-600 font-semibold min-h-[32px] px-2">Save</button>
+                          <SubmitButton type="button" pending={savingScores} onClick={() => savePlayerScore(p.id, p.name)} className="text-xs text-emerald-600 font-semibold min-h-[32px] px-2 disabled:opacity-60">Save</SubmitButton>
                         )
                       )}
                     </div>

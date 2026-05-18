@@ -2,7 +2,7 @@ import { useState, useEffect, type FormEvent, type ChangeEvent, type Dispatch, t
 import { Save, Camera, ChevronDown, Trash2 } from 'lucide-react';
 import * as DB from '../api';
 import type { Player, Season, ScoresMapFull, Round, Role, Status, PlayerUpdate, BuyInStatus, FinesSummary } from '../api';
-import { TabBar, Avatar, PlayerRoundsTable, FinesSummaryCards, StatsGrid, usePlayerStats, Card, useConfirm } from './common';
+import { TabBar, Avatar, PlayerRoundsTable, FinesSummaryCards, StatsGrid, usePlayerStats, Card, useConfirm, SubmitButton } from './common';
 
 const badgeStyles: Record<string, string> = {
   neutral: 'badge badge-ghost badge-sm',
@@ -34,17 +34,27 @@ export default function PlayerProfilePage({ players, setPlayers, scores, rounds,
     total_fines: 0, paid_fines: 0, outstanding_fines: 0, confirmed_rounds: 0, total_rounds_with_fines: 0,
   });
   const [profileTab, setProfileTab] = useState('stats');
+  const [summaryLoaded, setSummaryLoaded] = useState(false);
+  const [busy, setBusy] = useState(false); // shared: save / delete / buy-in toggle are mutually exclusive
   const { confirm, ConfirmDialogComponent } = useConfirm();
 
   useEffect(() => {
-    if (player) {
-      setFormData({ name: player.name, email: player.email, role: player.role, status: player.status, password: '' });
-      setAvatarPreview(player.avatar);
-      if (activeSeason?.id) {
-        DB.getPlayerBuyInStatus(player.id, activeSeason.id).then(setPlayerBuyIn);
-        DB.getPlayerFinesSummary(player.id, activeSeason.id).then(setPlayerFinesSummary);
-      }
-    }
+    if (!player) return;
+    setFormData({ name: player.name, email: player.email, role: player.role, status: player.status, password: '' });
+    setAvatarPreview(player.avatar);
+    if (!activeSeason?.id) return;
+    let cancelled = false;
+    setSummaryLoaded(false);
+    Promise.all([
+      DB.getPlayerBuyInStatus(player.id, activeSeason.id),
+      DB.getPlayerFinesSummary(player.id, activeSeason.id),
+    ]).then(([buyIn, fines]) => {
+      if (cancelled) return;
+      setPlayerBuyIn(buyIn);
+      setPlayerFinesSummary(fines);
+      setSummaryLoaded(true);
+    });
+    return () => { cancelled = true; };
   }, [managingPlayerId, player?.id, activeSeason?.id]);
 
   const { playerScores, roundsPlayed, totalStrokes, totalStableford, avgScore } = usePlayerStats(player?.id ?? '', scores, rounds);
@@ -57,9 +67,14 @@ export default function PlayerProfilePage({ players, setPlayers, scores, rounds,
     if (currentUser.role === 'master' && player.role !== 'master') updates.role = formData.role;
     if (formData.password?.trim()) updates.password = formData.password;
     if (avatarPreview !== player.avatar) updates.avatar = avatarPreview;
-    await DB.updatePlayer(player.id, updates);
-    setPlayers(prev => prev.map(p => p.id === player.id ? { ...p, ...updates } : p));
-    showToast(`${formData.name} updated successfully!`, 'success');
+    setBusy(true);
+    try {
+      await DB.updatePlayer(player.id, updates);
+      setPlayers(prev => prev.map(p => p.id === player.id ? { ...p, ...updates } : p));
+      showToast(`${formData.name} updated successfully!`, 'success');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const canDelete = currentUser.role === 'master' && player.role !== 'master' && player.id !== currentUser.id;
@@ -69,10 +84,15 @@ export default function PlayerProfilePage({ players, setPlayers, scores, rounds,
       `Delete ${player.name}?`,
       `This permanently removes ${player.name} and all their scores and fines. This cannot be undone.`,
       async () => {
-        await DB.deletePlayer(player.id);
-        setPlayers(prev => prev.filter(p => p.id !== player.id));
-        showToast(`${player.name} deleted`, 'success');
-        setManagingPlayerId(null);
+        setBusy(true);
+        try {
+          await DB.deletePlayer(player.id);
+          setPlayers(prev => prev.filter(p => p.id !== player.id));
+          showToast(`${player.name} deleted`, 'success');
+          setManagingPlayerId(null);
+        } finally {
+          setBusy(false);
+        }
       }
     );
   };
@@ -128,9 +148,9 @@ export default function PlayerProfilePage({ players, setPlayers, scores, rounds,
                 </span>
                 <span className={badgeStyles[player.status === 'active' ? 'success' : 'danger']}>{player.status}</span>
                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
-                  playerBuyIn.isPaid ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'
+                  !summaryLoaded ? 'bg-slate-100 text-slate-400' : playerBuyIn.isPaid ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'
                 }`}>
-                  Buy-In: {playerBuyIn.isPaid ? 'Paid' : 'Due'}
+                  Buy-In: {!summaryLoaded ? '…' : playerBuyIn.isPaid ? 'Paid' : 'Due'}
                 </span>
               </div>
             </div>
@@ -141,7 +161,7 @@ export default function PlayerProfilePage({ players, setPlayers, scores, rounds,
             <span className="bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full font-medium">{roundsPlayed}/{rounds.length} Rounds</span>
             <span className="bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full font-medium">Avg {avgScore || '-'}</span>
             <span className="bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full font-medium">SF {totalStableford || '-'}</span>
-            <span className="bg-red-50 text-red-600 px-2.5 py-1 rounded-full font-medium">Fines R{playerFinesSummary.total_fines.toLocaleString()}</span>
+            <span className={`px-2.5 py-1 rounded-full font-medium ${!summaryLoaded ? 'bg-slate-100 text-slate-400' : 'bg-red-50 text-red-600'}`}>Fines {!summaryLoaded ? '…' : `R${playerFinesSummary.total_fines.toLocaleString()}`}</span>
           </div>
         </div>
 
@@ -174,21 +194,28 @@ export default function PlayerProfilePage({ players, setPlayers, scores, rounds,
                   <p className="text-xs text-slate-500">R{activeSeason?.buy_in_amount?.toLocaleString() || '2,500'} — {activeSeason?.name}</p>
                   {playerBuyIn.date && <p className="text-xs text-slate-400 mt-0.5">Paid {playerBuyIn.date}</p>}
                 </div>
-                <button
+                <SubmitButton
+                  type="button"
+                  pending={busy}
                   onClick={async () => {
                     if (!activeSeason?.id) return;
-                    await DB.markBuyInPaid(player.id, activeSeason.id, !playerBuyIn.isPaid);
-                    setPlayerBuyIn({ isPaid: !playerBuyIn.isPaid, date: !playerBuyIn.isPaid ? new Date().toISOString().split('T')[0] : null });
-                    showToast(`Buy-in ${!playerBuyIn.isPaid ? 'marked as paid' : 'marked as outstanding'}`, 'success');
+                    setBusy(true);
+                    try {
+                      await DB.markBuyInPaid(player.id, activeSeason.id, !playerBuyIn.isPaid);
+                      setPlayerBuyIn({ isPaid: !playerBuyIn.isPaid, date: !playerBuyIn.isPaid ? new Date().toISOString().split('T')[0] : null });
+                      showToast(`Buy-in ${!playerBuyIn.isPaid ? 'marked as paid' : 'marked as outstanding'}`, 'success');
+                    } finally {
+                      setBusy(false);
+                    }
                   }}
-                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all min-h-[44px] ${
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all min-h-[44px] disabled:opacity-60 ${
                     playerBuyIn.isPaid
                       ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
                       : 'bg-red-500 text-white hover:bg-red-600'
                   }`}
                 >
                   {playerBuyIn.isPaid ? 'Paid' : 'Mark Paid'}
-                </button>
+                </SubmitButton>
               </div>
             </div>
           )}
@@ -280,13 +307,13 @@ export default function PlayerProfilePage({ players, setPlayers, scores, rounds,
                   </div>
                 </div>
               </div>
-              <button type="submit" className="w-full bg-emerald-600 text-white py-3 rounded-lg font-semibold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 min-h-[48px]">
+              <SubmitButton type="submit" pending={busy} pendingLabel="Saving…" className="w-full bg-emerald-600 text-white py-3 rounded-lg font-semibold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 min-h-[48px] disabled:opacity-60">
                 <Save size={16} /> Save Changes
-              </button>
+              </SubmitButton>
               {canDelete && (
-                <button type="button" onClick={handleDeletePlayer} className="w-full mt-2 bg-white text-red-600 border border-red-200 py-3 rounded-lg font-semibold hover:bg-red-50 transition-colors flex items-center justify-center gap-2 min-h-[48px]">
+                <SubmitButton type="button" pending={busy} pendingLabel="Deleting…" onClick={handleDeletePlayer} className="w-full mt-2 bg-white text-red-600 border border-red-200 py-3 rounded-lg font-semibold hover:bg-red-50 transition-colors flex items-center justify-center gap-2 min-h-[48px] disabled:opacity-60">
                   <Trash2 size={16} /> Delete Player
-                </button>
+                </SubmitButton>
               )}
             </form>
           )}

@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, type Dispatch, type SetStateAction } from
 import { Plus, Save, Edit, Trash2, ChevronDown } from 'lucide-react';
 import * as DB from '../api';
 import type { Player, Team, Season, Round, ScoresMapFull } from '../api';
-import { NoPlayersEmptyState, Avatar, Card } from './common';
+import { NoPlayersEmptyState, Avatar, Card, SubmitButton } from './common';
 
 type BuyInCache = Record<string, { isPaid: boolean; date: string | null }>;
 
@@ -19,41 +19,58 @@ const TeamManagementSection = ({ teams, setTeams, isAddingTeam, setIsAddingTeam,
   const [newPlayer1, setNewPlayer1] = useState('');
   const [newPlayer2, setNewPlayer2] = useState('');
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
+  const [teamBusy, setTeamBusy] = useState(false);
+  const [deletingTeamId, setDeletingTeamId] = useState<number | null>(null);
 
   const assignedPlayerIds = teams.flatMap(t => [t.player1_id, t.player2_id]);
   const availablePlayers = players.filter(p => p.status === 'active' && !assignedPlayerIds.includes(p.id));
 
   const handleAddTeam = async () => {
     if (!newTeamName || !newPlayer1 || !newPlayer2 || !activeSeason) return;
-    await DB.createTeam(activeSeason.id, newTeamName, newPlayer1, newPlayer2);
-    const updated = await DB.getTeams(activeSeason.id);
-    setTeams(updated);
-    setNewTeamName('');
-    setNewPlayer1('');
-    setNewPlayer2('');
-    setIsAddingTeam(false);
-    showToast('Team created!', 'success');
+    setTeamBusy(true);
+    try {
+      await DB.createTeam(activeSeason.id, newTeamName, newPlayer1, newPlayer2);
+      const updated = await DB.getTeams(activeSeason.id);
+      setTeams(updated);
+      setNewTeamName('');
+      setNewPlayer1('');
+      setNewPlayer2('');
+      setIsAddingTeam(false);
+      showToast('Team created!', 'success');
+    } finally {
+      setTeamBusy(false);
+    }
   };
 
   const handleDeleteTeam = async (id: number) => {
     if (!activeSeason) return;
-    await DB.deleteTeam(id);
-    const updated = await DB.getTeams(activeSeason.id);
-    setTeams(updated);
-    showToast('Team deleted', 'info');
+    setDeletingTeamId(id);
+    try {
+      await DB.deleteTeam(id);
+      const updated = await DB.getTeams(activeSeason.id);
+      setTeams(updated);
+      showToast('Team deleted', 'info');
+    } finally {
+      setDeletingTeamId(null);
+    }
   };
 
   const handleUpdateTeam = async () => {
     if (!editingTeam || !activeSeason) return;
-    await DB.updateTeam(editingTeam.id, {
-      name: editingTeam.name,
-      player1_id: editingTeam.player1_id,
-      player2_id: editingTeam.player2_id
-    });
-    const updated = await DB.getTeams(activeSeason.id);
-    setTeams(updated);
-    setEditingTeam(null);
-    showToast('Team updated!', 'success');
+    setTeamBusy(true);
+    try {
+      await DB.updateTeam(editingTeam.id, {
+        name: editingTeam.name,
+        player1_id: editingTeam.player1_id,
+        player2_id: editingTeam.player2_id
+      });
+      const updated = await DB.getTeams(activeSeason.id);
+      setTeams(updated);
+      setEditingTeam(null);
+      showToast('Team updated!', 'success');
+    } finally {
+      setTeamBusy(false);
+    }
   };
 
   return (
@@ -100,9 +117,9 @@ const TeamManagementSection = ({ teams, setTeams, isAddingTeam, setIsAddingTeam,
                     </select>
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={handleUpdateTeam} className="flex-1 bg-emerald-600 text-white py-2.5 rounded-lg font-semibold hover:bg-emerald-700 transition-colors text-sm min-h-[44px] flex items-center justify-center gap-2">
+                    <SubmitButton onClick={handleUpdateTeam} pending={teamBusy} pendingLabel="Saving…" className="flex-1 bg-emerald-600 text-white py-2.5 rounded-lg font-semibold hover:bg-emerald-700 transition-colors text-sm min-h-[44px] flex items-center justify-center gap-2 disabled:opacity-60">
                       <Save size={14} /> Save
-                    </button>
+                    </SubmitButton>
                     <button onClick={() => setEditingTeam(null)} className="px-4 py-2.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors text-sm min-h-[44px]">
                       Cancel
                     </button>
@@ -125,13 +142,14 @@ const TeamManagementSection = ({ teams, setTeams, isAddingTeam, setIsAddingTeam,
                     >
                       <Edit size={16} />
                     </button>
-                    <button
+                    <SubmitButton
                       onClick={() => handleDeleteTeam(team.id)}
-                      className="p-2.5 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+                      pending={deletingTeamId === team.id}
+                      className="p-2.5 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center disabled:opacity-60"
                       aria-label="Delete team"
                     >
                       <Trash2 size={16} />
-                    </button>
+                    </SubmitButton>
                   </div>
                 </div>
               )}
@@ -168,13 +186,15 @@ const TeamManagementSection = ({ teams, setTeams, isAddingTeam, setIsAddingTeam,
                 </select>
               </div>
               <div className="flex gap-2">
-                <button
+                <SubmitButton
                   onClick={handleAddTeam}
+                  pending={teamBusy}
+                  pendingLabel="Adding…"
                   disabled={!newTeamName || !newPlayer1 || !newPlayer2}
                   className="flex-1 bg-emerald-600 text-white py-2.5 rounded-lg font-semibold hover:bg-emerald-700 transition-colors text-sm min-h-[44px] disabled:opacity-50"
                 >
                   Add Team
-                </button>
+                </SubmitButton>
                 <button
                   onClick={() => setIsAddingTeam(false)}
                   className="px-4 py-2.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors text-sm min-h-[44px]"
