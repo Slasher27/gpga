@@ -141,6 +141,7 @@ select:focus,
   border-color: rgb(16 185 129) !important; /* emerald-500 */
   border-width: 2px !important;
   outline: none;
+  box-shadow: 0 0 0 3px rgb(16 185 129 / 0.18); /* emerald-500 focus ring */
 }
 
 input.grow:focus {
