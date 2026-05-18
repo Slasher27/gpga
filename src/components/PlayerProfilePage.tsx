@@ -54,11 +54,13 @@ export default function PlayerProfilePage({ players, setPlayers, scores, rounds,
     reader.readAsDataURL(file);
   };
 
+  // Editing player details (name/email/password/status/role) is master-only.
+  // Admins get view access + the buy-in/fines "mark paid" actions.
   const tabs = [
     { id: 'stats', label: 'Stats' },
     { id: 'rounds', label: 'Rounds' },
     { id: 'fines', label: 'Fines' },
-    { id: 'edit', label: 'Edit' },
+    ...(currentUser.role === 'master' ? [{ id: 'edit', label: 'Edit' }] : []),
   ];
 
   return (
@@ -159,8 +161,8 @@ export default function PlayerProfilePage({ players, setPlayers, scores, rounds,
             </div>
           )}
 
-          {/* Edit Tab */}
-          {profileTab === 'edit' && (
+          {/* Edit Tab — master only */}
+          {profileTab === 'edit' && currentUser.role === 'master' && (
             <form onSubmit={handleSave} className="space-y-4">
               {/* Avatar Upload */}
               <div className="flex items-center gap-4">

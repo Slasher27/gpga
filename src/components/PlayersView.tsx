@@ -255,7 +255,7 @@ export default function PlayersView({ players, scores, rounds, activeSeason, isR
       {/* Header */}
       <div className="flex items-center justify-between h-10">
         <h2 className="text-xl font-bold text-slate-800">Players & Teams</h2>
-        {!isReadOnlySeason && adminTab === 'players' && (
+        {!isReadOnlySeason && adminTab === 'players' && currentUser.role === 'master' && (
           <button
             onClick={onAddPlayer}
             className="bg-emerald-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-emerald-700 transition-colors flex items-center gap-2 text-sm min-h-[44px]"
