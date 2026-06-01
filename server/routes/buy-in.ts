@@ -30,7 +30,7 @@ router.post('/season/:seasonId/player', requireAdmin, async (req, res) => {
 router.delete('/season/:seasonId/player/:playerId', requireAdmin, async (req, res) => {
   await getClient().execute({
     sql: 'DELETE FROM season_players WHERE season_id = ? AND player_id = ?',
-    args: [Number(req.params.seasonId), req.params.playerId]
+    args: [Number(req.params.seasonId), String(req.params.playerId)]
   });
   res.json({ ok: true });
 });

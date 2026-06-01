@@ -24,6 +24,12 @@ export default function Modal({
   const boxRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
 
+  // Keep the latest onClose without making it an effect dependency — otherwise an
+  // inline onClose (new ref every render) would re-run the effect on every parent
+  // re-render and yank focus back to the first field while the user is typing.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   useEffect(() => {
     if (!isOpen) return;
     const box = boxRef.current;
@@ -41,7 +47,7 @@ export default function Modal({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (e.key !== 'Tab' || !box) return;
@@ -67,7 +73,7 @@ export default function Modal({
       document.body.style.overflow = prevOverflow;
       triggerEl?.focus?.();
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
   return (

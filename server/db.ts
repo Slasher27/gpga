@@ -206,8 +206,41 @@ export async function initSchema(): Promise<void> {
     notify_push: 'INTEGER DEFAULT 1',
   });
 
-  // Add missing Western Cape courses
+  // Canonical golf course list — the single source of truth. Idempotent
+  // (INSERT OR IGNORE) so it runs cheaply on every boot and back-fills any DB
+  // seeded before a course was added. Runs before seedDatabase() (see the two
+  // entry points), so seed-time rounds can safely reference these course ids.
   await db.execute(`INSERT OR IGNORE INTO golf_courses (id, name, location, par) VALUES
+    (1, 'Royal Cape Golf Club', 'Cape Town', 72),
+    (2, 'Rondebosch Golf Club', 'Cape Town', 70),
+    (3, 'Mowbray Golf Club', 'Cape Town', 72),
+    (4, 'King David Mowbray Golf Club', 'Cape Town', 72),
+    (5, 'Westlake Golf Club', 'Cape Town', 72),
+    (6, 'Clovelly Country Club', 'Cape Town', 72),
+    (7, 'Steenberg Golf Club', 'Cape Town', 72),
+    (8, 'Retreat Golf Club', 'Cape Town', 71),
+    (9, 'Durbanville Golf Club', 'Cape Town', 72),
+    (10, 'Bellville Golf Club', 'Cape Town', 72),
+    (11, 'Parow Golf Club', 'Cape Town', 72),
+    (12, 'Kuils River Golf Club', 'Cape Town', 72),
+    (13, 'Strand Golf Club', 'Cape Town', 72),
+    (14, 'Somerset West Golf Club', 'Cape Town', 72),
+    (15, 'Milnerton Golf Club', 'Cape Town', 72),
+    (16, 'Atlantic Beach Golf Club', 'Cape Town', 72),
+    (17, 'Metropolitan Golf Club', 'Cape Town', 72),
+    (18, 'Silwerstroom Golf Estate', 'Cape Town', 72),
+    (19, 'Fisantekraal Golf Club', 'Cape Town', 72),
+    (20, 'Sunrise Golf Club', 'Cape Town', 71),
+    (21, 'Rocklands Golf Club', 'Cape Town', 72),
+    (22, 'Hermanus Golf Club', 'Hermanus', 72),
+    (23, 'Arabella Golf Club', 'Kleinmond', 72),
+    (24, 'Stellenbosch Golf Club', 'Stellenbosch', 72),
+    (25, 'Erinvale Estate Hotel & Spa', 'Stellenbosch', 72),
+    (26, 'De Zalze Golf Club', 'Stellenbosch', 72),
+    (27, 'Devonvale Golf & Wine Estate', 'Stellenbosch', 72),
+    (28, 'Pearl Valley Golf Estate', 'Paarl', 72),
+    (29, 'Boschenmeer Golf Estate', 'Paarl', 72),
+    (30, 'Paarl Golf Club', 'Paarl', 72),
     (31, 'Kingswood Golf Estate', 'George', 72),
     (32, 'Fancourt Links', 'George', 73),
     (33, 'Fancourt Montagu', 'George', 72),

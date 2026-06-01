@@ -78,10 +78,14 @@ export default function App() {
   // Check if PWA install is available
   useEffect(() => {
     const check = () => setCanInstall(!!deferredPrompt);
+    const onInstalled = () => setCanInstall(false);
     check();
     window.addEventListener('beforeinstallprompt', check);
-    window.addEventListener('appinstalled', () => setCanInstall(false));
-    return () => { window.removeEventListener('beforeinstallprompt', check); };
+    window.addEventListener('appinstalled', onInstalled);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', check);
+      window.removeEventListener('appinstalled', onInstalled);
+    };
   }, []);
 
   const handleInstall = async () => {
@@ -96,9 +100,11 @@ export default function App() {
   const [toast, setToast] = useState<{ show: boolean; message: string; type: string }>({ show: false, message: '', type: 'success' });
   const { confirm: showConfirm, ConfirmDialogComponent } = useConfirm();
 
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const showToast = useCallback((message: string, type = 'success') => {
     setToast({ show: true, message, type });
-    setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
   }, []);
 
   const [isOnline, setIsOnline] = useState(typeof navigator === 'undefined' ? true : navigator.onLine);

@@ -133,6 +133,10 @@ export default function DashboardView({ activeSeason, leaderboardData, rounds, s
 
   const finesSorted = useMemo(() => [...leaderboardData].sort((a, b) => b.totalFines - a.totalFines), [leaderboardData]);
   const totalFinesPot = leaderboardData.reduce((acc, p) => acc + p.totalFines, 0);
+  // Denominator for the fines average: only rounds that have actually produced
+  // fines. Using rounds.length counts scheduled-but-unplayed rounds and so
+  // understates the average (and misreports the pot's round span).
+  const finedRoundsCount = rounds.filter(r => leaderboardData.some(p => (p.pScores[r.id]?.fines || 0) > 0)).length;
   const isCompletedSeason = !!activeSeason && !activeSeason.is_active;
   const medalLeader = leaderboardData[0];
   const sfLeader = stablefordSorted[0];
@@ -329,23 +333,22 @@ export default function DashboardView({ activeSeason, leaderboardData, rounds, s
 
         {/* Summary cards — always full width, 2 col on mobile, 3 col on desktop for balance */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
-          <div className="bg-red-50 rounded-xl p-4 text-center">
-            <p className="text-xs text-red-500 uppercase font-medium">Fines Pot</p>
-            <p className="text-2xl font-bold text-red-700 mt-1">R{totalFinesPot.toLocaleString()}</p>
-            <p className="text-xs text-red-400 mt-1">{rounds.length} rounds</p>
-          </div>
-          <div className="bg-slate-100 rounded-xl p-4 text-center">
-            <p className="text-xs text-slate-500 uppercase font-medium">Most Fines</p>
-            <p className="text-lg font-bold text-slate-700 mt-1 truncate">{finesSorted[0]?.name || '-'}</p>
-            <p className="text-xs text-slate-500 mt-1">R{finesSorted[0]?.totalFines?.toLocaleString() || '0'}</p>
-          </div>
-          <div className="bg-emerald-50 rounded-xl p-4 text-center col-span-2 md:col-span-1">
-            <p className="text-xs text-emerald-600 uppercase font-medium">Avg per Round</p>
-            <p className="text-2xl font-bold text-emerald-700 mt-1">
-              R{rounds.length > 0 ? Math.round(totalFinesPot / rounds.length).toLocaleString() : '0'}
+          <Card className="p-4 text-center">
+            <p className="text-xs text-slate-400 uppercase font-bold tracking-wide">Fines Pot</p>
+            <p className="text-2xl font-bold text-red-600 mt-1">R{totalFinesPot.toLocaleString()}</p>
+            <p className="text-xs text-slate-400 mt-1">{finedRoundsCount} {finedRoundsCount === 1 ? 'round' : 'rounds'}</p>
+          </Card>
+          <Card className="p-4 text-center">
+            <p className="text-xs text-slate-400 uppercase font-bold tracking-wide">Most Fines</p>
+            <p className="text-lg font-bold text-slate-800 mt-1 truncate">{finesSorted[0]?.name || '-'}</p>
+            <p className="text-xs text-slate-400 mt-1">R{finesSorted[0]?.totalFines?.toLocaleString() || '0'}</p>
+          </Card>
+          <Card className="p-4 text-center col-span-2 md:col-span-1">
+            <p className="text-xs text-slate-400 uppercase font-bold tracking-wide">Avg per Round</p>
+            <p className="text-2xl font-bold text-emerald-600 mt-1">
+              R{finedRoundsCount > 0 ? Math.round(totalFinesPot / finedRoundsCount).toLocaleString() : '0'}
             </p>
-            <p className="text-xs text-emerald-500 mt-1">across season</p>
-          </div>
+          </Card>
         </div>
 
         {/* Leaderboard + chart — stacked on mobile, side-by-side from md up */}

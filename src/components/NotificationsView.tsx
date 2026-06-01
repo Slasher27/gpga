@@ -12,7 +12,7 @@ export default function NotificationsView({ currentUser }: { currentUser: Player
 
   useEffect(() => {
     if (currentUser?.id) {
-      DB.getNotifications(currentUser.id).then(data => { setNotifications(data); setLoading(false); }).catch(() => setLoading(false));
+      DB.getNotifications().then(data => { setNotifications(data); setLoading(false); }).catch(() => setLoading(false));
     }
   }, [currentUser?.id]);
 
@@ -22,12 +22,12 @@ export default function NotificationsView({ currentUser }: { currentUser: Player
   };
 
   const handleMarkAllRead = async () => {
-    await DB.markAllNotificationsRead(currentUser.id);
+    await DB.markAllNotificationsRead();
     setNotifications(prev => prev.map(n => ({ ...n, read: 1 })));
   };
 
   const handleClearRead = async () => {
-    await DB.clearReadNotifications(currentUser.id);
+    await DB.clearReadNotifications();
     setNotifications(prev => prev.filter(n => !n.read));
   };
 

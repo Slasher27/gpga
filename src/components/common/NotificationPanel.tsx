@@ -23,7 +23,7 @@ export default function NotificationPanel({
   useEffect(() => {
     if (!playerId || !seasonId) return;
     let active = true;
-    const check = () => DB.checkNotifications(playerId, seasonId).then((d) => { if (active) setUnreadCount(d.count); }).catch(() => {});
+    const check = () => DB.checkNotifications(seasonId).then((d) => { if (active) setUnreadCount(d.count); }).catch(() => {});
     check();
     const interval = setInterval(check, 120000);
     return () => { active = false; clearInterval(interval); };
@@ -33,7 +33,7 @@ export default function NotificationPanel({
   useEffect(() => {
     if (!open || !playerId) return;
     let active = true;
-    DB.getNotifications(playerId).then((n) => { if (active) setNotifications(n); }).catch(() => {});
+    DB.getNotifications().then((n) => { if (active) setNotifications(n); }).catch(() => {});
     return () => { active = false; };
   }, [open, playerId, unreadCount]);
 
@@ -48,7 +48,7 @@ export default function NotificationPanel({
   };
 
   const handleMarkAllRead = async () => {
-    await DB.markAllNotificationsRead(playerId);
+    await DB.markAllNotificationsRead();
     setNotifications((prev) => prev.map((n) => ({ ...n, read: 1 })));
     setUnreadCount(0);
   };
@@ -75,7 +75,7 @@ export default function NotificationPanel({
                   <button onClick={handleMarkAllRead} className="text-xs text-emerald-600 font-medium hover:text-emerald-700">Mark all read</button>
                 )}
                 {notifications.some(n => n.read) && (
-                  <button onClick={async () => { await DB.clearReadNotifications(playerId); setNotifications(prev => prev.filter(n => !n.read)); }} className="text-xs text-slate-400 font-medium hover:text-slate-600">Clear read</button>
+                  <button onClick={async () => { await DB.clearReadNotifications(); setNotifications(prev => prev.filter(n => !n.read)); }} className="text-xs text-slate-400 font-medium hover:text-slate-600">Clear read</button>
                 )}
               </div>
             </div>

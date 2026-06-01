@@ -60,7 +60,7 @@ router.put('/:id', async (req, res) => {
 });
 
 router.delete('/:id', requireMaster, async (req, res) => {
-  await getClient().execute({ sql: 'DELETE FROM players WHERE id = ?', args: [req.params.id] });
+  await getClient().execute({ sql: 'DELETE FROM players WHERE id = ?', args: [String(req.params.id)] });
   res.json({ ok: true });
 });
 

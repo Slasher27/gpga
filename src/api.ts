@@ -617,28 +617,25 @@ export async function deleteTeam(id: number): Promise<OkResult> {
 // Notifications
 // ============================================================================
 
-export async function getNotifications(playerId: string): Promise<Notification[]> {
-  return request<Notification[]>(`/notifications?player_id=${playerId}`);
-}
-
-export async function getUnreadCount(playerId: string): Promise<{ count: number }> {
-  return request<{ count: number }>(`/notifications/unread-count?player_id=${playerId}`);
+// The server derives the player from the auth token, so these need no player id.
+export async function getNotifications(): Promise<Notification[]> {
+  return request<Notification[]>('/notifications');
 }
 
 export async function markNotificationRead(id: number): Promise<OkResult> {
   return request<OkResult>(`/notifications/${id}/read`, { method: 'PUT' });
 }
 
-export async function markAllNotificationsRead(playerId: string): Promise<OkResult> {
-  return request<OkResult>(`/notifications/read-all?player_id=${playerId}`, { method: 'PUT' });
+export async function markAllNotificationsRead(): Promise<OkResult> {
+  return request<OkResult>('/notifications/read-all', { method: 'PUT' });
 }
 
-export async function clearReadNotifications(playerId: string): Promise<OkResult> {
-  return request<OkResult>(`/notifications/clear-read?player_id=${playerId}`, { method: 'DELETE' });
+export async function clearReadNotifications(): Promise<OkResult> {
+  return request<OkResult>('/notifications/clear-read', { method: 'DELETE' });
 }
 
-export async function checkNotifications(playerId: string, seasonId: number): Promise<{ count: number }> {
-  return request<{ count: number }>(`/notifications/check?player_id=${playerId}&season_id=${seasonId}`);
+export async function checkNotifications(seasonId: number): Promise<{ count: number }> {
+  return request<{ count: number }>(`/notifications/check?season_id=${seasonId}`);
 }
 
 // ============================================================================

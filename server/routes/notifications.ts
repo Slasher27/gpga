@@ -4,55 +4,51 @@ import { notify } from '../notify.js';
 
 const router = Router();
 
+// All notification routes act on the authenticated player only — the player id
+// comes from the verified JWT (req.auth.sub set by requireAuth), never from a
+// client-supplied param, so one member can't read or alter another's feed.
+
 // Get player's notifications
 router.get('/', async (req, res) => {
-  const playerId = req.query.player_id;
-  if (!playerId) return res.status(400).json({ error: 'player_id required' });
+  const playerId = req.auth?.sub;
+  if (!playerId) return res.status(401).json({ error: 'Unauthorized' });
   const result = await getClient().execute({
     sql: 'SELECT * FROM notifications WHERE player_id = ? ORDER BY read ASC, created_at DESC LIMIT 50',
-    args: [playerId as string],
+    args: [playerId],
   });
   res.json(result.rows);
 });
 
-// Unread count
-router.get('/unread-count', async (req, res) => {
-  const playerId = req.query.player_id;
-  if (!playerId) return res.status(400).json({ error: 'player_id required' });
-  const result = await getClient().execute({
-    sql: 'SELECT COUNT(*) as count FROM notifications WHERE player_id = ? AND read = 0',
-    args: [playerId as string],
-  });
-  res.json({ count: Number(result.rows[0]?.count) || 0 });
-});
-
-// Mark one as read
+// Mark one as read (scoped to the owner so an id alone can't touch another feed)
 router.put('/:id/read', async (req, res) => {
-  await getClient().execute({ sql: 'UPDATE notifications SET read = 1 WHERE id = ?', args: [Number(req.params.id)] });
+  const playerId = req.auth?.sub;
+  if (!playerId) return res.status(401).json({ error: 'Unauthorized' });
+  await getClient().execute({ sql: 'UPDATE notifications SET read = 1 WHERE id = ? AND player_id = ?', args: [Number(req.params.id), playerId] });
   res.json({ ok: true });
 });
 
 // Mark all as read
 router.put('/read-all', async (req, res) => {
-  const playerId = req.query.player_id;
-  if (!playerId) return res.status(400).json({ error: 'player_id required' });
-  await getClient().execute({ sql: 'UPDATE notifications SET read = 1 WHERE player_id = ?', args: [playerId as string] });
+  const playerId = req.auth?.sub;
+  if (!playerId) return res.status(401).json({ error: 'Unauthorized' });
+  await getClient().execute({ sql: 'UPDATE notifications SET read = 1 WHERE player_id = ?', args: [playerId] });
   res.json({ ok: true });
 });
 
 // Clear all read notifications
 router.delete('/clear-read', async (req, res) => {
-  const playerId = req.query.player_id;
-  if (!playerId) return res.status(400).json({ error: 'player_id required' });
-  await getClient().execute({ sql: 'DELETE FROM notifications WHERE player_id = ? AND read = 1', args: [playerId as string] });
+  const playerId = req.auth?.sub;
+  if (!playerId) return res.status(401).json({ error: 'Unauthorized' });
+  await getClient().execute({ sql: 'DELETE FROM notifications WHERE player_id = ? AND read = 1', args: [playerId] });
   res.json({ ok: true });
 });
 
 // Check & generate time-based notifications, return unread count
 router.get('/check', async (req, res) => {
-  const playerId = req.query.player_id as string;
+  const playerId = req.auth?.sub;
   const seasonId = req.query.season_id;
-  if (!playerId || !seasonId) return res.status(400).json({ error: 'player_id and season_id required' });
+  if (!playerId) return res.status(401).json({ error: 'Unauthorized' });
+  if (!seasonId) return res.status(400).json({ error: 'season_id required' });
 
   const db = getClient();
 
