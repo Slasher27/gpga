@@ -72,7 +72,7 @@ export function useFines({
     if (!activeSeason) return;
     DB.getFineTypes(activeSeason.id).then(setFineTypes);
     DB.getSeasonPlayers(activeSeason.id).then((sp) => {
-      const cache = {};
+      const cache: BuyInCache = {};
       for (const p of sp) cache[p.player_id] = { isPaid: p.buy_in_paid, date: p.buy_in_date };
       setBuyInStatuses(cache);
     });

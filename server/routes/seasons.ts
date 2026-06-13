@@ -18,25 +18,21 @@ router.post('/', requireAdmin, async (req, res) => {
   const { year, name, buy_in_amount, is_active, medal_1st, medal_2nd, stableford_1st, stableford_2nd, team_1st } = req.body;
   const db = getClient();
 
-  if (is_active) {
-    await db.execute('UPDATE seasons SET is_active = 0');
-  }
-
-  const result = await db.execute({
+  const insert = {
     sql: 'INSERT INTO seasons (year, name, buy_in_amount, medal_1st, medal_2nd, stableford_1st, stableford_2nd, team_1st, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
     args: [year, name, buy_in_amount || 0, medal_1st || 0, medal_2nd || 0, stableford_1st || 0, stableford_2nd || 0, team_1st || 0, is_active ? 1 : 0]
-  });
+  };
 
-  res.status(201).json({ id: Number(result.lastInsertRowid) });
+  // Deactivate + insert atomically so a mid-way failure can't leave zero active seasons.
+  const stmts = is_active ? [{ sql: 'UPDATE seasons SET is_active = 0', args: [] }, insert] : [insert];
+  const results = await db.batch(stmts, 'write');
+
+  res.status(201).json({ id: Number(results[results.length - 1].lastInsertRowid) });
 });
 
 router.put('/:id', requireAdmin, async (req, res) => {
   const { id } = req.params;
   const db = getClient();
-
-  if (req.body.is_active) {
-    await db.execute('UPDATE seasons SET is_active = 0');
-  }
 
   const allowed = ['year', 'name', 'buy_in_amount', 'medal_1st', 'medal_2nd', 'stableford_1st', 'stableford_2nd', 'team_1st'];
   const fields: string[] = [];
@@ -50,10 +46,14 @@ router.put('/:id', requireAdmin, async (req, res) => {
   if (fields.length === 0) return res.status(400).json({ error: 'No valid fields' });
 
   values.push(Number(id));
-  await db.execute({
+  const update = {
     sql: `UPDATE seasons SET ${fields.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
     args: values
-  });
+  };
+
+  // Deactivate-all + update atomically so activating one can't leave zero active seasons.
+  const stmts = req.body.is_active ? [{ sql: 'UPDATE seasons SET is_active = 0', args: [] }, update] : [update];
+  await db.batch(stmts, 'write');
   res.json({ ok: true });
 });
 

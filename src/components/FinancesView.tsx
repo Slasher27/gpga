@@ -1,6 +1,6 @@
 import { useState, useEffect, type KeyboardEvent } from 'react';
 import { Plus, Trash2, ChevronDown, Edit, Save, X } from 'lucide-react';
-import type { Player, Round, Season, ScoresMapFull, FineType } from '../api';
+import type { Player, Round, Season, ScoresMapFull } from '../api';
 import { TabBar, Card, EmptyRow, formatDate, SubmitButton } from './common';
 import { useFines, calcFineTotal, type EditableFineType } from '../hooks/useFines';
 

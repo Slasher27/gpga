@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { Trophy, Eye, EyeOff } from 'lucide-react';
 import * as DB from '../api';
+import type { AuthedPlayer } from '../api';
 
-export default function LoginPage({ onLogin }) {
+export default function LoginPage({ onLogin }: { onLogin: (user: AuthedPlayer) => void }) {
   const [email, setEmail] = useState(() => localStorage.getItem('gpga_remembered_email') || '');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -10,7 +11,7 @@ export default function LoginPage({ onLogin }) {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(() => localStorage.getItem('gpga_remembered_email') !== null);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);

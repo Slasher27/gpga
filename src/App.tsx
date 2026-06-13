@@ -50,7 +50,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [view, setView] = useState(() => localStorage.getItem('gpga_current_view') || 'dashboard');
+  const [view, setView] = useState('dashboard');
   const [players, setPlayers] = useState<Player[]>([]);
   const [rounds, setRounds] = useState<Round[]>([]);
   const [scores, setScores] = useState<ScoresMapFull>({});
@@ -184,17 +184,17 @@ export default function App() {
   const currentUser = players.find(p => p.id === currentUserId) || players[0];
   const isReadOnlySeason = !!activeSeason && !activeSeason.is_active;
   const isAdmin = currentUser?.role === 'master' || currentUser?.role === 'admin';
-  const isMaster = currentUser?.role === 'master';
 
   const refreshFines = () => {
     DB.getPlayerFinesByRound().then(finesData => {
       setScores(prev => {
         // Reset all fines to 0, then apply fresh data
-        const reset = {};
+        const reset: ScoresMapFull = {};
         Object.keys(prev).forEach(pid => {
           reset[pid] = {};
           Object.keys(prev[pid]).forEach(rid => {
-            reset[pid][rid] = { ...prev[pid][rid], fines: 0 };
+            const r = Number(rid);
+            reset[pid][r] = { ...prev[pid][r], fines: 0 };
           });
         });
         return mergeScoresAndFines(reset, finesData);
@@ -260,18 +260,23 @@ export default function App() {
   const handleLogin = async (user: AuthedPlayer) => { setIsAuthenticated(true); setCurrentUserId(user.id); await loadData(); setupPush(user.id); };
   const handleLogout = () => { DB.logout(); setIsAuthenticated(false); setCurrentUserId('1'); setView('dashboard'); };
 
-  const setNavView = (id: string) => { setView(id); localStorage.setItem('gpga_current_view', id); };
+  const setNavView = (id: string) => setView(id);
 
   const handleSeasonSwitch = async (seasonId: number) => {
     const season = allSeasons.find(s => s.id === seasonId);
     if (!season) return;
     setActiveSeason(season);
-    const [roundsData, scoresData, finesData, seasonPlayersData] = await Promise.all([
-      DB.getAllRounds(season.id), DB.getAllScores(), DB.getPlayerFinesByRound(), DB.getSeasonPlayers(season.id)
-    ]);
-    setRounds(roundsData);
-    setSeasonPlayerIds(new Set(seasonPlayersData.map(sp => sp.player_id)));
-    setScores(mergeScoresAndFines(scoresData, finesData));
+    try {
+      const [roundsData, scoresData, finesData, seasonPlayersData] = await Promise.all([
+        DB.getAllRounds(season.id), DB.getAllScores(), DB.getPlayerFinesByRound(), DB.getSeasonPlayers(season.id)
+      ]);
+      setRounds(roundsData);
+      setSeasonPlayerIds(new Set(seasonPlayersData.map(sp => sp.player_id)));
+      setScores(mergeScoresAndFines(scoresData, finesData));
+    } catch (error) {
+      console.error('Failed to switch season:', error);
+      showToast('Failed to load season data', 'error');
+    }
   };
 
   const handleAddPlayer = async (e: FormEvent<HTMLFormElement>) => {
@@ -406,8 +411,6 @@ export default function App() {
     ...(isAdmin ? [{ id: 'settings', icon: <Settings size={20} />, label: 'Season Settings' }] : []),
   ];
 
-  const navProps = { view, setNavView, navItems, currentUser, activeSeason, allSeasons, handleSeasonSwitch, handleLogout, isAdmin };
-
   // --- Render ---
 
   return (
@@ -418,7 +421,7 @@ export default function App() {
           Offline — changes may not save
         </div>
       )}
-      <DesktopSidebar view={view} setNavView={setNavView} navItems={navItems} activeSeason={activeSeason} allSeasons={allSeasons} isAdmin={isAdmin} />
+      <DesktopSidebar view={view} setNavView={setNavView} navItems={navItems} activeSeason={activeSeason} />
       <MobileBottomNav view={view} setNavView={setNavView} navItems={navItems} />
 
       <main className="px-4 md:px-6 lg:px-8 pt-16 pb-28 landscape:pb-20 md:pb-8 md:ml-16 lg:ml-56">
@@ -427,7 +430,7 @@ export default function App() {
           {view === 'fines' && <FinancesView rounds={rounds} scores={scores} players={seasonPlayers} activeSeason={activeSeason} isReadOnlySeason={isReadOnlySeason} currentUser={currentUser} showToast={showToast} onAddFineType={() => setIsAddFineTypeModalOpen(true)} onDeleteFineType={handleDeleteFineType} onFinesChanged={refreshFines} fineTypesVersion={fineTypesVersion} />}
           {view === 'rounds' && <RoundsView rounds={rounds} scores={scores} setScores={setScores} players={players} activeSeason={activeSeason} isReadOnlySeason={isReadOnlySeason} isAdmin={isAdmin} showToast={showToast} onAddRound={() => setIsAddRoundModalOpen(true)} onEditRound={handleEditRound} onDeleteRound={handleDeleteRound} onCloseRound={handleCloseRound} />}
           {view === 'teamdraw' && isAdmin && <TeamDrawPage players={players} activeSeason={activeSeason} />}
-          {view === 'admin' && isAdmin && !managingPlayerId && <PlayersView players={players} scores={scores} rounds={rounds} activeSeason={activeSeason} isReadOnlySeason={isReadOnlySeason} currentUser={currentUser} showToast={showToast} showConfirm={showConfirm} setPlayers={setPlayers} onAddPlayer={() => setIsAddPlayerModalOpen(true)} managingPlayerId={managingPlayerId} setManagingPlayerId={setManagingPlayerId} />}
+          {view === 'admin' && isAdmin && !managingPlayerId && <PlayersView players={players} scores={scores} rounds={rounds} activeSeason={activeSeason} isReadOnlySeason={isReadOnlySeason} currentUser={currentUser} showToast={showToast} onAddPlayer={() => setIsAddPlayerModalOpen(true)} managingPlayerId={managingPlayerId} setManagingPlayerId={setManagingPlayerId} />}
           {view === 'admin' && isAdmin && managingPlayerId && <PlayerProfilePage players={players} setPlayers={setPlayers} scores={scores} rounds={rounds} activeSeason={activeSeason} currentUser={currentUser} managingPlayerId={managingPlayerId} setManagingPlayerId={setManagingPlayerId} showToast={showToast} />}
           {view === 'profile' && <ProfileView currentUser={currentUser} players={players} setPlayers={setPlayers} scores={scores} rounds={rounds} activeSeason={activeSeason} showToast={showToast} />}
           {view === 'notifications' && <NotificationsView currentUser={currentUser} />}

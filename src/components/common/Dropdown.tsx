@@ -13,7 +13,7 @@ export default function Dropdown<T extends string | number = string>({
   onChange,
   className = '',
 }: {
-  value: T;
+  value?: T;
   options: DropdownOption<T>[];
   onChange: (v: T) => void;
   className?: string;

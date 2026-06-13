@@ -2,7 +2,7 @@ import { useState, useEffect, type FormEvent, type ChangeEvent, type Dispatch, t
 import { Save, Camera, Mail, Bell } from 'lucide-react';
 import * as DB from '../api';
 import type { Player, Season, ScoresMapFull, Round, PlayerUpdate, BuyInStatus, FinesSummary } from '../api';
-import { TabBar, Avatar, PlayerRoundsTable, FinesSummaryCards, StatsGrid, usePlayerStats, Card, SubmitButton } from './common';
+import { TabBar, PlayerRoundsTable, FinesSummaryCards, StatsGrid, usePlayerStats, Card, SubmitButton } from './common';
 
 interface ProfileViewProps {
   currentUser: Player;

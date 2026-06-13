@@ -126,12 +126,13 @@ router.put('/:id/close', requireAdmin, async (req, res) => {
   // Notify all season players
   const seasonId = Number(round.season_id);
   const playerIds = await getSeasonPlayerIds(seasonId);
-  await notify({
+  // Fire-and-forget — the round is already closed; a notify failure must not 500 the request.
+  notify({
     playerIds, type: 'round_closed', roundId,
     title: `Results: ${round.name}`,
     body: body.trim(),
     email: true, push: true,
-  });
+  }).catch(() => {});
 
   res.json({ ok: true });
 });

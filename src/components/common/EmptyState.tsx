@@ -75,37 +75,3 @@ export const NoPlayersEmptyState: React.FC<{ onAddPlayer?: () => void }> = ({ on
   />
 );
 
-export const NoRoundsEmptyState: React.FC<{ onAddRound?: () => void }> = ({ onAddRound }) => (
-  <EmptyState
-    type="rounds"
-    title="No Rounds Scheduled"
-    description="Create your first round to start tracking scores. Select a golf course, set a date, and invite players to compete."
-    actionLabel={onAddRound ? "Create First Round" : undefined}
-    onAction={onAddRound}
-  />
-);
-
-export const NoScoresEmptyState: React.FC = () => (
-  <EmptyState
-    type="scores"
-    title="No Scores Recorded"
-    description="Scores will appear here once players complete rounds. The leaderboard will update automatically as scores are entered."
-  />
-);
-
-export const NoFinesEmptyState: React.FC<{ onAddFine?: () => void }> = ({ onAddFine }) => (
-  <EmptyState
-    type="fines"
-    title="No Fines Assigned"
-    description="No fines have been assigned for this round yet. Select a player and fine type to get started."
-    actionLabel={onAddFine ? "Assign Fine" : undefined}
-    onAction={onAddFine}
-  />
-);
-
-export const NoSearchResultsEmptyState: React.FC<{ searchTerm: string }> = ({ searchTerm }) => (
-  <EmptyState
-    title="No Results Found"
-    description={`We couldn't find anything matching "${searchTerm}". Try adjusting your search terms.`}
-  />
-);

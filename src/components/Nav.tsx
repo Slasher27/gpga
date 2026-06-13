@@ -1,9 +1,40 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, type ReactNode } from 'react';
 import { Trophy, LogOut, Download, EllipsisVertical } from 'lucide-react';
 import { Avatar, Dropdown, NotificationPanel, useDismiss } from './common';
+import type { Player, Season } from '../api';
+
+export interface NavItem {
+  id: string;
+  icon: ReactNode;
+  label: string;
+}
+
+interface TopBarProps {
+  currentUser: Player;
+  activeSeason: Season | null;
+  allSeasons: Season[];
+  handleSeasonSwitch: (seasonId: number) => void;
+  handleLogout: () => void;
+  setNavView: (id: string) => void;
+  canInstall: boolean;
+  onInstall: () => void;
+}
+
+interface SidebarProps {
+  view: string;
+  setNavView: (id: string) => void;
+  navItems: NavItem[];
+  activeSeason: Season | null;
+}
+
+interface MobileNavProps {
+  view: string;
+  setNavView: (id: string) => void;
+  navItems: NavItem[];
+}
 
 // Top bar — desktop: offset by sidebar width. Mobile: full width.
-export function TopBar({ currentUser, activeSeason, allSeasons, handleSeasonSwitch, handleLogout, setNavView, canInstall, onInstall }) {
+export function TopBar({ currentUser, activeSeason, allSeasons, handleSeasonSwitch, handleLogout, setNavView, canInstall, onInstall }: TopBarProps) {
   return (
     <div className="fixed top-0 right-0 left-0 md:left-16 lg:left-56 bg-white border-b border-slate-200 z-30 px-4 md:px-6 py-2 flex items-center justify-between h-14">
       {/* Mobile logo */}
@@ -28,7 +59,7 @@ export function TopBar({ currentUser, activeSeason, allSeasons, handleSeasonSwit
             <span className="hidden sm:inline">Install</span>
           </button>
         )}
-        <NotificationPanel playerId={currentUser?.id} seasonId={activeSeason?.id} onViewAll={() => setNavView('notifications')} />
+        <NotificationPanel playerId={currentUser?.id} seasonId={activeSeason?.id ?? null} onViewAll={() => setNavView('notifications')} />
         <button onClick={() => setNavView('profile')} className="p-1 rounded-full hover:ring-2 hover:ring-emerald-200 transition-all" aria-label="Profile">
           <Avatar src={currentUser?.avatar} name={currentUser?.name || '?'} size="sm" />
         </button>
@@ -41,7 +72,7 @@ export function TopBar({ currentUser, activeSeason, allSeasons, handleSeasonSwit
 }
 
 // Side nav — slim icon rail on tablet (md), full labelled sidebar on desktop (lg+).
-export function DesktopSidebar({ view, setNavView, navItems, activeSeason, allSeasons, isAdmin }) {
+export function DesktopSidebar({ view, setNavView, navItems, activeSeason }: SidebarProps) {
   return (
     <div className="hidden md:flex md:w-16 lg:w-56 bg-white border-r border-slate-200 flex-col h-full fixed left-0 top-0 z-40 overflow-y-auto">
       <div className="p-3 lg:p-5 pb-4">
@@ -69,14 +100,14 @@ export function DesktopSidebar({ view, setNavView, navItems, activeSeason, allSe
 
 // Mobile bottom tab bar. Up to 4 primary tabs; any extra (role-dependent)
 // collapse into a ⋮ "More" drop-up so nothing becomes unreachable on phones.
-export function MobileBottomNav({ view, setNavView, navItems }) {
+export function MobileBottomNav({ view, setNavView, navItems }: MobileNavProps) {
   const [moreOpen, setMoreOpen] = useState(false);
   const hasOverflow = navItems.length > 5;
   const primary = hasOverflow ? navItems.slice(0, 4) : navItems.slice(0, 5);
   const overflow = hasOverflow ? navItems.slice(4) : [];
   const moreActive = overflow.some(i => i.id === view);
 
-  const go = (id) => { setNavView(id); setMoreOpen(false); };
+  const go = (id: string) => { setNavView(id); setMoreOpen(false); };
   useDismiss(useCallback(() => setMoreOpen(false), []), moreOpen);
 
   return (

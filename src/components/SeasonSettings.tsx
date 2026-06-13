@@ -1,5 +1,5 @@
 import { useState, useEffect, type FormEvent, type ChangeEvent } from 'react';
-import { Plus, Trash2, Save, X, UserPlus } from 'lucide-react';
+import { Plus, Trash2, Save, UserPlus } from 'lucide-react';
 import * as DB from '../api';
 import type { Season, Player, SeasonPlayer, SeasonUpdate, Round } from '../api';
 import { TabBar, Card, SubmitButton } from './common';

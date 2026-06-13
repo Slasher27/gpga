@@ -38,7 +38,6 @@ body {
   .btn-primary  { @apply bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700; }
   .btn-ghost    { @apply bg-transparent border-transparent hover:bg-slate-100 text-slate-700; }
   .btn-error    { @apply bg-red-600 text-white border-red-600 hover:bg-red-700; }
-  .btn-warning  { @apply bg-amber-500 text-white border-amber-500 hover:bg-amber-600; }
   .btn-xs       { @apply px-2 py-1 text-xs min-h-0; }
   .btn-sm       { @apply px-3 py-1.5 text-sm min-h-0; }
   .btn-circle   { @apply rounded-full aspect-square p-0; }
@@ -93,24 +92,13 @@ body {
   .badge-error   { @apply bg-red-100 text-red-700; }
 
   .toast     { @apply fixed flex flex-col gap-2 pointer-events-none; }
-  .toast-top { @apply top-4; }
   .toast-end { @apply right-4; }
   .toast > * { @apply pointer-events-auto; }
 
   .form-control { @apply flex flex-col gap-1; }
   .label        { @apply flex flex-col; }
-  .label-text   { @apply text-sm text-slate-700; }
 
   .card         { @apply bg-white rounded-xl; }
-  .text-error   { @apply text-red-600; }
-
-  /* focus:input-primary and focus:select-primary were used on a few inputs —
-     the existing input/select :focus rules already handle the emerald border. */
-  .focus\:input-primary:focus,
-  .focus-within\:input-primary:focus-within,
-  .focus\:select-primary:focus {
-    border-color: rgb(16 185 129);
-  }
 }
 
 /* Consistent styling for ALL inputs across the entire app */

@@ -2,7 +2,7 @@ import { useState, useEffect, type FormEvent, type ChangeEvent, type Dispatch, t
 import { Save, Camera, ChevronDown, Trash2 } from 'lucide-react';
 import * as DB from '../api';
 import type { Player, Season, ScoresMapFull, Round, Role, Status, PlayerUpdate, BuyInStatus, FinesSummary } from '../api';
-import { TabBar, Avatar, PlayerRoundsTable, FinesSummaryCards, StatsGrid, usePlayerStats, Card, useConfirm, SubmitButton } from './common';
+import { TabBar, PlayerRoundsTable, FinesSummaryCards, StatsGrid, usePlayerStats, Card, useConfirm, SubmitButton } from './common';
 
 const badgeStyles: Record<string, string> = {
   neutral: 'badge badge-ghost badge-sm',

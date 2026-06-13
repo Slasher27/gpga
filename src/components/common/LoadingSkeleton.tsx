@@ -33,7 +33,7 @@ export const LoadingSkeleton: React.FC<LoadingSkeletonProps> = ({
     return (
       <div className={`space-y-4 ${className}`}>
         {skeletons.map((_, i) => (
-          <div key={i} className="card bg-base-100 border border-slate-200 p-6">
+          <div key={i} className="card border border-slate-200 p-6">
             <div className="h-6 bg-slate-200 rounded animate-pulse w-1/3 mb-4" />
             <div className="space-y-2">
               <div className="h-4 bg-slate-200 rounded animate-pulse w-full" />
@@ -114,7 +114,7 @@ export const DashboardSkeleton: React.FC = () => (
     {/* Stats Cards Skeleton */}
     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
       {[1, 2, 3, 4].map((i) => (
-        <div key={i} className="card bg-base-100 border border-slate-200 p-4">
+        <div key={i} className="card border border-slate-200 p-4">
           <div className="h-3 bg-slate-200 rounded animate-pulse w-24 mb-2" />
           <div className="h-8 bg-slate-200 rounded animate-pulse w-16" />
         </div>
@@ -123,15 +123,5 @@ export const DashboardSkeleton: React.FC = () => (
 
     {/* Leaderboard Skeleton */}
     <LoadingSkeleton type="table" count={8} />
-  </div>
-);
-
-// Composite skeleton for form
-export const FormSkeleton: React.FC = () => (
-  <div className="space-y-4">
-    <div className="h-10 bg-slate-200 rounded animate-pulse w-full" />
-    <div className="h-10 bg-slate-200 rounded animate-pulse w-full" />
-    <div className="h-10 bg-slate-200 rounded animate-pulse w-full" />
-    <div className="h-10 bg-slate-200 rounded animate-pulse w-32" />
   </div>
 );

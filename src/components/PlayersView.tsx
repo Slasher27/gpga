@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, type Dispatch, type SetStateAction } from
 import { Plus, Save, Edit, Trash2, ChevronDown } from 'lucide-react';
 import * as DB from '../api';
 import type { Player, Team, Season, Round, ScoresMapFull } from '../api';
-import { NoPlayersEmptyState, Avatar, Card, SubmitButton } from './common';
+import { NoPlayersEmptyState, Card, SubmitButton } from './common';
 
 type BuyInCache = Record<string, { isPaid: boolean; date: string | null }>;
 
@@ -218,8 +218,6 @@ interface PlayersViewProps {
   isReadOnlySeason: boolean;
   currentUser: Player;
   showToast: (msg: string, type?: string) => void;
-  showConfirm: (title: string, message: string, onConfirm: () => void) => void;
-  setPlayers: Dispatch<SetStateAction<Player[]>>;
   onAddPlayer: () => void;
   managingPlayerId: string | null;
   setManagingPlayerId: Dispatch<SetStateAction<string | null>>;
@@ -227,9 +225,6 @@ interface PlayersViewProps {
 
 export default function PlayersView({ players, scores, rounds, activeSeason, isReadOnlySeason, currentUser, showToast, onAddPlayer, setManagingPlayerId }: PlayersViewProps) {
   const [adminTab, setAdminTab] = useState('players');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [sortBy, setSortBy] = useState('name');
   const [teamsList, setTeamsList] = useState<Team[]>([]);
   const [isAddingTeam, setIsAddingTeam] = useState(false);
   const [buyInStatusCache, setBuyInStatusCache] = useState<BuyInCache>({});
@@ -276,26 +271,10 @@ export default function PlayersView({ players, scores, rounds, activeSeason, isR
     });
   }, [players, scores, rounds]);
 
-  const filteredPlayers = useMemo(() => {
-    let filtered = playersWithStats.filter(p => {
-      const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           p.email.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesStatus = statusFilter === 'all' || p.status === statusFilter;
-      return matchesSearch && matchesStatus;
-    });
-
-    filtered.sort((a, b) => {
-      switch (sortBy) {
-        case 'name': return a.name.localeCompare(b.name);
-        case 'rounds': return b.roundsPlayed - a.roundsPlayed;
-        case 'fines': return b.totalFines - a.totalFines;
-        case 'avg': return a.avgScore - b.avgScore;
-        default: return 0;
-      }
-    });
-
-    return filtered;
-  }, [playersWithStats, searchTerm, statusFilter, sortBy]);
+  const filteredPlayers = useMemo(
+    () => [...playersWithStats].sort((a, b) => a.name.localeCompare(b.name)),
+    [playersWithStats],
+  );
 
   return (
     <div className="space-y-4 animate-in fade-in duration-300">
@@ -346,10 +325,8 @@ export default function PlayersView({ players, scores, rounds, activeSeason, isR
 
       {/* Players Tab */}
       {adminTab === 'players' && <>
-        {filteredPlayers.length === 0 && players.length === 0 ? (
+        {filteredPlayers.length === 0 ? (
           <NoPlayersEmptyState onAddPlayer={onAddPlayer} />
-        ) : filteredPlayers.length === 0 ? (
-          <div className="text-center py-12 text-slate-400">No players match your search.</div>
         ) : (
           <Card>
             <div className="divide-y divide-slate-100">
