@@ -1,7 +1,7 @@
 export { LoadingSkeleton, DashboardSkeleton } from './LoadingSkeleton';
 export { ConfirmDialog, useConfirm } from './ConfirmDialog';
 export { EmptyState, NoPlayersEmptyState } from './EmptyState';
-export { TabBar, Avatar, PlayerRoundsTable, FinesSummaryCards, StatsGrid, CourseSelector, usePlayerStats, timeAgo, formatDate, EmptyRow } from './SharedUI';
+export { TabBar, Avatar, PlayerRoundsTable, FinesSummaryCards, StatsGrid, CourseSelector, usePlayerStats, timeAgo, formatDate, EmptyRow, fileToAvatarDataUrl } from './SharedUI';
 export { default as Modal } from './Modal';
 export { default as DatePicker } from './DatePicker';
 export { default as Card } from './Card';

@@ -2,7 +2,7 @@ import { useState, useEffect, type FormEvent, type ChangeEvent, type Dispatch, t
 import { Save, Camera, Mail, Bell } from 'lucide-react';
 import * as DB from '../api';
 import type { Player, Season, ScoresMapFull, Round, PlayerUpdate, BuyInStatus, FinesSummary } from '../api';
-import { TabBar, PlayerRoundsTable, FinesSummaryCards, StatsGrid, usePlayerStats, Card, SubmitButton } from './common';
+import { TabBar, PlayerRoundsTable, FinesSummaryCards, StatsGrid, usePlayerStats, Card, SubmitButton, fileToAvatarDataUrl } from './common';
 
 interface ProfileViewProps {
   currentUser: Player;
@@ -65,20 +65,16 @@ export default function ProfileView({ currentUser, setPlayers, scores, rounds, a
     }
   };
 
-  const handleAvatarUpload = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 500000) {
-      showToast("File too large for browser storage. Please use a smaller image (<500kb).", "error");
-      return;
-    }
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-      const avatar = reader.result as string;
+    try {
+      const avatar = await fileToAvatarDataUrl(file);
       await DB.updatePlayer(currentUser.id, { avatar });
       setPlayers(prev => prev.map(p => p.id === currentUser.id ? { ...p, avatar } : p));
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Could not process that image', 'error');
+    }
   };
 
   const profileTabs = [

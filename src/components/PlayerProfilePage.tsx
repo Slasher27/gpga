@@ -2,7 +2,7 @@ import { useState, useEffect, type FormEvent, type ChangeEvent, type Dispatch, t
 import { Save, Camera, ChevronDown, Trash2 } from 'lucide-react';
 import * as DB from '../api';
 import type { Player, Season, ScoresMapFull, Round, Role, Status, PlayerUpdate, BuyInStatus, FinesSummary } from '../api';
-import { TabBar, PlayerRoundsTable, FinesSummaryCards, StatsGrid, usePlayerStats, Card, useConfirm, SubmitButton } from './common';
+import { TabBar, PlayerRoundsTable, FinesSummaryCards, StatsGrid, usePlayerStats, Card, useConfirm, SubmitButton, fileToAvatarDataUrl } from './common';
 
 const badgeStyles: Record<string, string> = {
   neutral: 'badge badge-ghost badge-sm',
@@ -103,13 +103,14 @@ export default function PlayerProfilePage({ players, setPlayers, scores, rounds,
     );
   };
 
-  const handleAvatarChange = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarChange = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 500000) { showToast('Image too large. Max 500KB.', 'error'); return; }
-    const reader = new FileReader();
-    reader.onloadend = () => setAvatarPreview(reader.result as string);
-    reader.readAsDataURL(file);
+    try {
+      setAvatarPreview(await fileToAvatarDataUrl(file));
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Could not process that image', 'error');
+    }
   };
 
   // Editing player details (name/email/password/status/role) is master-only.

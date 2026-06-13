@@ -74,6 +74,42 @@ export const Avatar = ({ src, name, size = 'md' }: { src?: string | null; name: 
   );
 };
 
+// --- fileToAvatarDataUrl ---
+// Avatars are stored inline in the players row and refetched on every load, so a
+// raw phone photo (hundreds of KB) would bloat every players fetch. Downscale to a
+// small JPEG thumbnail (longest side <= `max`px) before saving — typically a few KB.
+// Rendered with object-cover in a circle, so plain aspect-preserving downscale is enough.
+export async function fileToAvatarDataUrl(file: File, max = 128, quality = 0.82): Promise<string> {
+  if (!file.type.startsWith('image/')) throw new Error('That file is not an image');
+  if (file.size > 15_000_000) throw new Error('Image is too large (max 15MB)');
+
+  const original = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error('Could not read image'));
+    reader.readAsDataURL(file);
+  });
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error('Could not load image'));
+    image.src = original;
+  });
+
+  const scale = Math.min(1, max / Math.max(img.width, img.height));
+  const w = Math.max(1, Math.round(img.width * scale));
+  const h = Math.max(1, Math.round(img.height * scale));
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return original; // canvas unsupported — keep the original rather than fail
+  ctx.fillStyle = '#fff'; // JPEG has no alpha; flatten any transparency to white
+  ctx.fillRect(0, 0, w, h);
+  ctx.drawImage(img, 0, 0, w, h);
+  return canvas.toDataURL('image/jpeg', quality);
+}
+
 // --- PlayerRoundsTable ---
 type PlayerScoreMap = Record<number, { strokes?: number; handicap?: number; stableford?: number }>;
 
