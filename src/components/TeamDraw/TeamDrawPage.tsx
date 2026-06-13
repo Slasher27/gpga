@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { RefreshCw } from 'lucide-react';
 import * as DB from '../../api';
 import type { Player, Season } from '../../api';
 import { Card, useConfirm } from '../common';
@@ -44,6 +45,9 @@ export default function TeamDrawPage({
   const [revealStep, setRevealStep] = useState(0); // player-slots locked (0..8)
   const [auto, setAuto] = useState(true);
   const [gateOpen, setGateOpen] = useState(true);
+  const [resetting, setResetting] = useState(false); // brief spin so the reset visibly registers
+  const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (resetTimer.current) clearTimeout(resetTimer.current); }, []);
 
   const { confirm, ConfirmDialogComponent } = useConfirm();
 
@@ -128,6 +132,16 @@ export default function TeamDrawPage({
     setPhase('idle');
   };
 
+  // Start fresh from the idle screen — wipe any saved/lingering draw so the next
+  // run is a clean slate. (A real page reload would restore the saved draw, so
+  // a soft reset is the correct "refresh" here.)
+  const handleRefresh = () => {
+    clearDraw();
+    setResetting(true);
+    if (resetTimer.current) clearTimeout(resetTimer.current);
+    resetTimer.current = setTimeout(() => setResetting(false), 600);
+  };
+
   const handleClear = () =>
     confirm(
       'Clear the draw?',
@@ -209,20 +223,29 @@ export default function TeamDrawPage({
             <p className="text-sm text-slate-500 mb-6">
               8 players · 2 four-balls · 4 cart partnerships
             </p>
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
+              <button
+                type="button"
+                onClick={handleRefresh}
+                aria-label="Reset draw"
+                title="Start fresh — clears the last saved draw"
+                className="inline-flex items-center justify-center bg-slate-100 text-slate-500 px-4 rounded-lg hover:bg-slate-200 transition-colors min-h-[48px] min-w-[48px]"
+              >
+                <RefreshCw size={18} className={resetting ? 'animate-spin' : ''} />
+              </button>
               <button
                 type="button"
                 onClick={() => startDraw(true)}
-                className="bg-emerald-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-emerald-700 transition-colors min-h-[48px]"
+                className="w-full sm:w-auto bg-emerald-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-emerald-700 transition-colors min-h-[48px]"
               >
-                Start the Draw
+                Draw All Teams
               </button>
               <button
                 type="button"
                 onClick={() => startDraw(false)}
-                className="bg-slate-100 text-slate-600 px-6 py-3 rounded-lg font-semibold hover:bg-slate-200 transition-colors min-h-[48px]"
+                className="w-full sm:w-auto bg-slate-100 text-slate-600 px-6 py-3 rounded-lg font-semibold hover:bg-slate-200 transition-colors min-h-[48px]"
               >
-                Manual Reveal
+                Single Team Draw
               </button>
             </div>
           </div>
