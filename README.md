@@ -45,25 +45,40 @@ node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
 
 ```text
 src/
-  App.tsx              — shell, routing, auth guard
-  api.ts               — typed API client (talks to /api)
+  App.tsx              — shell, routing, auth guard, leaderboard
+  api.ts               — typed API client + all shared types (talks to /api)
   hooks/useFines.ts    — fines data layer
   components/
-    common/            — Card, Modal, TabBar, DatePicker, Dropdown, SharedUI
+    common/            — Card, Modal, TabBar, DatePicker, Dropdown, SubmitButton, useDismiss, SharedUI (Avatar + helpers)
+    TeamDraw/          — day-of-round playing-group draw (transient, localStorage-only)
     DashboardView.tsx  — Medal/Stableford/Teams tabs + Fines section
     FinancesView.tsx   — Start Fines / Fine Sheet / History / Payments
     RoundsView.tsx     — rounds list + scoring
-    PlayersView.tsx    — master-only roster management
+    PlayersView.tsx    — roster + fixed season-teams management
     SeasonSettings.tsx — buy-in, prize pool, season creation
     PlayerProfilePage.tsx, ProfileView.tsx, NotificationsView.tsx, LoginPage.tsx, Nav.tsx
 server/
-  index.ts             — Express app (local dev)
-  db.ts                — Turso client + schema + migrations
+  app.ts               — createApp(): shared Express bootstrap — register new routers HERE
+  index.ts             — local dev entry (initSchema + seed, then listen); uses app.ts
+  db.ts                — Turso client + schema + idempotent migrations + course list
+  seed.ts              — seedDatabase() initial data
   notify.ts            — unified email + push + in-app notifications
   auth-middleware.ts   — bcrypt, JWT, requireAuth/requireAdmin/requireMaster
   routes/              — per-resource routers
 api/
-  index.ts             — Vercel serverless wrapper
+  index.ts             — Vercel serverless entry; uses app.ts (lazy init on cold start)
+```
+
+> Both `server/index.ts` and `api/index.ts` build the app via `server/app.ts`'s `createApp()` — add a new router in **one** place.
+
+## Checks
+
+Keep all three green before pushing:
+
+```bash
+npx tsc -b        # types — strict, noImplicitAny + noUnused, covers src + server + api
+npm run lint      # eslint (tsx + jsx-a11y) — target 0 warnings
+npm run build     # vite production build + PWA
 ```
 
 ## Deploy

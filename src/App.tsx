@@ -225,19 +225,22 @@ export default function App() {
 
   const leaderboardData = useMemo<LeaderboardEntry[]>(() => {
     const totalRoundsCreated = rounds.length;
+    const closedRoundsCount = rounds.filter(r => r.closed).length;
     return seasonPlayers.map((player): LeaderboardEntry => {
       const pScores = scores[player.id] || {};
-      let totalStrokes = 0, totalStableford = 0, totalFines = 0, roundsPlayed = 0, worstRound = 0, worstStableford = 999;
+      let totalStrokes = 0, totalStableford = 0, totalFines = 0, roundsPlayed = 0, closedRoundsPlayed = 0, worstRound = 0, worstStableford = 999;
       rounds.forEach(r => {
         if (pScores[r.id]) {
           const s = pScores[r.id].strokes || 0;
           const sf = pScores[r.id].stableford || 0;
           totalFines += pScores[r.id].fines || 0;
-          if (s > 0) { totalStrokes += s; totalStableford += sf; roundsPlayed++; if (s > worstRound) worstRound = s; if (sf < worstStableford) worstStableford = sf; }
+          if (s > 0) { totalStrokes += s; totalStableford += sf; roundsPlayed++; if (r.closed) closedRoundsPlayed++; if (s > worstRound) worstRound = s; if (sf < worstStableford) worstStableford = sf; }
         }
       });
-      const roundsMissed = totalRoundsCreated - roundsPlayed;
-      const isDisqualified = roundsMissed > 1;
+      // Missed rounds only count once a round is closed; DQ (played < 8 of 9)
+      // is only decided once the full season's rounds are closed.
+      const roundsMissed = closedRoundsCount - closedRoundsPlayed;
+      const isDisqualified = closedRoundsCount >= SEASON_ROUNDS && roundsMissed > 1;
       const canDropWorstRound = totalRoundsCreated >= SEASON_ROUNDS && roundsPlayed === totalRoundsCreated;
       const netTotal = canDropWorstRound ? totalStrokes - worstRound : totalStrokes;
       const netStableford = canDropWorstRound ? totalStableford - worstStableford : totalStableford;
