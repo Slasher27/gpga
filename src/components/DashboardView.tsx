@@ -112,18 +112,33 @@ export default function DashboardView({ activeSeason, leaderboardData, rounds, s
 
   const teamLeaderboard = useMemo(() => {
     if (!teamsData.length || !rounds.length) return [];
+    // Teams comp only: an absent teammate is credited with the day's lowest
+    // stableford minus 2 points. Individual standings are unaffected (there a
+    // miss consumes the player's worst-round drop instead).
+    const substitute: Record<number, number> = {};
+    rounds.forEach(r => {
+      const daySf = players.flatMap(p => {
+        const s = scores[p.id]?.[r.id];
+        return s && (s.strokes ?? 0) > 0 ? [s.stableford || 0] : [];
+      });
+      if (daySf.length > 0) substitute[r.id] = Math.min(...daySf) - 2;
+    });
     return teamsData.map(team => {
-      const p1 = scores[team.player1_id] || {}, p2 = scores[team.player2_id] || {};
       let total = 0;
       const roundTotals: Record<number, number> = {};
       rounds.forEach(r => {
-        const combined = (p1[r.id]?.stableford || 0) + (p2[r.id]?.stableford || 0);
+        const sfFor = (pid: string) => {
+          const s = scores[pid]?.[r.id];
+          if (s && (s.strokes ?? 0) > 0) return s.stableford || 0;
+          return substitute[r.id] ?? 0; // round happened but this player missed it
+        };
+        const combined = sfFor(team.player1_id) + sfFor(team.player2_id);
         roundTotals[r.id] = combined;
         total += combined;
       });
       return { ...team, roundTotals, total };
     }).sort((a, b) => b.total - a.total);
-  }, [teamsData, scores, rounds]);
+  }, [teamsData, scores, rounds, players]);
 
   const stablefordSorted = useMemo(() => [...leaderboardData].sort((a, b) => {
     if (a.isDisqualified && !b.isDisqualified) return 1;

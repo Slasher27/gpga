@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense, type FormEvent } from 'react';
 import { TrendingUp, Banknote, Calendar, Users, Plus, Save, Shuffle, Settings } from 'lucide-react';
 import * as DB from './api';
-import { SEASON_ROUNDS } from './api';
 import type {
   Player, Round, Season, GolfCourse, ScoresMapFull, FinesByRound,
   LeaderboardEntry, AuthedPlayer, Role, Status,
@@ -22,9 +21,7 @@ const SeasonSettings = lazy(() => import('./components/SeasonSettings'));
 const NotificationsView = lazy(() => import('./components/NotificationsView'));
 const TeamDrawPage = lazy(() => import('./components/TeamDraw/TeamDrawPage'));
 
-// SEASON_ROUNDS imported from ./api — the worst round is only dropped once the
-// full season exists and the player completed all of it (never mid-season).
-const mergeScoresAndFines = (scoresData: ScoresMapFull, finesData: FinesByRound): ScoresMapFull => {
+const mergeScoresAndFines =(scoresData: ScoresMapFull, finesData: FinesByRound): ScoresMapFull => {
   const merged: ScoresMapFull = { ...scoresData };
   for (const pid of Object.keys(finesData)) {
     if (!merged[pid]) merged[pid] = {};
@@ -232,24 +229,32 @@ export default function App() {
   );
 
   const leaderboardData = useMemo<LeaderboardEntry[]>(() => {
-    const totalRoundsCreated = rounds.length;
-    const closedRoundsCount = rounds.filter(r => r.closed).length;
+    // Rounds that have actually happened: closed, or with at least one score
+    // recorded — admins often close a round days later (fines night), and the
+    // missed/drop logic below must not wait for that.
+    const happenedIds = new Set(
+      rounds.filter(r => r.closed || Object.values(scores).some(ps => (ps[r.id]?.strokes ?? 0) > 0)).map(r => r.id),
+    );
     return seasonPlayers.map((player): LeaderboardEntry => {
       const pScores = scores[player.id] || {};
-      let totalStrokes = 0, totalStableford = 0, totalFines = 0, roundsPlayed = 0, closedRoundsPlayed = 0, worstRound = 0, worstStableford = 999;
+      let totalStrokes = 0, totalStableford = 0, totalFines = 0, roundsPlayed = 0, happenedPlayed = 0, worstRound = 0, worstStableford = 999;
       rounds.forEach(r => {
         if (pScores[r.id]) {
           const s = pScores[r.id].strokes || 0;
           const sf = pScores[r.id].stableford || 0;
           totalFines += pScores[r.id].fines || 0;
-          if (s > 0) { totalStrokes += s; totalStableford += sf; roundsPlayed++; if (r.closed) closedRoundsPlayed++; if (s > worstRound) worstRound = s; if (sf < worstStableford) worstStableford = sf; }
+          if (s > 0) { totalStrokes += s; totalStableford += sf; roundsPlayed++; if (happenedIds.has(r.id)) happenedPlayed++; if (s > worstRound) worstRound = s; if (sf < worstStableford) worstStableford = sf; }
         }
       });
-      // Missed rounds only count once a round is closed; DQ (played < 8 of 9)
-      // is only decided once the full season's rounds are closed.
-      const roundsMissed = closedRoundsCount - closedRoundsPlayed;
-      const isDisqualified = closedRoundsCount >= SEASON_ROUNDS && roundsMissed > 1;
-      const canDropWorstRound = totalRoundsCreated >= SEASON_ROUNDS && roundsPlayed === totalRoundsCreated;
+      // Rolling drop rule (medal AND stableford): from the 2nd played round,
+      // every player's single worst round is dropped — and a missed round
+      // consumes the drop (it IS the player's worst by definition), so totals
+      // stay comparable when someone skips a round. Missing more than one
+      // round is a DQ: still listed with scores (social competition) but
+      // ranked at the bottom.
+      const roundsMissed = happenedIds.size - happenedPlayed;
+      const isDisqualified = roundsMissed > 1;
+      const canDropWorstRound = happenedIds.size >= 2 && roundsMissed === 0 && roundsPlayed > 0;
       const netTotal = canDropWorstRound ? totalStrokes - worstRound : totalStrokes;
       const netStableford = canDropWorstRound ? totalStableford - worstStableford : totalStableford;
       return { ...player, totalStrokes, totalStableford, netTotal, netStableford, worstRound: canDropWorstRound ? worstRound : 0, worstStableford: canDropWorstRound ? worstStableford : 0, totalFines, roundsPlayed, roundsMissed, isDisqualified, pScores, canDropWorstRound };
