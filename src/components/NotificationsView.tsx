@@ -40,10 +40,10 @@ export default function NotificationsView({ currentUser }: { currentUser: Player
         <h2 className="text-xl font-bold text-slate-800">Notifications</h2>
         <div className="flex items-center gap-3">
           {unread.length > 0 && (
-            <button onClick={handleMarkAllRead} className="text-sm text-emerald-600 font-medium hover:text-emerald-700">Mark all read</button>
+            <button onClick={handleMarkAllRead} className="text-sm text-emerald-600 font-medium hover:text-emerald-700 min-h-[44px] px-2">Mark all read</button>
           )}
           {read.length > 0 && (
-            <button onClick={handleClearRead} className="text-sm text-slate-400 font-medium hover:text-slate-600">Clear read</button>
+            <button onClick={handleClearRead} className="text-sm text-slate-400 font-medium hover:text-slate-600 min-h-[44px] px-2">Clear read</button>
           )}
         </div>
       </div>
@@ -67,7 +67,9 @@ export default function NotificationsView({ currentUser }: { currentUser: Player
               </div>
               <div className="divide-y divide-slate-50">
                 {unread.map(n => (
-                  <button type="button" key={n.id} onClick={() => handleMarkRead(n.id)} aria-label="Mark notification as read"
+                  /* No aria-label — it would override the button's content and
+                     SRs would never hear the notification itself. */
+                  <button type="button" key={n.id} onClick={() => handleMarkRead(n.id)}
                     className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors border-l-2 border-l-emerald-500">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -76,6 +78,7 @@ export default function NotificationsView({ currentUser }: { currentUser: Player
                       </div>
                       <span className="text-xs text-slate-400 flex-shrink-0 mt-0.5">{timeAgoLong(n.created_at)}</span>
                     </div>
+                    <span className="sr-only">— mark as read</span>
                   </button>
                 ))}
               </div>

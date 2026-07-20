@@ -30,7 +30,9 @@ export default function LoginPage({ onLogin }: { onLogin: (user: AuthedPlayer) =
         setError('Invalid email or password. Please try again.');
       }
     } catch (err) {
-      setError('An error occurred. Please try again.');
+      // Rate-limit / outage / network messages from the API layer — showing
+      // them beats a misleading "invalid credentials".
+      setError(err instanceof Error && err.message ? err.message : 'An error occurred. Please try again.');
       console.error('Login error:', err);
     } finally {
       setIsLoading(false);

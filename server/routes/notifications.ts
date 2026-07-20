@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { getClient } from '../db.js';
 import { notify } from '../notify.js';
+import { FINE_TOTAL_SQL } from './fines.js';
 
 const router = Router();
 
@@ -52,74 +53,70 @@ router.get('/check', async (req, res) => {
 
   const db = getClient();
 
-  // Auto-delete read notifications older than 30 days
-  await db.execute({ sql: "DELETE FROM notifications WHERE player_id = ? AND read = 1 AND created_at < datetime('now', '-30 days')", args: [playerId] });
-
   const today = new Date().toISOString().split('T')[0];
   const in7d = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0];
   const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
 
-  // Get upcoming rounds for this season
+  // This endpoint is polled every 2 min by every open client. Every reminder
+  // (7-day, 24-hour, fine-overdue) only fires within 7 days of a round, so one
+  // bounded query decides whether any of the heavier work below runs at all —
+  // outside that window the poll costs just this SELECT plus the count.
   const rounds = await db.execute({
-    sql: 'SELECT * FROM rounds WHERE season_id = ? AND date >= ? ORDER BY date',
-    args: [Number(seasonId), today],
+    sql: 'SELECT * FROM rounds WHERE season_id = ? AND date >= ? AND date <= ? ORDER BY date',
+    args: [Number(seasonId), today, in7d],
   });
 
-  for (const round of rounds.rows) {
-    const roundDate = round.date as string;
-    const roundId = Number(round.id);
-    const courseName = round.course_name as string;
-    const roundName = round.name as string;
-    const tees = [round.tee_time, round.tee_time_2].filter(Boolean).join(' & ');
+  if (rounds.rows.length > 0) {
+    // Auto-delete read notifications older than 30 days
+    await db.execute({ sql: "DELETE FROM notifications WHERE player_id = ? AND read = 1 AND created_at < datetime('now', '-30 days')", args: [playerId] });
 
-    // 7-day reminder
-    if (roundDate === in7d) {
-      const exists = await db.execute({
-        sql: 'SELECT id FROM notifications WHERE player_id = ? AND type = ? AND round_id = ?',
-        args: [playerId, 'round_reminder_7d', roundId],
-      });
-      if (exists.rows.length === 0) {
-        await notify({
-          playerIds: [playerId], type: 'round_reminder_7d', roundId,
-          title: 'Round in 7 days',
-          body: `${roundName} at ${courseName} on ${roundDate}`,
-          email: true, push: true,
+    for (const round of rounds.rows) {
+      const roundDate = round.date as string;
+      const roundId = Number(round.id);
+      const courseName = round.course_name as string;
+      const roundName = round.name as string;
+      const tees = [round.tee_time, round.tee_time_2].filter(Boolean).join(' & ');
+
+      // 7-day reminder
+      if (roundDate === in7d) {
+        const exists = await db.execute({
+          sql: 'SELECT id FROM notifications WHERE player_id = ? AND type = ? AND round_id = ?',
+          args: [playerId, 'round_reminder_7d', roundId],
         });
+        if (exists.rows.length === 0) {
+          await notify({
+            playerIds: [playerId], type: 'round_reminder_7d', roundId,
+            title: 'Round in 7 days',
+            body: `${roundName} at ${courseName} on ${roundDate}`,
+            email: true, push: true,
+          });
+        }
+      }
+
+      // 24-hour reminder
+      if (roundDate === tomorrow) {
+        const exists = await db.execute({
+          sql: 'SELECT id FROM notifications WHERE player_id = ? AND type = ? AND round_id = ?',
+          args: [playerId, 'round_reminder_24h', roundId],
+        });
+        if (exists.rows.length === 0) {
+          await notify({
+            playerIds: [playerId], type: 'round_reminder_24h', roundId,
+            title: 'Round tomorrow!',
+            body: `${roundName} at ${courseName}${tees ? `. Tee times: ${tees}` : ''}`,
+            email: true, push: true,
+          });
+        }
       }
     }
 
-    // 24-hour reminder
-    if (roundDate === tomorrow) {
-      const exists = await db.execute({
-        sql: 'SELECT id FROM notifications WHERE player_id = ? AND type = ? AND round_id = ?',
-        args: [playerId, 'round_reminder_24h', roundId],
-      });
-      if (exists.rows.length === 0) {
-        await notify({
-          playerIds: [playerId], type: 'round_reminder_24h', roundId,
-          title: 'Round tomorrow!',
-          body: `${roundName} at ${courseName}${tees ? `. Tee times: ${tees}` : ''}`,
-          email: true, push: true,
-        });
-      }
-    }
-  }
-
-  // Fine overdue check — next round within 7 days and player has unpaid fines
-  const nextRound = rounds.rows[0];
-  if (nextRound) {
-    const nextDate = new Date(nextRound.date as string);
-    const daysUntil = Math.ceil((nextDate.getTime() - Date.now()) / 86400000);
+    // Fine overdue check — next round within 7 days and player has unpaid fines
+    const nextRound = rounds.rows[0];
+    const daysUntil = Math.ceil((new Date(nextRound.date as string).getTime() - Date.now()) / 86400000);
     if (daysUntil <= 7 && daysUntil > 0) {
       // Check unpaid fines
       const unpaid = await db.execute({
-        sql: `SELECT SUM(
-                CASE
-                  WHEN ft.tier_threshold > 0 AND pf.quantity > ft.tier_threshold
-                    THEN (ft.tier_threshold * ft.amount) + ((pf.quantity - ft.tier_threshold) * ft.tier_amount)
-                  ELSE pf.quantity * ft.amount
-                END
-              ) as total FROM player_fines pf
+        sql: `SELECT SUM(${FINE_TOTAL_SQL}) as total FROM player_fines pf
               INNER JOIN fine_types ft ON pf.fine_type_id = ft.id
               INNER JOIN rounds r ON pf.round_id = r.id AND r.season_id = ?
               WHERE pf.player_id = ? AND pf.paid = 0`,

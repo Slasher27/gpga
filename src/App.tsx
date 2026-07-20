@@ -98,7 +98,7 @@ export default function App() {
 
   // Toast + confirm
   const [toast, setToast] = useState<{ show: boolean; message: string; type: string }>({ show: false, message: '', type: 'success' });
-  const { confirm: showConfirm, ConfirmDialogComponent } = useConfirm();
+  const { confirm: showConfirm, confirmDialog } = useConfirm();
 
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const showToast = useCallback((message: string, type = 'success') => {
@@ -137,7 +137,7 @@ export default function App() {
       const [seasonsData, playersData, roundsData, coursesData, scoresData, finesData, seasonPlayersData] = await Promise.all([
         DB.getAllSeasons(),
         DB.getAllPlayers(),
-        season ? DB.getAllRounds(season.id) : DB.getAllRounds(),
+        season ? DB.getAllRounds(season.id) : Promise.resolve([]),
         DB.getAllGolfCourses(),
         DB.getAllScores(),
         DB.getPlayerFinesByRound(),
@@ -166,9 +166,15 @@ export default function App() {
     const goOffline = () => { setIsOnline(false); showToast('You are offline — changes may not save', 'error'); };
     const onRejection = (e: PromiseRejectionEvent) => {
       const msg = e.reason instanceof Error ? e.reason.message : '';
+      if (!msg) return;
+      e.preventDefault();
       if (/network|connection|timed out|Failed to fetch/i.test(msg)) {
         showToast('Action failed — check your connection', 'error');
-        e.preventDefault();
+      } else {
+        // Server/logic errors (409 duplicate, 403, "Round already closed", …)
+        // must surface too — handlers rely on this instead of per-call catches.
+        console.error(e.reason);
+        showToast(msg, 'error');
       }
     };
     window.addEventListener('online', goOnline);
@@ -182,7 +188,8 @@ export default function App() {
   }, [showToast]);
 
   const currentUser = players.find(p => p.id === currentUserId) || players[0];
-  const isReadOnlySeason = !!activeSeason && !activeSeason.is_active;
+  // No active season (e.g. just ended, successor not created yet) is read-only too.
+  const isReadOnlySeason = !activeSeason || !activeSeason.is_active;
   const isAdmin = currentUser?.role === 'master' || currentUser?.role === 'admin';
 
   const refreshFines = () => {
@@ -202,11 +209,12 @@ export default function App() {
     });
   };
 
-  // Refresh fines when leaving fines view
+  // Refresh fines when leaving fines view. A ref, not localStorage — this is
+  // in-session-only state; persisting it let other tabs/sessions clobber it.
+  const previousViewRef = useRef(view);
   useEffect(() => {
-    const prev = localStorage.getItem('gpga_previous_view');
-    if (prev === 'fines' && view !== 'fines') refreshFines();
-    localStorage.setItem('gpga_previous_view', view);
+    if (previousViewRef.current === 'fines' && view !== 'fines') refreshFines();
+    previousViewRef.current = view;
   }, [view]);
 
   // --- Computed ---
@@ -251,7 +259,9 @@ export default function App() {
       if (a.netTotal === 0 && b.netTotal === 0) return 0;
       if (a.netTotal === 0) return 1;
       if (b.netTotal === 0) return -1;
-      return a.netTotal - b.netTotal;
+      // Tie-break: better stableford, then name — so equal strokes can't rank
+      // (and badge a WINNER) by roster order.
+      return a.netTotal - b.netTotal || b.netStableford - a.netStableford || a.name.localeCompare(b.name);
     });
   }, [seasonPlayers, scores, rounds]);
 
@@ -265,18 +275,24 @@ export default function App() {
 
   const setNavView = (id: string) => setView(id);
 
+  // Monotonic token so rapid A→B→A switching can't leave header=A with B's
+  // data when responses resolve out of order.
+  const seasonSwitchToken = useRef(0);
   const handleSeasonSwitch = async (seasonId: number) => {
     const season = allSeasons.find(s => s.id === seasonId);
     if (!season) return;
+    const token = ++seasonSwitchToken.current;
     setActiveSeason(season);
     try {
       const [roundsData, scoresData, finesData, seasonPlayersData] = await Promise.all([
         DB.getAllRounds(season.id), DB.getAllScores(), DB.getPlayerFinesByRound(), DB.getSeasonPlayers(season.id)
       ]);
+      if (token !== seasonSwitchToken.current) return; // superseded by a newer switch
       setRounds(roundsData);
       setSeasonPlayerIds(new Set(seasonPlayersData.map(sp => sp.player_id)));
       setScores(mergeScoresAndFines(scoresData, finesData));
     } catch (error) {
+      if (token !== seasonSwitchToken.current) return;
       console.error('Failed to switch season:', error);
       showToast('Failed to load season data', 'error');
     }
@@ -390,7 +406,7 @@ export default function App() {
   };
 
   const handleDeleteFineType = (id: number, name: string) => {
-    showConfirm(`Delete Fine Type "${name}"?`, `This will permanently delete this fine type. Any existing fines of this type will remain.`, async () => {
+    showConfirm(`Delete Fine Type "${name}"?`, `This will permanently delete this fine type and remove all fines already recorded against it.`, async () => {
       await DB.deleteFineType(id);
       setFineTypesVersion(v => v + 1);
       refreshFines?.();
@@ -431,7 +447,7 @@ export default function App() {
         <Suspense fallback={<DashboardSkeleton />}>
           {view === 'dashboard' && <DashboardView activeSeason={activeSeason} leaderboardData={leaderboardData} rounds={rounds} scores={scores} players={seasonPlayers} golfCourses={golfCourses} />}
           {view === 'fines' && <FinancesView rounds={rounds} scores={scores} players={seasonPlayers} activeSeason={activeSeason} isReadOnlySeason={isReadOnlySeason} currentUser={currentUser} showToast={showToast} onAddFineType={() => setIsAddFineTypeModalOpen(true)} onDeleteFineType={handleDeleteFineType} onFinesChanged={refreshFines} fineTypesVersion={fineTypesVersion} />}
-          {view === 'rounds' && <RoundsView rounds={rounds} scores={scores} setScores={setScores} players={players} activeSeason={activeSeason} isReadOnlySeason={isReadOnlySeason} isAdmin={isAdmin} showToast={showToast} onAddRound={() => setIsAddRoundModalOpen(true)} onEditRound={handleEditRound} onDeleteRound={handleDeleteRound} onCloseRound={handleCloseRound} />}
+          {view === 'rounds' && <RoundsView rounds={rounds} scores={scores} setScores={setScores} players={seasonPlayers} activeSeason={activeSeason} isReadOnlySeason={isReadOnlySeason} isAdmin={isAdmin} showToast={showToast} onAddRound={() => setIsAddRoundModalOpen(true)} onEditRound={handleEditRound} onDeleteRound={handleDeleteRound} onCloseRound={handleCloseRound} />}
           {view === 'teamdraw' && isAdmin && <TeamDrawPage players={players} activeSeason={activeSeason} />}
           {view === 'admin' && isAdmin && !managingPlayerId && <PlayersView players={players} scores={scores} rounds={rounds} activeSeason={activeSeason} isReadOnlySeason={isReadOnlySeason} currentUser={currentUser} showToast={showToast} onAddPlayer={() => setIsAddPlayerModalOpen(true)} managingPlayerId={managingPlayerId} setManagingPlayerId={setManagingPlayerId} />}
           {view === 'admin' && isAdmin && managingPlayerId && <PlayerProfilePage players={players} setPlayers={setPlayers} scores={scores} rounds={rounds} activeSeason={activeSeason} currentUser={currentUser} managingPlayerId={managingPlayerId} setManagingPlayerId={setManagingPlayerId} showToast={showToast} />}
@@ -569,7 +585,7 @@ export default function App() {
         </div>
       )}
 
-      <ConfirmDialogComponent />
+      {confirmDialog}
     </div>
   );
 }

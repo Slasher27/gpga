@@ -2,7 +2,7 @@ import { useState, useEffect, type FormEvent, type ChangeEvent, type Dispatch, t
 import { Save, Camera, ChevronDown, Trash2 } from 'lucide-react';
 import * as DB from '../api';
 import type { Player, Season, ScoresMapFull, Round, Role, Status, PlayerUpdate, BuyInStatus, FinesSummary } from '../api';
-import { TabBar, PlayerRoundsTable, FinesSummaryCards, StatsGrid, usePlayerStats, Card, useConfirm, SubmitButton, fileToAvatarDataUrl } from './common';
+import { TabBar, PlayerRoundsTable, FinesSummaryCards, StatsGrid, usePlayerStats, Card, useConfirm, SubmitButton, fileToAvatarDataUrl, todayLocal } from './common';
 
 const badgeStyles: Record<string, string> = {
   neutral: 'badge badge-ghost badge-sm',
@@ -36,7 +36,7 @@ export default function PlayerProfilePage({ players, setPlayers, scores, rounds,
   const [profileTab, setProfileTab] = useState('stats');
   const [summaryLoaded, setSummaryLoaded] = useState(false);
   const [busy, setBusy] = useState(false); // shared: save / delete / buy-in toggle are mutually exclusive
-  const { confirm, ConfirmDialogComponent } = useConfirm();
+  const { confirm, confirmDialog } = useConfirm();
 
   // Seed the edit form whenever the managed player (or their data) changes.
   useEffect(() => {
@@ -76,7 +76,10 @@ export default function PlayerProfilePage({ players, setPlayers, scores, rounds,
     setBusy(true);
     try {
       await DB.updatePlayer(player.id, updates);
-      setPlayers(prev => prev.map(p => p.id === player.id ? { ...p, ...updates } : p));
+      // Never merge the password into client state — it would sit in memory as
+      // plaintext on the Player object for the rest of the session.
+      const { password: _password, ...stateUpdates } = updates;
+      setPlayers(prev => prev.map(p => p.id === player.id ? { ...p, ...stateUpdates } : p));
       showToast(`${formData.name} updated successfully!`, 'success');
     } finally {
       setBusy(false);
@@ -209,7 +212,7 @@ export default function PlayerProfilePage({ players, setPlayers, scores, rounds,
                     setBusy(true);
                     try {
                       await DB.markBuyInPaid(player.id, activeSeason.id, !playerBuyIn.isPaid);
-                      setPlayerBuyIn({ isPaid: !playerBuyIn.isPaid, date: !playerBuyIn.isPaid ? new Date().toISOString().split('T')[0] : null });
+                      setPlayerBuyIn({ isPaid: !playerBuyIn.isPaid, date: !playerBuyIn.isPaid ? todayLocal() : null });
                       showToast(`Buy-in ${!playerBuyIn.isPaid ? 'marked as paid' : 'marked as outstanding'}`, 'success');
                     } finally {
                       setBusy(false);
@@ -326,7 +329,7 @@ export default function PlayerProfilePage({ players, setPlayers, scores, rounds,
           )}
         </div>
       </Card>
-      <ConfirmDialogComponent />
+      {confirmDialog}
     </div>
   );
 }

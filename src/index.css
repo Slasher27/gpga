@@ -205,7 +205,9 @@ input[type="number"] {
 
 @media (prefers-reduced-motion: reduce) {
   .td-pop,
-  .td-confetti-piece {
+  .td-confetti-piece,
+  .animate-spin,
+  .animate-pulse {
     animation: none !important;
   }
 }

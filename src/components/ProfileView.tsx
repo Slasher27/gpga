@@ -28,7 +28,13 @@ export default function ProfileView({ currentUser, setPlayers, scores, rounds, a
 
   const toggleNotifyPref = async (field: 'notify_email' | 'notify_push', value: boolean) => {
     const update: PlayerUpdate = { [field]: value ? 1 : 0 };
-    await DB.updatePlayer(currentUser.id, update);
+    try {
+      await DB.updatePlayer(currentUser.id, update);
+    } catch (err) {
+      // Revert the optimistically-flipped checkbox so UI matches the server.
+      (field === 'notify_email' ? setNotifyEmail : setNotifyPush)(!value);
+      throw err; // global handler shows the toast
+    }
     setPlayers(prev => prev.map(p => p.id === currentUser.id ? { ...p, ...update } : p));
     showToast(`${field === 'notify_email' ? 'Email' : 'Push'} notifications ${value ? 'enabled' : 'disabled'}`);
   };
@@ -58,7 +64,10 @@ export default function ProfileView({ currentUser, setPlayers, scores, rounds, a
     setSavingProfile(true);
     try {
       await DB.updatePlayer(currentUser.id, updates);
-      setPlayers(prev => prev.map(p => p.id === currentUser.id ? { ...p, ...updates } : p));
+      // Never merge the password into client state — it would sit in memory as
+      // plaintext on the Player object for the rest of the session.
+      const { password: _password, ...stateUpdates } = updates;
+      setPlayers(prev => prev.map(p => p.id === currentUser.id ? { ...p, ...stateUpdates } : p));
       showToast('Profile updated!', 'success');
     } finally {
       setSavingProfile(false);

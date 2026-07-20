@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Trophy, MapPin, Calendar, Clock } from 'lucide-react';
-import { TabBar, Card, Avatar, formatDate, EmptyRow } from './common';
+import { TabBar, Card, Avatar, formatDate, todayLocal, EmptyRow } from './common';
 import * as DB from '../api';
 import { SEASON_ROUNDS } from '../api';
 import type { Season, Round, Player, GolfCourse, Team, LeaderboardEntry, ScoresMapFull } from '../api';
@@ -77,7 +77,7 @@ const StandingsTable = ({ players, rounds, isCompletedSeason, metric }: {
           {players.map((player, idx) => (
             <tr key={player.id} className={`${player.isDisqualified ? 'opacity-50' : idx === 0 ? 'bg-emerald-50/30' : 'hover:bg-slate-50'}`}>
               <td className="px-3 py-3 sticky left-0 bg-white z-10"><RankBadge idx={idx} dq={player.isDisqualified} /></td>
-              <td className="px-3 py-3 sticky left-10 bg-white z-10 w-px whitespace-nowrap"><PlayerCell player={player} isWinner={isCompletedSeason && idx === 0 && !player.isDisqualified} /></td>
+              <th scope="row" className="px-3 py-3 sticky left-10 bg-white z-10 w-px whitespace-nowrap text-left font-normal"><PlayerCell player={player} isWinner={isCompletedSeason && idx === 0 && !player.isDisqualified} /></th>
               {rounds.map(r => <td key={r.id} className="px-1.5 py-3 text-center text-slate-600 text-xs">{cell(player, r.id) || <span className="text-slate-300">-</span>}</td>)}
               <td className="px-3 py-3 text-center font-semibold bg-slate-50">{total(player) || '-'}</td>
               <td className="px-3 py-3 text-center text-red-400 text-xs">{player.canDropWorstRound ? `-${drop(player)}` : '-'}</td>
@@ -104,7 +104,10 @@ export default function DashboardView({ activeSeason, leaderboardData, rounds, s
   const [teamsData, setTeamsData] = useState<Team[]>([]);
 
   useEffect(() => {
-    if (activeSeason) DB.getTeams(activeSeason.id).then(setTeamsData);
+    if (!activeSeason) return;
+    let cancelled = false;
+    DB.getTeams(activeSeason.id).then((t) => { if (!cancelled) setTeamsData(t); });
+    return () => { cancelled = true; };
   }, [activeSeason]);
 
   const teamLeaderboard = useMemo(() => {
@@ -128,7 +131,9 @@ export default function DashboardView({ activeSeason, leaderboardData, rounds, s
     if (a.netStableford === 0 && b.netStableford === 0) return 0;
     if (a.netStableford === 0) return 1;
     if (b.netStableford === 0) return -1;
-    return b.netStableford - a.netStableford;
+    // Tie-break: better medal net, then name — so equal points can't rank
+    // (and badge a WINNER) by roster order.
+    return b.netStableford - a.netStableford || a.netTotal - b.netTotal || a.name.localeCompare(b.name);
   }), [leaderboardData]);
 
   const finesSorted = useMemo(() => [...leaderboardData].sort((a, b) => b.totalFines - a.totalFines), [leaderboardData]);
@@ -144,7 +149,7 @@ export default function DashboardView({ activeSeason, leaderboardData, rounds, s
   // The spotlight card walks a round through its lifecycle, driven only by
   // the round date + `closed` flag: Next → Today's → Awaiting Results → Last.
   const spotlight = useMemo(() => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = todayLocal();
     const byDateAsc = (a: Round, b: Round) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
     const upcoming = rounds.filter(r => !r.closed && r.date >= today).sort(byDateAsc);
     if (upcoming.length) {

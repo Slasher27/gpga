@@ -12,11 +12,15 @@ export default function Dropdown<T extends string | number = string>({
   options,
   onChange,
   className = '',
+  label,
 }: {
   value?: T;
   options: DropdownOption<T>[];
   onChange: (v: T) => void;
   className?: string;
+  /** SR-only purpose of the dropdown (e.g. "Season") — without it the trigger
+      announces only the selected value with no hint what it selects. */
+  label?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [dropUp, setDropUp] = useState(false);
@@ -38,6 +42,7 @@ export default function Dropdown<T extends string | number = string>({
     <div ref={ref} className={`relative ${className}`}>
       <button onClick={handleToggle} type="button"
         className="w-full flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
+        {label && <span className="sr-only">{label}: </span>}
         <span className="truncate">{selected?.label || '—'}</span>
         <ChevronDown size={14} className={`text-slate-400 transition-transform flex-shrink-0 ${open ? 'rotate-180' : ''}`} />
       </button>

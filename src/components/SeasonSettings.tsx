@@ -73,6 +73,7 @@ export default function SeasonSettings({ activeSeason, players, rounds, showToas
     if (!activeSeason) return;
     await DB.addSeasonPlayer(activeSeason.id, playerId);
     setSeasonPlayers(await DB.getSeasonPlayers(activeSeason.id));
+    await onDataChanged(); // standings/fines filter on App's seasonPlayerIds
     showToast('Player added to season');
   };
 
@@ -81,6 +82,7 @@ export default function SeasonSettings({ activeSeason, players, rounds, showToas
     showConfirm(`Remove ${playerName}?`, 'This will remove them from the season roster. Their scores and fines will remain.', async () => {
       await DB.removeSeasonPlayer(activeSeason.id, playerId);
       setSeasonPlayers(await DB.getSeasonPlayers(activeSeason.id));
+      await onDataChanged();
       showToast(`${playerName} removed from season`);
     });
   };

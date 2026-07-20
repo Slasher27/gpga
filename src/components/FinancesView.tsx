@@ -73,8 +73,10 @@ export default function FinancesView({
 
 	// Default selection to the newest round whenever a new latest round appears
 	// (won't fight the user picking an older round — that doesn't change the id).
+	// Falls back to null so a season with no rounds can't keep the previous
+	// season's round selected (fines would be recorded against the wrong season).
 	useEffect(() => {
-		if (mostRecentRoundId != null) setSelectedRound(mostRecentRoundId);
+		setSelectedRound(mostRecentRoundId ?? null);
 	}, [mostRecentRoundId]);
 
 	useEffect(() => {
@@ -227,7 +229,7 @@ export default function FinancesView({
 										<button
 											type='button'
 											onClick={() => setSelectedPlayer(null)}
-											className='p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors'
+											className='w-11 h-11 flex items-center justify-center rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors'
 											aria-label='Close'
 										>
 											<X size={14} />
@@ -285,6 +287,7 @@ export default function FinancesView({
 														type='button'
 														onClick={() => fines.removeFine(ft.id)}
 														disabled={qty === 0}
+														aria-label='Remove fine'
 														className='w-11 h-11 flex items-center justify-center rounded-lg bg-red-100 text-red-600 hover:bg-red-200 disabled:opacity-30 transition-colors font-bold min-h-[44px]'
 													>
 														-
@@ -295,6 +298,7 @@ export default function FinancesView({
 													<button
 														type='button'
 														onClick={() => fines.addFine(ft.id)}
+														aria-label='Add fine'
 														className='w-11 h-11 flex items-center justify-center rounded-lg bg-emerald-100 text-emerald-600 hover:bg-emerald-200 transition-colors font-bold min-h-[44px]'
 													>
 														+
@@ -339,6 +343,7 @@ export default function FinancesView({
 													<button
 														type='button'
 														onClick={() => fines.removeFine(ft.id)}
+														aria-label='Remove fine'
 														className='w-11 h-11 flex items-center justify-center rounded-lg bg-red-100 text-red-600 hover:bg-red-200 transition-colors font-bold min-h-[44px]'
 													>
 														-
@@ -349,6 +354,7 @@ export default function FinancesView({
 													<button
 														type='button'
 														onClick={() => fines.addFine(ft.id)}
+														aria-label='Add fine'
 														className='w-11 h-11 flex items-center justify-center rounded-lg bg-emerald-100 text-emerald-600 hover:bg-emerald-200 transition-colors font-bold min-h-[44px]'
 													>
 														+
@@ -774,10 +780,11 @@ export default function FinancesView({
 													key={s.player_id}
 													className='border border-slate-200 rounded-lg overflow-hidden'
 												>
+													{/* No aria-label — it would hide the player name and total
+													    from SR; the row content is the accessible name. */}
 													<div
 														role='button'
 														tabIndex={0}
-														aria-label='Toggle fines breakdown'
 														className='p-4 bg-white cursor-pointer hover:bg-slate-50'
 														onClick={() =>
 															setExpandedRoundViewPlayers((prev) => ({
@@ -813,6 +820,7 @@ export default function FinancesView({
 																R{s.total_amount.toLocaleString()}
 															</p>
 														</div>
+														<span className='sr-only'>— toggle fines breakdown</span>
 													</div>
 													{expanded && (
 														<div className='bg-slate-50 border-t border-slate-200 p-4 space-y-2'>
@@ -868,10 +876,11 @@ export default function FinancesView({
 								const isExpanded = expandedPlayers[summary.player_id];
 								return (
 									<div key={summary.player_id} className='hover:bg-slate-50'>
+										{/* No aria-label — it would hide the player name and paid/unpaid
+										    amounts from SR; the row content is the accessible name. */}
 										<div
 											role='button'
 											tabIndex={0}
-											aria-label='Toggle payment details'
 											className='p-4 cursor-pointer select-none'
 											onClick={async () => {
 												if (!isExpanded)
@@ -918,13 +927,14 @@ export default function FinancesView({
 												</div>
 												<div className='text-right text-sm'>
 													<p className='font-bold text-emerald-600'>
-														R{summary.paid_fines.toLocaleString()}
+														R{summary.paid_fines.toLocaleString()}<span className='sr-only'> paid</span>
 													</p>
 													<p className='font-bold text-red-600'>
-														R{summary.unpaid_fines.toLocaleString()}
+														R{summary.unpaid_fines.toLocaleString()}<span className='sr-only'> unpaid</span>
 													</p>
 												</div>
 											</div>
+											<span className='sr-only'>— toggle payment details</span>
 											<div className='ml-9'>
 												<div className='w-full bg-slate-200 rounded-full h-4 overflow-hidden flex'>
 													{summary.paid_fines > 0 && (

@@ -55,11 +55,14 @@ export default function NotificationPanel({
 
   return (
     <div ref={ref} className="relative">
-      <button onClick={() => setOpen(!open)} className="relative p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors" aria-label="Notifications">
+      {/* Name via sr-only text, not aria-label — a label would override the
+          button's content and the unread count would never be announced. */}
+      <button onClick={() => setOpen(!open)} className="relative p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors">
         <Bell size={18} />
+        <span className="sr-only">Notifications</span>
         {unreadCount > 0 && (
           <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
-            {unreadCount > 9 ? '9+' : unreadCount}
+            {unreadCount > 9 ? '9+' : unreadCount}<span className="sr-only"> unread</span>
           </span>
         )}
       </button>
@@ -72,10 +75,10 @@ export default function NotificationPanel({
               <p className="text-sm font-semibold text-slate-800">Notifications</p>
               <div className="flex items-center gap-3">
                 {unreadCount > 0 && (
-                  <button onClick={handleMarkAllRead} className="text-xs text-emerald-600 font-medium hover:text-emerald-700">Mark all read</button>
+                  <button onClick={handleMarkAllRead} className="text-xs text-emerald-600 font-medium hover:text-emerald-700 min-h-[44px] px-2">Mark all read</button>
                 )}
                 {notifications.some(n => n.read) && (
-                  <button onClick={async () => { await DB.clearReadNotifications(); setNotifications(prev => prev.filter(n => !n.read)); }} className="text-xs text-slate-400 font-medium hover:text-slate-600">Clear read</button>
+                  <button onClick={async () => { await DB.clearReadNotifications(); setNotifications(prev => prev.filter(n => !n.read)); }} className="text-xs text-slate-400 font-medium hover:text-slate-600 min-h-[44px] px-2">Clear read</button>
                 )}
               </div>
             </div>

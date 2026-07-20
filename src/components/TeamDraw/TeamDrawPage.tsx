@@ -49,7 +49,7 @@ export default function TeamDrawPage({
   const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (resetTimer.current) clearTimeout(resetTimer.current); }, []);
 
-  const { confirm, ConfirmDialogComponent } = useConfirm();
+  const { confirm, confirmDialog } = useConfirm();
 
   const playerById = useMemo(() => {
     const m = new Map<string, Player>();
@@ -295,7 +295,7 @@ export default function TeamDrawPage({
         </>
       )}
 
-      <ConfirmDialogComponent />
+      {confirmDialog}
     </div>
   );
 }

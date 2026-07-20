@@ -75,16 +75,38 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
   next();
 }
 
-export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
+// Admin/master mutations re-check role + status against the DB (one PK SELECT)
+// so a demoted or deactivated player can't keep using a stale 30-day token.
+async function liveRoleStatus(playerId: string): Promise<{ role: string; status: string } | null> {
+  const result = await getClient().execute({
+    sql: 'SELECT role, status FROM players WHERE id = ?',
+    args: [playerId],
+  });
+  const row = result.rows[0];
+  return row ? { role: String(row.role), status: String(row.status) } : null;
+}
+
+export async function requireAdmin(req: Request, res: Response, next: NextFunction): Promise<void> {
   if (!req.auth || (req.auth.role !== 'master' && req.auth.role !== 'admin')) {
     res.status(403).json({ error: 'Forbidden' });
     return;
   }
+  const live = await liveRoleStatus(req.auth.sub);
+  if (!live || live.status !== 'active' || (live.role !== 'master' && live.role !== 'admin')) {
+    res.status(403).json({ error: 'Forbidden' });
+    return;
+  }
+  req.auth.role = live.role as TokenPayload['role'];
   next();
 }
 
-export function requireMaster(req: Request, res: Response, next: NextFunction): void {
+export async function requireMaster(req: Request, res: Response, next: NextFunction): Promise<void> {
   if (!req.auth || req.auth.role !== 'master') {
+    res.status(403).json({ error: 'Forbidden' });
+    return;
+  }
+  const live = await liveRoleStatus(req.auth.sub);
+  if (!live || live.status !== 'active' || live.role !== 'master') {
     res.status(403).json({ error: 'Forbidden' });
     return;
   }

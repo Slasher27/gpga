@@ -26,6 +26,14 @@ export function formatDate(date: string): string {
   return `${MONTHS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
 }
 
+// --- todayLocal ---
+// Local-date yyyy-mm-dd. toISOString() gives the UTC date, which is yesterday
+// between 00:00 and 02:00 SAST — wrong for "is the round today?" checks.
+export function todayLocal(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 // --- EmptyRow ---
 // Compact, consistent inline empty/placeholder used inside cards & lists.
 export function EmptyRow({ children }: { children: string }) {
@@ -131,7 +139,7 @@ export const PlayerRoundsTable = ({ rounds, playerScores }: { rounds: Round[]; p
             const s = playerScores[r.id];
             return (
               <tr key={r.id} className={`border-b border-slate-50 ${!s?.strokes ? 'opacity-30' : ''}`}>
-                <td className="px-4 py-2.5 font-medium text-slate-800">{r.name}</td>
+                <th scope="row" className="px-4 py-2.5 font-medium text-slate-800 text-left">{r.name}</th>
                 <td className="px-4 py-2.5 text-slate-500 text-xs">{r.course_name}</td>
                 <td className="px-4 py-2.5 text-center font-bold text-slate-800">{s?.strokes || '-'}</td>
                 <td className="px-4 py-2.5 text-center text-slate-600">{s?.handicap || '-'}</td>

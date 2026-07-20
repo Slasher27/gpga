@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { getClient } from '../db.js';
 import { notify, getSeasonPlayerIds } from '../notify.js';
 import { requireAdmin } from '../auth-middleware.js';
+import { FINE_TOTAL_SQL } from './fines.js';
 
 const router = Router();
 
@@ -22,7 +23,10 @@ router.post('/', requireAdmin, async (req, res) => {
   const roundId = Number(result.lastInsertRowid);
   const tees = [tee_time, tee_time_2].filter(Boolean).join(' & ');
   const playerIds = await getSeasonPlayerIds(season_id);
-  notify({ playerIds, type: 'round_added', roundId, title: `New Round: ${name}`, body: `${course_name} on ${date}${tees ? `. Tee times: ${tees}` : ''}`, email: true, push: true }).catch(() => {});
+  // Awaited: on serverless the instance can freeze once the response is sent,
+  // silently dropping a fire-and-forget fan-out. The catch keeps a notify
+  // failure from failing the request itself.
+  await notify({ playerIds, type: 'round_added', roundId, title: `New Round: ${name}`, body: `${course_name} on ${date}${tees ? `. Tee times: ${tees}` : ''}`, email: true, push: true }).catch(() => {});
   res.status(201).json({ id: roundId });
 });
 
@@ -65,7 +69,7 @@ router.put('/:id', requireAdmin, async (req, res) => {
       const tees = [updated.tee_time, updated.tee_time_2].filter(Boolean).join(' & ');
       const seasonId = Number(old.season_id);
       const playerIds = await getSeasonPlayerIds(seasonId);
-      notify({
+      await notify({
         playerIds, type: 'round_updated', roundId,
         title: `${old.name} Updated`,
         body: `${changes.charAt(0).toUpperCase() + changes.slice(1)} changed — ${updated.course_name} on ${updated.date}${tees ? `. Tee times: ${tees}` : ''}`,
@@ -85,10 +89,11 @@ router.put('/:id/close', requireAdmin, async (req, res) => {
   const roundResult = await db.execute({ sql: 'SELECT * FROM rounds WHERE id = ?', args: [roundId] });
   const round = roundResult.rows[0];
   if (!round) return res.status(404).json({ error: 'Round not found' });
-  if (round.closed) return res.status(400).json({ error: 'Round already closed' });
 
-  // Mark as closed
-  await db.execute({ sql: 'UPDATE rounds SET closed = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?', args: [roundId] });
+  // Atomic close — two concurrent closes (double-tap, two admins) would both
+  // pass a read-then-check and double-send the results fan-out.
+  const closed = await db.execute({ sql: 'UPDATE rounds SET closed = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND closed = 0', args: [roundId] });
+  if (closed.rowsAffected === 0) return res.status(400).json({ error: 'Round already closed' });
 
   // Get scores for this round
   const scoresResult = await db.execute({
@@ -100,13 +105,7 @@ router.put('/:id/close', requireAdmin, async (req, res) => {
 
   // Get fines summary for this round
   const finesResult = await db.execute({
-    sql: `SELECT SUM(
-            CASE
-              WHEN ft.tier_threshold > 0 AND pf.quantity > ft.tier_threshold
-                THEN (ft.tier_threshold * ft.amount) + ((pf.quantity - ft.tier_threshold) * ft.tier_amount)
-              ELSE pf.quantity * ft.amount
-            END
-          ) as total_fines, COUNT(DISTINCT pf.player_id) as players_fined
+    sql: `SELECT SUM(${FINE_TOTAL_SQL}) as total_fines, COUNT(DISTINCT pf.player_id) as players_fined
           FROM player_fines pf JOIN fine_types ft ON pf.fine_type_id = ft.id
           WHERE pf.round_id = ?`,
     args: [roundId],
@@ -126,8 +125,9 @@ router.put('/:id/close', requireAdmin, async (req, res) => {
   // Notify all season players
   const seasonId = Number(round.season_id);
   const playerIds = await getSeasonPlayerIds(seasonId);
-  // Fire-and-forget — the round is already closed; a notify failure must not 500 the request.
-  notify({
+  // Awaited so serverless can't drop it; the catch keeps a notify failure from
+  // 500ing the request (the round is already closed at this point).
+  await notify({
     playerIds, type: 'round_closed', roundId,
     title: `Results: ${round.name}`,
     body: body.trim(),

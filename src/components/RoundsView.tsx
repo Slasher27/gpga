@@ -163,12 +163,12 @@ export default function RoundsView({ rounds, scores, setScores, players, isReadO
                     ? 'bg-emerald-600 text-white'
                     : 'bg-white text-slate-600 border border-slate-200 hover:border-emerald-300'
                 }`}>
-                <p className={`text-sm font-semibold ${isActive ? 'text-white' : 'text-slate-800'}`}>{r.name}</p>
+                <p className={`text-sm font-semibold ${isActive ? 'text-white' : 'text-slate-800'}`}>{r.name}{isActive && <span className="sr-only"> (selected)</span>}</p>
                 <p className={`text-[10px] mt-0.5 truncate ${isActive ? 'text-emerald-100' : 'text-slate-400'}`}>{r.course_name}</p>
                 <div className="flex items-center gap-1.5 mt-1.5">
                   <Calendar size={10} className={isActive ? 'text-emerald-200' : 'text-slate-500'} />
                   <span className={`text-[10px] ${isActive ? 'text-emerald-100' : 'text-slate-400'}`}>{r.date}</span>
-                  {r.closed ? <Lock size={10} className={`ml-auto ${isActive ? 'text-emerald-200' : 'text-slate-400'}`} /> : hasScores && <span className={`ml-auto w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-200' : 'bg-emerald-400'}`} />}
+                  {r.closed ? <Lock size={10} className={`ml-auto ${isActive ? 'text-emerald-200' : 'text-slate-400'}`} /> : hasScores && <span className={`ml-auto w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-200' : 'bg-emerald-400'}`}><span className="sr-only">Scores entered</span></span>}
                 </div>
               </button>
             );
@@ -241,9 +241,9 @@ export default function RoundsView({ rounds, scores, setScores, players, isReadO
                       <span className="font-medium text-slate-800 text-sm">{p.name}</span>
                       {canManage && !currentRound.closed && (
                         !isEditing ? (
-                          <button onClick={() => setEditingPlayers(prev => ({ ...prev, [p.id]: true }))} className="text-xs text-emerald-600 font-semibold min-h-[32px] px-2">Edit</button>
+                          <button onClick={() => setEditingPlayers(prev => ({ ...prev, [p.id]: true }))} className="text-xs text-emerald-600 font-semibold min-h-[44px] px-3">Edit</button>
                         ) : (
-                          <SubmitButton type="button" pending={savingScores} onClick={() => savePlayerScore(p.id, p.name)} className="text-xs text-emerald-600 font-semibold min-h-[32px] px-2 disabled:opacity-60">Save</SubmitButton>
+                          <SubmitButton type="button" pending={savingScores} onClick={() => savePlayerScore(p.id, p.name)} className="text-xs text-emerald-600 font-semibold min-h-[44px] px-3 disabled:opacity-60">Save</SubmitButton>
                         )
                       )}
                     </div>

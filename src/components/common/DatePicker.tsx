@@ -1,7 +1,8 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { ChevronLeft, ChevronRight, Calendar, X } from 'lucide-react';
 import { formatDate as formatDisplay } from './SharedUI';
 import { useDismiss } from './useDismiss';
+import { useFocusTrap } from './useFocusTrap';
 
 export default function DatePicker({
   value,
@@ -14,6 +15,11 @@ export default function DatePicker({
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(value ? new Date(value) : new Date());
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // aria-modal without focus management leaves keyboard users tabbing through
+  // the page behind the overlay — same trap/restore behavior as Modal.
+  useFocusTrap(panelRef, isOpen, useCallback(() => setIsOpen(false), []));
 
   const formatDate = (date: Date): string => {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -68,7 +74,7 @@ export default function DatePicker({
           aria-label="Select date"
         >
           <button type="button" aria-label="Close date picker" className="absolute inset-0 bg-slate-900/50" onClick={() => setIsOpen(false)} />
-          <div className="relative w-full max-w-md sm:max-w-xs bg-white shadow-xl rounded-t-2xl sm:rounded-xl border border-slate-200 flex flex-col max-h-[100dvh] sm:max-h-[calc(100dvh-2rem)] overscroll-contain pb-[env(safe-area-inset-bottom)]">
+          <div ref={panelRef} className="relative w-full max-w-md sm:max-w-xs bg-white shadow-xl rounded-t-2xl sm:rounded-xl border border-slate-200 flex flex-col max-h-[100dvh] sm:max-h-[calc(100dvh-2rem)] overscroll-contain pb-[env(safe-area-inset-bottom)]">
             {/* Header — month nav (fixed, doesn't scroll) */}
             <div className="flex items-center justify-between px-3 pt-3 pb-2 flex-shrink-0">
               <button
@@ -122,6 +128,7 @@ export default function DatePicker({
                       }`}
                     >
                       {date.getDate()}
+                      {(selected || today) && <span className="sr-only">{selected ? ' (selected)' : ' (today)'}</span>}
                     </button>
                   );
                 })}

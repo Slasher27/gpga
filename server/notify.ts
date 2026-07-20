@@ -1,5 +1,4 @@
 import { getClient } from './db.js';
-// @ts-ignore -- no type declarations available
 import webpush from 'web-push';
 import { Resend } from 'resend';
 

@@ -41,8 +41,9 @@ self.addEventListener('push', (event: PushEvent) => {
   event.waitUntil(
     self.registration.showNotification(data.title, {
       body: data.body,
-      icon: '/icons/icon.svg',
-      badge: '/icons/icon.svg',
+      // PNG required — Chrome on Android won't render SVG notification icons.
+      icon: '/icons/icon-192.png',
+      badge: '/icons/icon-192.png',
       data: data.url || '/',
     })
   );

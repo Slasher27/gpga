@@ -17,4 +17,11 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   });
+  // After a deploy, the new SW (skipWaiting) replaces the old one and purges its
+  // precache — reload once so the running app doesn't request now-deleted chunks.
+  let hadController = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController) { hadController = true; return; } // first install claiming this tab
+    window.location.reload();
+  });
 }

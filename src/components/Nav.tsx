@@ -48,6 +48,7 @@ export function TopBar({ currentUser, activeSeason, allSeasons, handleSeasonSwit
       <div className="flex items-center gap-3">
         {allSeasons.length > 1 && (
           <Dropdown
+            label="Season"
             value={activeSeason?.id}
             options={allSeasons.map(s => ({ value: s.id, label: String(s.year) }))}
             onChange={(id) => handleSeasonSwitch(Number(id))}
@@ -143,6 +144,7 @@ export function MobileBottomNav({ view, setNavView, navItems }: MobileNavProps) 
               }`}>
               {item.icon}
               <span className="text-[11px] font-medium leading-none mt-1">{item.label}</span>
+              {view === item.id && <span className="sr-only">(current)</span>}
             </button>
           ))}
           {hasOverflow && (

@@ -1,4 +1,4 @@
-import express, { type RequestHandler } from 'express';
+import express, { type RequestHandler, type ErrorRequestHandler } from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import { requireAuth } from './auth-middleware.js';
@@ -19,6 +19,10 @@ import pushRouter from './routes/push.js';
 // the serverless entry uses it to lazily init the DB on cold start.
 export function createApp(defaultOrigin: string, preRoute?: RequestHandler) {
   const app = express();
+
+  // Vercel terminates exactly one proxy hop — without this, req.ip is the proxy,
+  // so the auth rate limiter would put every user in one shared bucket.
+  app.set('trust proxy', 1);
 
   app.use(cors({ origin: process.env.FRONTEND_URL || defaultOrigin, credentials: false }));
   app.use(express.json());
@@ -49,6 +53,18 @@ export function createApp(defaultOrigin: string, preRoute?: RequestHandler) {
   app.use('/api/teams', requireAuth, teamsRouter);
   app.use('/api/notifications', requireAuth, notificationsRouter);
   app.use('/api/push', requireAuth, pushRouter);
+
+  // Terminal error handler — Express 5 forwards rejected route promises here;
+  // without it they render as HTML the client can't parse (silent UI failures).
+  const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
+    console.error(err);
+    const msg = err instanceof Error ? err.message : '';
+    const isDuplicate = /UNIQUE constraint/i.test(msg);
+    res.status(isDuplicate ? 409 : 500).json({
+      error: isDuplicate ? 'That already exists — duplicate value' : 'Server error — please try again',
+    });
+  };
+  app.use(errorHandler);
 
   return app;
 }

@@ -35,7 +35,9 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           <Trash2 size={48} className="text-red-500" />
         </div>
 
-        <h3 className="font-bold text-xl mb-2">{title}</h3>
+        {/* Modal already renders the title as an sr-only heading — hide this
+            visual copy from SR so the title isn't announced twice. */}
+        <p aria-hidden="true" className="font-bold text-xl mb-2">{title}</p>
 
         <p className="text-slate-600 mb-6">{message}</p>
 
@@ -74,7 +76,10 @@ export const useConfirm = () => {
     setConfirmState(prev => ({ ...prev, isOpen: false }));
   };
 
-  const ConfirmDialogComponent = () => (
+  // Returned as an element, not a component — a component defined inside the
+  // hook gets a new identity every parent render, which unmounts/remounts an
+  // OPEN dialog (focus reset + flicker) whenever anything else re-renders.
+  const confirmDialog = (
     <ConfirmDialog
       isOpen={confirmState.isOpen}
       onClose={closeConfirm}
@@ -84,5 +89,5 @@ export const useConfirm = () => {
     />
   );
 
-  return { confirm, ConfirmDialogComponent };
+  return { confirm, confirmDialog };
 };

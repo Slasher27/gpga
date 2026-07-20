@@ -286,13 +286,14 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
     clearTimeout(timeout);
   }
 
-  if (res.status === 401) {
+  // Expired/invalid token: clear auth and reload so the login page renders.
+  // /auth/login 401s mean bad credentials, not an expired session.
+  if (res.status === 401 && url !== '/auth/login') {
     clearToken();
     localStorage.removeItem('gpga_authenticated');
     localStorage.removeItem('gpga_current_user');
-    if (typeof window !== 'undefined' && window.location.pathname !== '/') {
-      window.location.reload();
-    }
+    if (typeof caches !== 'undefined') caches.delete('api-cache').catch(() => {});
+    window.location.reload();
     throw new Error('Session expired');
   }
 
@@ -658,16 +659,20 @@ export async function unsubscribePush(endpoint: string): Promise<OkResult> {
 // ============================================================================
 
 export async function authenticateUser(email: string, password: string): Promise<AuthedPlayer | null> {
+  let user: AuthedPlayer;
   try {
-    const user = await request<AuthedPlayer>('/auth/login', {
+    user = await request<AuthedPlayer>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
-    if (user?.token) setToken(user.token);
-    return user;
-  } catch {
-    return null;
+  } catch (err) {
+    // Wrong email/password → null (login form's own message). Anything else —
+    // rate limit, outage, timeout — must surface, not read as bad credentials.
+    if (err instanceof Error && /invalid credentials/i.test(err.message)) return null;
+    throw err;
   }
+  if (user?.token) setToken(user.token);
+  return user;
 }
 
 export function isAuthenticated(): boolean {
@@ -690,6 +695,9 @@ export function logout(): void {
   clearToken();
   localStorage.removeItem('gpga_authenticated');
   localStorage.removeItem('gpga_current_user');
+  // The SW api-cache holds this user's authorized GET responses (notifications
+  // are per-user) — purge so the next login on this device can't be served them.
+  if (typeof caches !== 'undefined') caches.delete('api-cache').catch(() => {});
 }
 
 export async function initDatabase(): Promise<void> {

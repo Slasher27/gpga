@@ -98,9 +98,13 @@ export function useFines({
     return () => { cancelled = true; };
   }, [selectedPlayer, selectedRound]);
 
-  // Load round-level fines data for the History tab.
+  // Load round-level fines data for the History tab (guarded so a slow
+  // response for a previous round can't overwrite the current one).
   useEffect(() => {
-    if (selectedRound) DB.getRoundFines(selectedRound).then(setRoundFinesData);
+    if (!selectedRound) return;
+    let cancelled = false;
+    DB.getRoundFines(selectedRound).then((d) => { if (!cancelled) setRoundFinesData(d); });
+    return () => { cancelled = true; };
   }, [selectedRound]);
 
   // Load payment summary when season changes; reset per-player cache too.
@@ -127,52 +131,60 @@ export function useFines({
 
   // ---- Mutations ----
 
+  // Synchronous mirror of playerFines for the +/− mutations. Two quick taps
+  // before a re-render would both read the same render-captured state and send
+  // the same quantity, losing a fine — the ref always holds the latest value.
+  const playerFinesRef = useRef(playerFines);
+  useEffect(() => { playerFinesRef.current = playerFines; }, [playerFines]);
+
   const addFine = useCallback(async (fineTypeId: number) => {
     if (!selectedPlayer || !selectedRound) return;
-    const existing = playerFines.find((pf) => pf.fine_type_id === fineTypeId);
+    const snapshot = playerFinesRef.current;
+    const existing = snapshot.find((pf) => pf.fine_type_id === fineTypeId);
     const newQty = (existing?.quantity || 0) + 1;
-    const snapshot = playerFines;
-    setPlayerFines((prev) => {
-      const idx = prev.findIndex((pf) => pf.fine_type_id === fineTypeId);
-      if (idx >= 0) {
-        const updated = [...prev];
-        updated[idx] = { ...updated[idx], quantity: newQty };
-        return updated;
-      }
-      const ft = fineTypes.find((f) => f.id === fineTypeId);
-      return [...prev, {
-        fine_type_id: fineTypeId,
-        quantity: 1,
-        amount: ft?.amount || 0,
-        tier_threshold: ft?.tier_threshold || 0,
-        tier_amount: ft?.tier_amount || 0,
-        name: ft?.name || ''
-      }];
-    });
+    const ft = fineTypes.find((f) => f.id === fineTypeId);
+    const next = existing
+      ? snapshot.map((pf) => pf.fine_type_id === fineTypeId ? { ...pf, quantity: newQty } : pf)
+      : [...snapshot, {
+          fine_type_id: fineTypeId,
+          quantity: 1,
+          amount: ft?.amount || 0,
+          tier_threshold: ft?.tier_threshold || 0,
+          tier_amount: ft?.tier_amount || 0,
+          name: ft?.name || ''
+        } as PlayerFine];
+    playerFinesRef.current = next;
+    setPlayerFines(next);
     try {
       await DB.setPlayerFine(selectedPlayer, selectedRound, fineTypeId, newQty);
       refreshDerived();
     } catch {
+      playerFinesRef.current = snapshot;
       setPlayerFines(snapshot);
       showToast?.('Could not save fine — not recorded', 'error');
     }
-  }, [selectedPlayer, selectedRound, playerFines, fineTypes, refreshDerived, showToast]);
+  }, [selectedPlayer, selectedRound, fineTypes, refreshDerived, showToast]);
 
   const removeFine = useCallback(async (fineTypeId: number) => {
     if (!selectedPlayer || !selectedRound) return;
-    const existing = playerFines.find((pf) => pf.fine_type_id === fineTypeId);
+    const snapshot = playerFinesRef.current;
+    const existing = snapshot.find((pf) => pf.fine_type_id === fineTypeId);
     if (!existing || existing.quantity <= 0) return;
     const newQty = existing.quantity - 1;
-    const snapshot = playerFines;
-    setPlayerFines((prev) => prev.map((pf) => pf.fine_type_id === fineTypeId ? { ...pf, quantity: newQty } : pf).filter((pf) => pf.quantity > 0));
+    const next = snapshot
+      .map((pf) => pf.fine_type_id === fineTypeId ? { ...pf, quantity: newQty } : pf)
+      .filter((pf) => pf.quantity > 0);
+    playerFinesRef.current = next;
+    setPlayerFines(next);
     try {
       await DB.setPlayerFine(selectedPlayer, selectedRound, fineTypeId, newQty);
       refreshDerived();
     } catch {
+      playerFinesRef.current = snapshot;
       setPlayerFines(snapshot);
       showToast?.('Could not update fine — not recorded', 'error');
     }
-  }, [selectedPlayer, selectedRound, playerFines, refreshDerived, showToast]);
+  }, [selectedPlayer, selectedRound, refreshDerived, showToast]);
 
   const addOpenFine = useCallback(async (name: string, amount: string | number) => {
     if (!name.trim() || !amount || !activeSeason || !selectedPlayer || !selectedRound) return;

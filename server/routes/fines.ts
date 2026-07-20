@@ -5,7 +5,9 @@ import { requireAdmin } from '../auth-middleware.js';
 
 // Tiered fine total: first N units at base amount, remainder at tier_amount.
 // When tier_threshold = 0, it's a flat fine (quantity * amount).
-const FINE_TOTAL_SQL = `(
+// Single server-side source (also used by rounds close + overdue reminders);
+// mirrored client-side by calcFineTotal in src/hooks/useFines.ts — keep in sync.
+export const FINE_TOTAL_SQL = `(
   CASE
     WHEN ft.tier_threshold > 0 AND pf.quantity > ft.tier_threshold
       THEN (ft.tier_threshold * ft.amount) + ((pf.quantity - ft.tier_threshold) * ft.tier_amount)
@@ -122,7 +124,13 @@ router.get('/by-round', async (_req, res) => {
 });
 
 router.put('/set', requireAdmin, async (req, res) => {
-  const { player_id, round_id, fine_type_id, quantity } = req.body;
+  const { player_id, round_id, fine_type_id } = req.body;
+  const quantity = Number(req.body.quantity);
+  // A non-numeric quantity would either 500 or be stored as a string and
+  // poison every SUM(quantity * amount) fine total.
+  if (!player_id || !round_id || !fine_type_id || !Number.isFinite(quantity)) {
+    return res.status(400).json({ error: 'player_id, round_id, fine_type_id and numeric quantity required' });
+  }
   const db = getClient();
 
   if (quantity <= 0) {
@@ -131,22 +139,13 @@ router.put('/set', requireAdmin, async (req, res) => {
       args: [player_id, round_id, fine_type_id]
     });
   } else {
-    const exists = await db.execute({
-      sql: 'SELECT id FROM player_fines WHERE player_id = ? AND round_id = ? AND fine_type_id = ?',
-      args: [player_id, round_id, fine_type_id]
+    // Single upsert — the old SELECT-then-INSERT raced concurrent sets into
+    // UNIQUE violations, and cost extra Turso round trips per fine tap.
+    await db.execute({
+      sql: `INSERT INTO player_fines (player_id, round_id, fine_type_id, quantity) VALUES (?, ?, ?, ?)
+            ON CONFLICT(player_id, round_id, fine_type_id) DO UPDATE SET quantity = excluded.quantity`,
+      args: [player_id, round_id, fine_type_id, quantity]
     });
-
-    if (exists.rows.length > 0) {
-      await db.execute({
-        sql: 'UPDATE player_fines SET quantity = ? WHERE player_id = ? AND round_id = ? AND fine_type_id = ?',
-        args: [quantity, player_id, round_id, fine_type_id]
-      });
-    } else {
-      await db.execute({
-        sql: 'INSERT INTO player_fines (player_id, round_id, fine_type_id, quantity) VALUES (?, ?, ?, ?)',
-        args: [player_id, round_id, fine_type_id, quantity]
-      });
-    }
   }
   res.json({ ok: true });
 });
@@ -165,7 +164,7 @@ router.put('/pay-round', requireAdmin, async (req, res) => {
     const round = await db.execute({ sql: 'SELECT name FROM rounds WHERE id = ?', args: [round_id] });
     const amt = Number(total.rows[0]?.amt) || 0;
     const roundName = (round.rows[0]?.name as string) || 'Round';
-    notify({ playerIds: [player_id], type: 'fine_paid', roundId: round_id, title: 'Fine payment confirmed', body: `R${amt.toLocaleString()} for ${roundName} marked as paid`, email: true, push: true }).catch(() => {});
+    await notify({ playerIds: [player_id], type: 'fine_paid', roundId: round_id, title: 'Fine payment confirmed', body: `R${amt.toLocaleString()} for ${roundName} marked as paid`, email: true, push: true }).catch(() => {});
   }
   res.json({ ok: true });
 });
@@ -185,7 +184,7 @@ router.put('/confirm', requireAdmin, async (req, res) => {
     const cnt = Number(fines.rows[0]?.cnt) || 0;
     const amt = Number(fines.rows[0]?.amt) || 0;
     const roundName = (round.rows[0]?.name as string) || 'Round';
-    notify({ playerIds: [player_id], type: 'fines_closed', roundId: round_id, title: `Fines confirmed: ${roundName}`, body: `${cnt} fines totalling R${amt.toLocaleString()}`, email: true, push: true }).catch(() => {});
+    await notify({ playerIds: [player_id], type: 'fines_closed', roundId: round_id, title: `Fines confirmed: ${roundName}`, body: `${cnt} fines totalling R${amt.toLocaleString()}`, email: true, push: true }).catch(() => {});
   }
   res.json({ ok: true });
 });
