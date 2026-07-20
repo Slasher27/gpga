@@ -1,5 +1,5 @@
-import { useState, useEffect, type Dispatch, type SetStateAction } from 'react';
-import { Plus, Save, Edit, Trash2, MapPin, Calendar, Lock, CheckCircle } from 'lucide-react';
+import { useState, useEffect, useMemo, type Dispatch, type SetStateAction } from 'react';
+import { Plus, Save, Edit, Trash2, MapPin, Calendar, Lock, CheckCircle, Trophy } from 'lucide-react';
 import * as DB from '../api';
 import type { Round, Player, Season, ScoresMapFull } from '../api';
 import { Card, SubmitButton } from './common';
@@ -65,21 +65,36 @@ export default function RoundsView({ rounds, scores, setScores, players, isReadO
     const net = Number(vals.net) || 0;
     const hc = Number(vals.hc) || 0;
     const sf = Number(vals.sf) || 0;
+    const hadScore = (scores[playerId]?.[selectedRound]?.strokes ?? 0) > 0;
 
-    if (net <= 0) { showToast('Enter a gross score first', 'error'); return; }
+    if (net <= 0 && !hadScore) { showToast('Enter a gross score first', 'error'); return; }
+    // A stored 0 stableford would count as the player's worst round AND poison
+    // the teams-comp day-minimum — require it alongside the gross score.
+    if (net > 0 && sf <= 0) { showToast(`Enter a stableford score for ${playerName}`, 'error'); return; }
 
     setSavingScores(true);
     try {
-      await DB.updateScore(playerId, selectedRound, net, hc, sf);
-      setScores(prev => {
-        const updated = { ...prev };
-        if (!updated[playerId]) updated[playerId] = {};
-        updated[playerId] = { ...updated[playerId], [selectedRound]: { ...updated[playerId][selectedRound], strokes: net, handicap: hc, stableford: sf } };
-        return updated;
-      });
+      if (net <= 0) {
+        // Gross cleared on an existing entry — remove the score (server
+        // deletes the row) so the round no longer counts as played for them.
+        await DB.updateScore(playerId, selectedRound, 0, 0, 0);
+        setScores(prev => ({
+          ...prev,
+          [playerId]: { ...prev[playerId], [selectedRound]: { ...prev[playerId]?.[selectedRound], strokes: 0, handicap: 0, stableford: 0 } },
+        }));
+        showToast(`Cleared scores for ${playerName}`);
+      } else {
+        await DB.updateScore(playerId, selectedRound, net, hc, sf);
+        setScores(prev => {
+          const updated = { ...prev };
+          if (!updated[playerId]) updated[playerId] = {};
+          updated[playerId] = { ...updated[playerId], [selectedRound]: { ...updated[playerId][selectedRound], strokes: net, handicap: hc, stableford: sf } };
+          return updated;
+        });
+        showToast(`Saved scores for ${playerName}!`);
+      }
       setEditScores(prev => { const s = { ...prev }; delete s[playerId]; return s; });
       setEditingPlayers(prev => ({ ...prev, [playerId]: false }));
-      showToast(`Saved scores for ${playerName}!`);
     } catch {
       showToast('Could not save score — check your connection', 'error');
     } finally {
@@ -93,33 +108,42 @@ export default function RoundsView({ rounds, scores, setScores, players, isReadO
 
   const saveAllPlayers = async () => {
     if (selectedRound == null) return;
+    // Collect everything to save once, then write in parallel — a sequential
+    // await-in-loop here means one network round-trip per player on mobile.
+    const toSave = players
+      .filter(pl => pl.status === 'active' && editingPlayers[pl.id])
+      .map(p => {
+        const vals = getPlayerValues(p.id);
+        return { id: p.id, name: p.name, net: Number(vals.net) || 0, hc: Number(vals.hc) || 0, sf: Number(vals.sf) || 0 };
+      })
+      .filter(s => s.net > 0);
+
+    const missingSf = toSave.find(s => s.sf <= 0);
+    if (missingSf) { showToast(`Enter a stableford score for ${missingSf.name}`, 'error'); return; }
+
     setSavingScores(true);
     try {
-      // Collect everything to save once, then write in parallel — a sequential
-      // await-in-loop here means one network round-trip per player on mobile.
-      const toSave = players
-        .filter(pl => pl.status === 'active' && editingPlayers[pl.id])
-        .map(p => {
-          const vals = getPlayerValues(p.id);
-          return { id: p.id, net: Number(vals.net) || 0, hc: Number(vals.hc) || 0, sf: Number(vals.sf) || 0 };
-        })
-        .filter(s => s.net > 0);
-
-      await Promise.all(toSave.map(s => DB.updateScore(s.id, selectedRound, s.net, s.hc, s.sf)));
+      // allSettled so one failed write doesn't hide the ones that succeeded —
+      // successes are applied locally and only the failures need a retry.
+      const results = await Promise.allSettled(toSave.map(s => DB.updateScore(s.id, selectedRound, s.net, s.hc, s.sf)));
+      const saved = toSave.filter((_, i) => results[i].status === 'fulfilled');
+      const failed = toSave.filter((_, i) => results[i].status === 'rejected');
 
       setScores(prev => {
         const updated = { ...prev };
-        for (const s of toSave) {
+        for (const s of saved) {
           if (!updated[s.id]) updated[s.id] = {};
           updated[s.id] = { ...updated[s.id], [selectedRound]: { ...updated[s.id][selectedRound], strokes: s.net, handicap: s.hc, stableford: s.sf } };
         }
         return updated;
       });
-      setEditScores({});
-      setEditingPlayers({});
-      showToast(`Saved scores for ${toSave.length} player${toSave.length !== 1 ? 's' : ''}!`);
-    } catch {
-      showToast('Could not save all scores — check your connection and retry', 'error');
+      setEditScores(prev => { const next = { ...prev }; for (const s of saved) delete next[s.id]; return next; });
+      setEditingPlayers(prev => { const next = { ...prev }; for (const s of saved) next[s.id] = false; return next; });
+      if (failed.length > 0) {
+        showToast(`Saved ${saved.length}, but ${failed.length} failed (${failed.map(s => s.name).join(', ')}) — retry`, 'error');
+      } else {
+        showToast(`Saved scores for ${saved.length} player${saved.length !== 1 ? 's' : ''}!`);
+      }
     } finally {
       setSavingScores(false);
     }
@@ -127,6 +151,20 @@ export default function RoundsView({ rounds, scores, setScores, players, isReadO
 
   const isAnyPlayerEditing = Object.values(editingPlayers).some(v => v);
   const currentRound = rounds.find(r => r.id === selectedRound);
+
+  // Winning order for the selected round: lowest saved net first (ties: higher
+  // stableford, then name), unscored players at the bottom. Sorted on SAVED
+  // scores only so rows don't jump around while values are being typed.
+  const sortedPlayers = useMemo(() => {
+    const active = players.filter(p => p.status === 'active');
+    if (selectedRound == null) return active;
+    return [...active].sort((a, b) => {
+      const sa = scores[a.id]?.[selectedRound], sb = scores[b.id]?.[selectedRound];
+      const na = sa?.strokes || Infinity;
+      const nb = sb?.strokes || Infinity;
+      return na - nb || ((sb?.stableford || 0) - (sa?.stableford || 0)) || a.name.localeCompare(b.name);
+    });
+  }, [players, scores, selectedRound]);
   // Players get a read-only Rounds view; management UI is admin + active season only.
   const canManage = isAdmin && !isReadOnlySeason;
 
@@ -230,15 +268,30 @@ export default function RoundsView({ rounds, scores, setScores, players, isReadO
             </div>
 
             <div className="divide-y divide-slate-50">
-              {players.filter(p => p.status === 'active').map(p => {
+              {sortedPlayers.map((p, idx) => {
                 const isEditing = editingPlayers[p.id];
                 const isEdited = editScores[p.id] !== undefined;
                 const vals = getPlayerValues(p.id);
+                // Scored players are sorted to the top, so idx is the position.
+                const hasSaved = selectedRound != null && (scores[p.id]?.[selectedRound]?.strokes ?? 0) > 0;
 
                 return (
                   <div key={p.id} className={`p-3 ${isEdited ? 'bg-emerald-50/50' : ''}`}>
                     <div className="flex items-center justify-between mb-2">
-                      <span className="font-medium text-slate-800 text-sm">{p.name}</span>
+                      <span className="font-medium text-slate-800 text-sm flex items-center gap-2 min-w-0">
+                        {hasSaved && (
+                          <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${idx === 0 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
+                            {idx + 1}
+                          </span>
+                        )}
+                        <span className="truncate">{p.name}</span>
+                        {hasSaved && idx === 0 && (
+                          <span className="w-5 h-5 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                            <Trophy size={12} className="text-amber-500" />
+                            <span className="sr-only">Round winner</span>
+                          </span>
+                        )}
+                      </span>
                       {canManage && !currentRound.closed && (
                         !isEditing ? (
                           <button onClick={() => setEditingPlayers(prev => ({ ...prev, [p.id]: true }))} className="text-xs text-emerald-600 font-semibold min-h-[44px] px-3">Edit</button>
