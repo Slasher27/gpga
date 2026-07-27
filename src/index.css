@@ -167,6 +167,10 @@ input[type="number"]::-webkit-outer-spin-button {
 input[type="number"] {
   -moz-appearance: textfield;
   appearance: textfield;
+  /* Number inputs have an intrinsic min width of ~150px; in multi-column
+     grids (score entry, prize money) that forces the page wider than a phone
+     viewport, which zooms the whole layout out and shrinks the fixed navs. */
+  min-width: 0;
 }
 
 

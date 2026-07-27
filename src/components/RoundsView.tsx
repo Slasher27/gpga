@@ -190,7 +190,15 @@ export default function RoundsView({ rounds, scores, setScores, players, isReadO
           </div>
         </Card>
       ) : (
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+        /* The card row is absolutely positioned inside a fixed-height scroll
+           wrapper: Blink propagates in-flow content's preferred width through
+           scroll containers into the mobile layout-viewport calculation, so a
+           wide in-flow row makes phones zoom the whole page out (shrinking the
+           fixed navs). Absolute positioning is the only reliable opt-out —
+           overflow clipping, contain, and grid minmax all fail. h matches the
+           card height (p-3 + three text rows). */
+        <div className="relative h-[84px] overflow-x-auto scrollbar-hide">
+          <div className="absolute inset-y-0 left-0 flex gap-2 w-max">
           {rounds.map(r => {
             const isActive = selectedRound === r.id;
             const hasScores = players.some(p => (scores[p.id]?.[r.id]?.strokes ?? 0) > 0);
@@ -211,6 +219,7 @@ export default function RoundsView({ rounds, scores, setScores, players, isReadO
               </button>
             );
           })}
+          </div>
         </div>
       )}
 
@@ -241,7 +250,8 @@ export default function RoundsView({ rounds, scores, setScores, players, isReadO
                     </button>
                   </>
                 )}
-                {currentRound.closed && (
+                {/* !! — closed is 0/1; a bare 0 would render as a literal "0" */}
+                {!!currentRound.closed && (
                   <span className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-500 flex items-center gap-1.5">
                     <Lock size={13} /> Closed
                   </span>
